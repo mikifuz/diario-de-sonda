@@ -1,0 +1,151 @@
+export type Skin = "sonda" | "caderno" | "blueprint" | "terminal" | "moderno";
+export type Activity = "aula" | "leitura" | "exercicios" | "revisao" | "simulado" | "resumo" | "teorico" | "pratico";
+export type Result = "certo" | "parcial" | "errado" | "nao";
+export type Autonomy = "sozinho" | "anotacoes" | "ajuda" | "resolucao";
+export type Comprehension = "total" | "parcial" | "duvidas" | "nao";
+export type Priority = "baixa" | "media" | "alta";
+export type Status = "pendente" | "concluido" | "cancelado";
+export type AssessmentKind = "prova" | "trabalho" | "apresentacao" | "entrega";
+export type EventType = AssessmentKind | "aula" | "atividade" | "simulado" | "estudo" | "revisao" | "pessoal" | "indisponivel";
+export type Scenario = "c" | "e" | "o";
+
+export interface Timer {
+  subject_id: string;
+  topic_id: string | null;
+  activity: Activity;
+  /** ms epoch do último "retomar" */
+  since: number;
+  /** ms epoch do início da sessão */
+  started: number;
+  /** ms acumulados antes do último "retomar" */
+  accum: number;
+  running: boolean;
+}
+
+export interface Profile {
+  id: string;
+  name: string;
+  course: string;
+  university: string;
+  current_semester: string;
+  default_min_avg: number;
+  weekly_goal_h: number | null;
+  skin: Skin;
+  timer: Timer | null;
+}
+
+export interface Traits {
+  discursiva?: boolean;
+  detalhada?: boolean;
+  teoria?: boolean;
+  calculos?: boolean;
+  unidades?: boolean;
+  algarismos?: boolean;
+  metodos?: string;
+  nivel?: string;
+}
+
+export interface Subject {
+  id: string;
+  name: string;
+  code: string;
+  professor: string;
+  semester: string;
+  credits: number | null;
+  hours: number | null;
+  color: string;
+  min_avg: number;
+  schedule: string;
+  notes: string;
+  traits: Traits;
+  exam_enabled: boolean;
+  exam_w_avg: number;
+  exam_w_exam: number;
+  exam_min_final: number;
+  exam_min_take: number | null;
+  archived: boolean;
+}
+
+export interface Topic {
+  id: string;
+  subject_id: string;
+  parent_id: string | null;
+  name: string;
+  position: number;
+}
+
+export interface Session {
+  id: string;
+  subject_id: string;
+  topic_id: string | null;
+  activity: Activity;
+  started_at: string;
+  duration_min: number;
+  questions: number | null;
+  correct: number | null;
+  notes: string;
+  confidence: number | null;
+  result: Result | null;
+  autonomy: Autonomy | null;
+  difficulty: number | null;
+  comprehension: Comprehension | null;
+}
+
+export interface Assessment {
+  id: string;
+  subject_id: string;
+  name: string;
+  kind: AssessmentKind;
+  date: string | null;
+  time: string | null;
+  weight: number;
+  grade: number | null;
+  predicted: number | null;
+  sim_c: number | null;
+  sim_e: number | null;
+  sim_o: number | null;
+  priority: Priority;
+  status: Status;
+  description: string;
+}
+
+export interface CalEvent {
+  id: string;
+  subject_id: string | null;
+  title: string;
+  type: EventType;
+  date: string;
+  time: string | null;
+  priority: Priority;
+  status: Status;
+  description: string;
+}
+
+export interface RoomMember {
+  user_id: string;
+  nick: string;
+  share_subject: boolean;
+  studying: boolean;
+  paused: boolean;
+  since: string | null;
+  accum_ms: number;
+  subject: string;
+  updated_at: string;
+}
+
+export interface StudyGroup {
+  code: string;
+  name: string;
+  created_by: string | null;
+}
+
+export interface GroupMember {
+  code: string;
+  user_id: string;
+}
+
+export interface DailyTotal {
+  user_id: string;
+  day: string;
+  minutes: number;
+}
