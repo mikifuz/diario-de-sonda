@@ -9,8 +9,8 @@ jobs:
     name: Tipos, testes e build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
@@ -37,7 +37,7 @@ jobs:
       PGUSER: postgres
       PGPASSWORD: postgres
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: psql -v ON_ERROR_STOP=1 -f supabase/tests/00_stub_auth.sql
       - run: for f in supabase/migrations/*.sql; do psql -v ON_ERROR_STOP=1 -f "$f"; done
       - run: psql -v ON_ERROR_STOP=1 -f supabase/tests/10_rls.sql
