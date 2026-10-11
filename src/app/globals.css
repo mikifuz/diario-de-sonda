@@ -312,3 +312,30 @@ ul.plain{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:co
 .fleg.st-liberada i{border-left-color:var(--warn);border-style:dashed}
 .fleg.st-reprovada i{border-left-color:var(--bad)}
 .prq{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:var(--radius);padding:6px 8px;display:flex;flex-direction:column;gap:2px;margin:6px 0 4px}
+
+/* ============ Folha do dia (imprimir / salvar em PDF) ============ */
+#print-root{display:none}
+@media print{
+  @page{size:A4;margin:0}
+  html,body.printing{background:#fff !important;color-scheme:light !important}
+  body.printing #print-root{padding:12mm 14mm}
+  body.printing > *:not(#print-root){display:none !important}
+  body.printing #print-root{display:block}
+}
+.ps{color:#111;background:#fff;font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:10.5pt;line-height:1.35;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.ps h1{font-size:17pt;margin:2px 0 0;font-weight:700;letter-spacing:0;text-transform:none;color:#111}
+.ps h2{font-size:10pt;margin:12px 0 4px;text-transform:uppercase;letter-spacing:.06em;color:#333;border-bottom:1px solid #999;padding-bottom:2px;font-family:inherit}
+.ps-h{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;border-bottom:2px solid #111;padding-bottom:6px}
+.ps-k{font-size:8.5pt;color:#555;text-transform:uppercase;letter-spacing:.05em}
+.ps-m{color:#555;font-weight:400}
+.ps-t{width:100%;border-collapse:collapse}
+.ps-t td{padding:3px 4px;border-bottom:1px solid #ddd;vertical-align:top}
+.ps-time{width:92px;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:9pt;color:#333;white-space:nowrap}
+.ps-l{list-style:none;margin:0;padding:0}
+.ps-l li{padding:3px 0;border-bottom:1px solid #eee;break-inside:avoid}
+.ps-cols{columns:2;column-gap:18px}
+.ps .box,.ps .nobox{display:inline-block;width:11px;height:11px;margin-right:7px;vertical-align:-1px}
+.ps .box{border:1.3px solid #111;border-radius:2px}
+.ps-notes{height:90px;background:repeating-linear-gradient(#fff 0 21px,#ccc 21px 22px)}
+.ps-f{margin-top:10px;font-size:8.5pt;color:#555;border-top:1px solid #999;padding-top:4px}
+.ps tr,.ps li{break-inside:avoid}
