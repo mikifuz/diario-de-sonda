@@ -29,6 +29,7 @@ Aplicativo de acompanhamento de estudos de um aluno de Engenharia de Petróleo (
 - Notas ficam dentro de cada disciplina (`GradesPanel`, `#notas`); a lista de Disciplinas é a visão geral (uma linha por disciplina).
 - Página `/hoje` (abas Plano do dia, Revisões, Banco de erros, Rotina; `?aba=` abre uma aba).
 - Tela logada em `src/app/(app)/*` (client components). Login em `/entrar`.
+- **Modo demonstração**: `/demo` grava `sessionStorage['ds-demo']` e abre o painel; o layout `(app)` monta `buildDemo()` (`src/lib/demo.ts`, determinístico pela data, testado em `demo.test.ts`) e usa `DataProvider demo=…` + `DemoRoomProvider` — nenhuma chamada ao Supabase, tudo na memória da aba, faixa "Modo demonstração" no `Shell`. `/entrar` apaga a marca. Qualquer código novo que chame `sb()` direto numa tela logada precisa checar `st.demo`.
 - Estilo: `src/app/globals.css` com tokens; temas pelo atributo `data-skin` no `<html>` (sonda, caderno, blueprint, terminal; "moderno" = sem atributo, segue claro/escuro).
 - Banco: `supabase/migrations/`. **Nunca editar uma migration já aplicada**; criar uma nova com timestamp maior e avisar o dono para rodá-la no SQL Editor do Supabase.
 
@@ -50,7 +51,7 @@ Aplicativo de acompanhamento de estudos de um aluno de Engenharia de Petróleo (
 - O plano do dia considera a rotina pessoal (blocos semanais de aula, estudo, trabalho etc.), compromissos do calendário e a preferência de estudo (adiantar antes da aula / revisar depois / os dois; padrão no perfil, opcional por disciplina). Só blocos de **estudo** recebem tarefas. O que não cabe aparece, não é escondido. Sem IA nesta parte: regras fixas e explicadas.
 
 ## Próximas etapas (ordem combinada)
-1. **Análise de desempenho** — feito: banco de erros, revisão espaçada, plano do dia, rotina, SUB por prova, planejamento reverso, notificações com relatório semanal, amigos. Falta: modo demonstração (dados só em memória) e uma rodada de testes reais com o dono.
+1. **Análise de desempenho** — feito: banco de erros, revisão espaçada, plano do dia, rotina, SUB por prova, planejamento reverso, notificações com relatório semanal, amigos, modo demonstração. Falta: uma rodada de testes reais com o dono.
 1b. **Pedidos do dono**: feito — Notas dentro de Disciplinas (`components/grades.tsx`; `/notas` redireciona), painel com alertas e lista de tarefas (`tasks`, `components/dashboard.tsx`), índice de domínio.
 2. **IA** (chave só no servidor, via route handlers): simulados com gabarito/resolução/critérios em PDF, correção assistida de resoluções por foto (sinalizar trechos ilegíveis), assistente que responde com base nos dados e distingue fato de estimativa.
 3. **Engenharia de Petróleo**: fórmulas com variáveis, unidades e hipóteses (KaTeX), conversor SI ↔ unidades de campo (bbl, scf, psi, ft, mD, cP, °API), verificação dimensional, histórico da graduação (matriz curricular informada pelo aluno, não presumida).

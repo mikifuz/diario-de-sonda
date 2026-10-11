@@ -241,3 +241,33 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     [ready, members, groups, memberships, totals, me, myGroups, join, updateMe, leave, createGroup, joinGroup, leaveGroup, friends, sendFriend, acceptFriend, removeFriend, nudge, setAcceptNudges]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
+
+/** Sala da demonstração: colegas e amiga de exemplo, nada vai para o banco */
+export function DemoRoomProvider({ demo, children }: { demo: import("./demo").DemoRoom; children: ReactNode }) {
+  const st = useStore();
+  const { uid, toast } = st;
+  const timer = st.profile?.timer || null;
+  const members = useMemo(() => demo.members.map((m) => {
+    if (m.user_id !== uid) return m;
+    const t = timer && timer.social !== "sozinho" ? timer : null;
+    return { ...m, studying: !!(t && t.running), paused: !!(t && !t.running), since: t && t.running ? new Date(t.since).toISOString() : null,
+      accum_ms: t ? Math.round(t.running ? t.accum || 0 : timerMs(t)) : 0, subject: t && t.social === "materia" ? st.subjects.find((s) => s.id === t.subject_id)?.name || "" : "" };
+  }), [demo.members, uid, timer, st.subjects]);
+  const totals = useMemo(() => {
+    const out: Record<string, Record<string, number>> = {};
+    for (const r of demo.totals) (out[r.user_id] ||= {})[r.day] = r.minutes;
+    return out;
+  }, [demo.totals]);
+  const value = useMemo<Room>(() => {
+    const only = async () => { toast("Na demonstração, a sala, os grupos e os amigos são de exemplo."); return false; };
+    return {
+      ready: true, members, groups: demo.groups, memberships: demo.memberships, totals, me: members.find((m) => m.user_id === uid) || null, myGroups: demo.groups,
+      join: only, updateMe: async () => { await only(); }, leave: async () => { await only(); }, createGroup: async () => { await only(); return null; },
+      joinGroup: only, leaveGroup: async () => { await only(); }, friends: demo.friends, sendFriend: only,
+      acceptFriend: async () => { await only(); }, removeFriend: async () => { await only(); },
+      nudge: async (_to, msg) => { toast(`Exemplo: na conta de verdade, sua amiga receberia "${NUDGES[msg]}".`); return true; },
+      setAcceptNudges: async () => { await only(); },
+    };
+  }, [members, demo, totals, uid, toast]);
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
