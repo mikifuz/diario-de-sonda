@@ -116,7 +116,7 @@ export function nextReview(o: { step: number; steps: number[]; result: Result; a
 }
 
 /* ============ Plano do dia ============ */
-export type TaskKind = "revisao" | "adiantar" | "consolidar";
+export type TaskKind = "revisao" | "adiantar" | "consolidar" | "preparar";
 export interface Task {
   key: string;
   kind: TaskKind;
@@ -157,6 +157,8 @@ export interface PlanInput {
   /** histórico de revisões e pesos do índice de domínio (opcionais) */
   logs?: ReviewLog[];
   cfg?: MasteryCfg;
+  /** tarefas vindas do planejamento reverso (reverse.ts) */
+  extra?: Task[];
 }
 
 const CLASS_MIN = 30;
@@ -246,6 +248,7 @@ export function dayTasks(p: PlanInput): Task[] {
       rank: [1, 1, 0, 0, 1, 0],
     });
   }
+  tasks.push(...(p.extra || []));
   return tasks.sort((a, b) => cmpRank(a.rank, b.rank));
 }
 

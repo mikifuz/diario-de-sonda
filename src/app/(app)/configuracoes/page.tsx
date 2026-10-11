@@ -155,7 +155,7 @@ export default function Configuracoes() {
       <section className="panel">
         <div className="panel-h"><h2>Próximas etapas</h2><span className="lbl">ainda não disponíveis</span></div>
         <div className="grid g2 small">
-          <div><b>Análise de desempenho</b><p className="muted" style={{ margin: ".3em 0 0" }}>Planejamento reverso completo para provas, relatórios e modo demonstração. O banco de erros, a revisão espaçada, o plano do dia, o índice de domínio e os alertas já estão disponíveis.</p></div>
+          <div><b>Análise de desempenho</b><p className="muted" style={{ margin: ".3em 0 0" }}>Relatórios e modo demonstração. O banco de erros, a revisão espaçada, o plano do dia, o planejamento reverso das provas, o índice de domínio e os alertas já estão disponíveis.</p></div>
           <div><b>Inteligência artificial</b><p className="muted" style={{ margin: ".3em 0 0" }}>Gerador de simulados com gabarito e resolução, correção assistida de resoluções enviadas por foto e assistente que consulta seus dados.</p></div>
           <div><b>Engenharia de Petróleo</b><p className="muted" style={{ margin: ".3em 0 0" }}>Biblioteca de fórmulas com unidades, conversor SI ↔ unidades de campo (bbl, psi, ft, mD, cP, °API), verificação dimensional e histórico da graduação.</p></div>
           <div><b>Biblioteca de materiais</b><p className="muted" style={{ margin: ".3em 0 0" }}>Planos de ensino, listas e provas antigas por disciplina, que depois servirão de base para os simulados.</p></div>

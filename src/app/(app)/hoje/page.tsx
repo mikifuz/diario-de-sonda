@@ -4,17 +4,18 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { activeSubjects, topicName, useStore } from "@/lib/store";
 import { addDays, daysBetween, fmtMin, gradeCalc, keyDate, nf, todayKey } from "@/lib/calc";
-import { cleanSteps, dm, examLoads, firstDue, fromMin, itemState, parseSteps, planDay, weekCapacity, type PlanInput, type Task } from "@/lib/plan";
+import { cleanSteps, dm, firstDue, fromMin, itemState, parseSteps, planDay, weekCapacity, type PlanInput, type Task } from "@/lib/plan";
 import { BLOCK, MISTAKE, PREF, WD_S, WEEKDAYS } from "@/lib/constants";
-import { masteryCfg } from "@/lib/mastery";
+import { BAND, masteryCfg } from "@/lib/mastery";
+import { FINAL_MIN, RESERVE, TARGET, reversePlan, todayTasks } from "@/lib/reverse";
 import type { Activity, MistakeCategory, ReviewItem, StudyPref } from "@/lib/types";
 import { Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
 import { BlockModal, MistakeModal, ReviewItemModal, ReviewModal } from "@/components/planning";
 import { ImportSigaModal } from "@/components/importSiga";
 import { StartModal, type StartArgs } from "@/components/studyStart";
 
-type Tab = "plano" | "revisoes" | "erros" | "rotina";
-const TABS: [Tab, string][] = [["plano", "Plano do dia"], ["revisoes", "Revisões"], ["erros", "Banco de erros"], ["rotina", "Rotina"]];
+type Tab = "plano" | "provas" | "revisoes" | "erros" | "rotina";
+const TABS: [Tab, string][] = [["plano", "Plano do dia"], ["provas", "Provas"], ["revisoes", "Revisões"], ["erros", "Banco de erros"], ["rotina", "Rotina"]];
 type ModalState = null | { k: "review"; id: string } | { k: "item"; id: string | null } | { k: "mistake"; id: string | null } | { k: "block"; id: string | null; weekday?: number } | { k: "siga" } | { k: "start"; args: StartArgs };
 type Open = (m: ModalState) => void;
 
@@ -31,10 +32,11 @@ function Hoje() {
   return (
     <>
       <Tabs value={tab} onChange={setTab} label="Seções" options={TABS} />
-      {tab === "plano" && <PlanTab open={setModal} goRoutine={() => setTab("rotina")} />}
+      {tab === "plano" && <PlanTab open={setModal} goRoutine={() => setTab("rotina")} goExams={() => setTab("provas")} />}
       {tab === "revisoes" && <ReviewsTab open={setModal} />}
       {tab === "erros" && <MistakesTab open={setModal} />}
       {tab === "rotina" && <RoutineTab open={setModal} />}
+      {tab === "provas" && <ExamsTab open={setModal} />}
       {modal?.k === "review" && <ReviewModal id={modal.id} onClose={close} />}
       {modal?.k === "item" && <ReviewItemModal id={modal.id} onClose={close} />}
       {modal?.k === "mistake" && <MistakeModal id={modal.id} onClose={close} />}
@@ -45,8 +47,8 @@ function Hoje() {
   );
 }
 
-const ACT_OF: Record<Task["kind"], Activity> = { revisao: "revisao", consolidar: "revisao", adiantar: "leitura" };
-const KIND_CHIP: Record<Task["kind"], [string, string]> = { revisao: ["Revisão", "acc"], consolidar: ["Consolidar aula", "ok"], adiantar: ["Adiantar", "warn"] };
+const ACT_OF: Record<Task["kind"], Activity> = { revisao: "revisao", consolidar: "revisao", adiantar: "leitura", preparar: "exercicios" };
+const KIND_CHIP: Record<Task["kind"], [string, string]> = { revisao: ["Revisão", "acc"], consolidar: ["Consolidar aula", "ok"], adiantar: ["Adiantar", "warn"], preparar: ["Preparar prova", "bad"] };
 
 function TaskRow({ t, at, open }: { t: Task; at?: string; open: Open }) {
   const st = useStore();
@@ -70,17 +72,28 @@ function TaskRow({ t, at, open }: { t: Task; at?: string; open: Open }) {
 }
 
 /* ============ Plano do dia ============ */
-function PlanTab({ open, goRoutine }: { open: Open; goRoutine: () => void }) {
+/** Planejamento reverso com os dados do diário */
+function useReverse() {
   const st = useStore();
   const now = new Date(useNow(60_000));
   const today = todayKey();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const plans = reversePlan({
+    today, nowMin, blocks: st.blocks, events: st.events, subjects: st.subjects, topics: st.topics, sessions: st.sessions,
+    assessments: st.assessments, items: st.reviews, logs: st.reviewLogs, mistakes: st.mistakes, cfg: masteryCfg(st.profile?.mastery_cfg),
+  });
+  return { plans, today, nowMin };
+}
+
+function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => void; goExams: () => void }) {
+  const st = useStore();
+  const { plans, today, nowMin } = useReverse();
   const input: PlanInput = {
-    today, nowMin: now.getHours() * 60 + now.getMinutes(), pref: st.profile?.study_pref || "depois", blocks: st.blocks, events: st.events,
+    today, nowMin, pref: st.profile?.study_pref || "depois", blocks: st.blocks, events: st.events,
     subjects: st.subjects, topics: st.topics, sessions: st.sessions, assessments: st.assessments, items: st.reviews, mistakes: st.mistakes,
-    logs: st.reviewLogs, cfg: masteryCfg(st.profile?.mastery_cfg),
+    logs: st.reviewLogs, cfg: masteryCfg(st.profile?.mastery_cfg), extra: todayTasks(plans, today),
   };
   const plan = planDay(input);
-  const loads = examLoads(input);
   const subOf = (id: string) => st.subjects.find((s) => s.id === id);
   const openItems = st.reviews.filter((i) => subOf(i.subject_id) && !subOf(i.subject_id)!.archived && itemState(i, st.assessments, today).open);
   const due = openItems.filter((i) => i.due <= today);
@@ -126,8 +139,8 @@ function PlanTab({ open, goRoutine }: { open: Open; goRoutine: () => void }) {
         </div>
       )}
       {plan.notes.map((n) => <div key={n} className="callout">{n}</div>)}
-      {loads.filter((l) => l.tight).map((l) => (
-        <div key={l.a.id} className="callout"><b>{l.a.name} de {subOf(l.a.subject_id)?.name} {l.days === 0 ? "é hoje" : l.days === 1 ? "é amanhã" : `em ${l.days} dias`}: não cabe tudo.</b> {l.why} Aumente os blocos de estudo, reduza o tempo estimado das revisões ou encerre as menos importantes.</div>
+      {plans.filter((pl) => pl.missing > 0 && pl.topics.length).map((pl) => (
+        <div key={pl.exam.id} className="callout"><b>{pl.exam.name} de {pl.subject.name} em {pl.days} dia(s): não cabe tudo.</b> Faltam {pl.missing} min de estudo antes da prova. <button className="btn sm ghost" onClick={goExams}>Ver o plano da prova</button></div>
       ))}
       {subOffers.map((o) => (
         <div key={o.s.id} className="callout info stack" style={{ gap: 8 }}>
@@ -176,12 +189,15 @@ function PlanTab({ open, goRoutine }: { open: Open; goRoutine: () => void }) {
           ))}</div>
         </div>
         <div className="panel">
-          <div className="panel-h"><h2>Carga até as provas</h2><span className="lbl">próximas 3 semanas</span></div>
-          {loads.length ? <div className="list">{loads.map((l) => (
-            <div key={l.a.id} className="li"><span className={"cdays " + (l.tight ? "bad" : l.days <= 7 ? "warn" : "")}>{l.days === 0 ? "hoje" : `${l.days} d`}</span>
-              <div className="grow"><div className="t">{l.a.name} · {subOf(l.a.subject_id)?.name}</div><div className="m">{l.why}</div></div></div>
-          ))}</div> : <p className="small muted" style={{ margin: 0 }}>Nenhuma prova com revisões abertas nas próximas 3 semanas.</p>}
-          <p className="small muted" style={{ margin: "8px 0 0" }}>Estimativa simples: cada revisão aberta conta uma vez, e o tempo de estudo da rotina é dividido entre todas as disciplinas.</p>
+          <div className="panel-h"><h2>Provas chegando</h2><button className="btn sm ghost" onClick={goExams}>Plano completo</button></div>
+          {plans.length ? <div className="list">{plans.map((pl) => {
+            const done = pl.topics.reduce((a, t) => a + Math.min(t.done, t.target), 0), goal = pl.topics.reduce((a, t) => a + t.target, 0);
+            return (
+              <div key={pl.exam.id} className="li"><span className={"cdays " + (pl.missing ? "bad" : pl.days <= 7 ? "warn" : "")}>{pl.days} d</span>
+                <div className="grow"><div className="t">{pl.exam.name} · {pl.subject.name}</div>
+                  <div className="m">{pl.topics.length ? `${pl.topics.length} conteúdo(s) · estudado ${done} de ${goal} min da meta${pl.missing ? ` · faltam ${pl.missing} min que não cabem` : ""}` : "sem conteúdos ligados"}</div></div></div>
+            );
+          })}</div> : <p className="small muted" style={{ margin: 0 }}>Nenhuma prova nos próximos 30 dias.</p>}
         </div>
       </section>
 
@@ -368,6 +384,66 @@ function RoutineTab({ open }: { open: Open }) {
         </div>
         <p className="small muted" style={{ margin: "10px 0 0" }}>Nada aqui é compartilhado: a sala de estudos continua vendo só apelido, presença e minutos por dia. <Link href="/sala">Ir para a sala</Link>.</p>
       </section>
+    </>
+  );
+}
+
+/* ============ Provas (planejamento reverso) ============ */
+function ExamsTab({ open }: { open: Open }) {
+  const st = useStore();
+  const { plans, today } = useReverse();
+  if (!plans.length) return <Empty title="Nenhuma prova nos próximos 30 dias">Cadastre as provas com data (ou importe o cronograma na disciplina) para o diário montar o plano até cada uma.</Empty>;
+  return (
+    <>
+      {plans.map((pl) => {
+        const byDay = new Map<string, typeof pl.chunks>();
+        for (const c of pl.chunks) byDay.set(c.day, [...(byDay.get(c.day) || []), c]);
+        return (
+          <section key={pl.exam.id} className="panel">
+            <div className="panel-h">
+              <h2><Dot c={pl.subject.color} /> {pl.exam.name} · {pl.subject.name}</h2>
+              <span className={"chip " + (pl.missing ? "bad" : pl.days <= 7 ? "warn" : "")}>{dm(pl.exam.date!)} · em {pl.days} dia(s)</span>
+            </div>
+            {pl.notes.map((n) => <div key={n} className={"callout small" + (n.startsWith("Conteúdos que ainda") ? " info" : "")} style={{ marginBottom: 8 }}>{n}</div>)}
+            {pl.topics.length > 0 && (
+              <div className="tbl-wrap"><table>
+                <thead><tr><th>Conteúdo</th><th>Domínio</th><th className="n">Meta</th><th className="n">Já estudou</th><th className="n">Falta</th></tr></thead>
+                <tbody>{pl.topics.map((t) => (
+                  <tr key={t.topic.id}>
+                    <td>{t.topic.name}{t.available && <span className="small muted"> · aula em {dm(t.available)}</span>}</td>
+                    <td>{t.band ? <span className={"chip " + BAND[t.band][1]}>{t.score} · {BAND[t.band][0]}</span> : <span className="chip">sem dados</span>}</td>
+                    <td className="n">{t.target}</td><td className="n">{t.done}</td><td className="n" style={{ color: t.need ? undefined : "var(--ok)" }}>{t.need || "✓"}</td>
+                  </tr>
+                ))}</tbody>
+              </table></div>
+            )}
+            {pl.chunks.length > 0 && (
+              <div className="list" style={{ marginTop: 10 }}>{[...byDay.entries()].map(([d, cs]) => (
+                <div key={d} className="li" style={{ alignItems: "flex-start" }}>
+                  <span className={"cdays " + (d === today ? "warn" : "")}>{d === today ? "hoje" : `${WD_S[keyDate(d).getDay()]} ${dm(d)}`}</span>
+                  <div className="grow small">{cs.map((c) => (
+                    <div key={c.key} className="row" style={{ gap: 6, justifyContent: "space-between" }} title={c.why}>
+                      <span>{c.final ? <b>{c.title}</b> : c.title} · {c.minutes} min</span>
+                      {d === today && <button className="btn sm" disabled={!!st.profile?.timer} onClick={() => open({ k: "start", args: { subject_id: c.subjectId, topic_id: c.topicId, activity: c.final ? "revisao" : "exercicios" } })}><Icon d={I.play} s={13} />Começar</button>}
+                    </div>
+                  ))}</div>
+                </div>
+              ))}</div>
+            )}
+          </section>
+        );
+      })}
+      <details className="small">
+        <summary>Como o planejamento reverso é montado</summary>
+        <ol className="muted" style={{ margin: ".5em 0 0", paddingLeft: "1.2em" }}>
+          <li>Entram as provas dos próximos 30 dias e os conteúdos ligados a cada uma (ou, para a próxima prova, os conteúdos sem prova marcada).</li>
+          <li>Meta de estudo por conteúdo, pelo índice de domínio: sem dados ou frágil {TARGET.sem} min; em construção {TARGET.construcao} min; dominado {TARGET.dominado} min. Desconta o que você já estudou do conteúdo nas últimas semanas.</li>
+          <li>O tempo vem dos seus blocos de estudo, deixando {Math.round(RESERVE * 100)}% de cada dia para revisões espaçadas e aulas. A prova mais próxima usa o tempo primeiro.</li>
+          <li>Pedaços de até 45 min, no máximo um por conteúdo por dia (estudo espaçado rende mais que maratona). Conteúdo ainda não dado só entra a partir da aula.</li>
+          <li>Na véspera: {FINAL_MIN} min de revisão geral (resumo, erros registrados, prova antiga), sem conteúdo novo.</li>
+          <li>Nada fica gravado: conforme você registra sessões, o que falta diminui e o plano se refaz. O que não couber aparece como aviso.</li>
+        </ol>
+      </details>
     </>
   );
 }
