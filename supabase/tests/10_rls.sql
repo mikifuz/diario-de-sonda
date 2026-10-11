@@ -72,16 +72,102 @@ do $$ begin
   end;
 end $$;
 
--- Ana: apagar conteúdo mantém a sessão como "geral"
+-- ============ Rotina, banco de erros e revisões ============
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.assessments (id, subject_id, name, weight, date) values ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Prova 2', 3, current_date + 10);
+insert into public.assessments (subject_id, name, kind, weight) values ('10000000-0000-0000-0000-000000000001', 'SUB', 'sub', 1);
+update public.topics set taught_on = current_date, assessment_id = '30000000-0000-0000-0000-000000000001' where id = '20000000-0000-0000-0000-000000000001';
+update public.subjects set recovery = 'sub' where id = '10000000-0000-0000-0000-000000000001';
+insert into public.routine_blocks (weekday, start_time, end_time, kind, subject_id) values (1, '08:20', '10:00', 'aula', '10000000-0000-0000-0000-000000000001');
+insert into public.routine_blocks (weekday, start_time, end_time, kind) values (1, '14:00', '16:00', 'estudo');
+insert into public.mistakes (id, subject_id, topic_id, category, description) values ('40000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'sinal', 'Troquei o sinal do jacobiano');
+insert into public.review_items (id, subject_id, topic_id, mistake_id, assessment_id, title, due) values ('50000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'Sinal do jacobiano', current_date + 1);
+insert into public.review_logs (item_id, result, autonomy, prev_step, new_step, prev_due, new_due) values ('50000000-0000-0000-0000-000000000001', 'certo', 'sozinho', 0, 1, current_date, current_date + 3);
+
+do $$ begin
+  begin
+    insert into public.routine_blocks (weekday, start_time, end_time, kind) values (2, '10:00', '09:00', 'estudo');
+    raise exception 'FALHOU: bloco terminando antes de começar';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into public.routine_blocks (weekday, start_time, end_time, kind) values (2, '08:00', '09:00', 'aula');
+    raise exception 'FALHOU: aula sem disciplina';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into public.mistakes (subject_id, category, description) values ('10000000-0000-0000-0000-000000000001', 'chute', 'x');
+    raise exception 'FALHOU: categoria de erro inválida';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.profiles set review_steps = '{1,0,7}';
+    raise exception 'FALHOU: degrau de revisão com zero dias';
+  exception when check_violation then null;
+  end;
+end $$;
+
+-- Bruno não vê nem altera a rotina, os erros e as revisões de Ana
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+do $$ begin
+  if (select count(*) from public.routine_blocks) <> 0 then raise exception 'Bruno vê a rotina de Ana'; end if;
+  if (select count(*) from public.mistakes) <> 0 then raise exception 'Bruno vê os erros de Ana'; end if;
+  if (select count(*) from public.review_items) <> 0 then raise exception 'Bruno vê as revisões de Ana'; end if;
+  if (select count(*) from public.review_logs) <> 0 then raise exception 'Bruno vê o histórico de revisões de Ana'; end if;
+end $$;
+update public.mistakes set description = 'hack';
+delete from public.review_items;
+insert into public.subjects (id, name) values ('10000000-0000-0000-0000-00000000000b', 'Física');
+do $$ begin
+  begin
+    insert into public.mistakes (subject_id, category, description) values ('10000000-0000-0000-0000-000000000001', 'sinal', 'invasão');
+    raise exception 'FALHOU: erro ligado à disciplina de outra pessoa';
+  exception when foreign_key_violation then null;
+  end;
+  begin
+    insert into public.review_items (subject_id, mistake_id, title, due) values ('10000000-0000-0000-0000-00000000000b', '40000000-0000-0000-0000-000000000001', 'x', current_date);
+    raise exception 'FALHOU: revisão ligada ao erro de outra pessoa';
+  exception when foreign_key_violation then null;
+  end;
+  begin
+    insert into public.review_logs (item_id, result, prev_step, new_step, prev_due) values ('50000000-0000-0000-0000-000000000001', 'certo', 0, 1, current_date);
+    raise exception 'FALHOU: histórico gravado na revisão de outra pessoa';
+  exception when foreign_key_violation then null;
+  end;
+  begin
+    insert into public.topics (subject_id, name, assessment_id) values ('10000000-0000-0000-0000-00000000000b', 'x', '30000000-0000-0000-0000-000000000001');
+    raise exception 'FALHOU: conteúdo ligado à prova de outra pessoa';
+  exception when foreign_key_violation then null;
+  end;
+end $$;
+
+-- Ana: dados intactos; apagar a prova solta o conteúdo e a revisão; apagar o erro apaga a revisão dele
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+do $$ begin
+  if (select description from public.mistakes) <> 'Troquei o sinal do jacobiano' then raise exception 'Bruno alterou o erro de Ana'; end if;
+  if (select count(*) from public.review_items) <> 1 then raise exception 'Bruno apagou a revisão de Ana'; end if;
+end $$;
+delete from public.assessments where id = '30000000-0000-0000-0000-000000000001';
+do $$ begin
+  if (select assessment_id from public.topics where id = '20000000-0000-0000-0000-000000000001') is not null then raise exception 'conteúdo continua ligado à prova apagada'; end if;
+  if (select assessment_id from public.review_items) is not null or (select count(*) from public.review_items) <> 1 then raise exception 'revisão não foi solta da prova apagada'; end if;
+end $$;
+
+-- Ana: apagar conteúdo mantém a sessão como "geral"
 delete from public.topics where id = '20000000-0000-0000-0000-000000000001';
 do $$ begin
   if (select count(*) from public.study_sessions where topic_id is null) <> 1 then raise exception 'sessão perdida ao apagar conteúdo'; end if;
+  if (select count(*) from public.mistakes where topic_id is null) <> 1 then raise exception 'erro perdido ao apagar conteúdo'; end if;
+end $$;
+delete from public.mistakes;
+do $$ begin
+  if (select count(*) from public.review_items) <> 0 or (select count(*) from public.review_logs) <> 0 then raise exception 'revisão do erro apagado continuou'; end if;
 end $$;
 -- Ana: apagar disciplina apaga sessões e avaliações dela
 delete from public.subjects where id = '10000000-0000-0000-0000-000000000001';
 do $$ begin
   if (select count(*) from public.study_sessions) <> 0 or (select count(*) from public.assessments) <> 0 then raise exception 'cascata falhou'; end if;
+  if (select count(*) from public.routine_blocks) <> 1 then raise exception 'aula da disciplina apagada continuou na rotina'; end if;
 end $$;
 
 reset role;

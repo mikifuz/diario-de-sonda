@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/lib/calc.test.ts src/lib/legacy.test.ts"
+    "test": "tsx --test src/lib/calc.test.ts src/lib/plan.test.ts src/lib/legacy.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.57.4",

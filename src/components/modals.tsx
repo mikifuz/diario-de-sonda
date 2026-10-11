@@ -2,10 +2,11 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Modal, Seg, ConfirmButton, Icon, I } from "./ui";
-import { ACT, AUTO, COLORS, COMP, CONF, DIFF, EVT, GRADED, PRIO, RES, STATUS } from "@/lib/constants";
+import { ACT, AUTO, COLORS, COMP, CONF, DIFF, EVT, GRADED, PREF, PRIO, RES, STATUS } from "@/lib/constants";
 import { dkey, fmtMin, pad, parseNum, todayKey } from "@/lib/calc";
 import { activeSubjects, useStore } from "@/lib/store";
-import type { Activity, Assessment, AssessmentKind, Autonomy, CalEvent, Comprehension, EventType, Priority, Result, Session, Status, Subject, Topic, Traits } from "@/lib/types";
+import type { Activity, Assessment, AssessmentKind, Autonomy, CalEvent, Comprehension, EventType, Priority, Result, Session, Status, StudyPref, Subject, Topic, Traits } from "@/lib/types";
+import { MistakeModal } from "./planning";
 
 /* ============ Conteúdos em árvore ============ */
 export function TopicOptions({ topics, subjectId, exclude }: { topics: Topic[]; subjectId: string | null; exclude?: Set<string> }) {
@@ -71,18 +72,26 @@ export function EvalModal({ id, onClose }: { id: string; onClose: () => void }) 
   const st = useStore();
   const s = st.sessions.find((x) => x.id === id);
   const [v, setV] = useState<EvalState>(() => evalFrom(s));
+  const [logMistake, setLogMistake] = useState(true);
+  const [mistakeFor, setMistakeFor] = useState<Session | null>(null);
+  if (mistakeFor) return <MistakeModal id={null} preset={{ subject_id: mistakeFor.subject_id, topic_id: mistakeFor.topic_id, session_id: mistakeFor.id }} onClose={onClose} />;
   if (!s) return null;
   const sub = st.subjects.find((x) => x.id === s.subject_id);
+  const wrong = v.result === "parcial" || v.result === "errado";
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const r = evalToRow(v);
     if (typeof r === "string") { st.toast(r); return; }
-    if (await st.save("study_sessions", { ...s, ...r })) { st.toast("Sessão registrada."); onClose(); }
+    if (await st.save("study_sessions", { ...s, ...r })) {
+      st.toast("Sessão registrada.");
+      if (wrong && logMistake) setMistakeFor(s); else onClose();
+    }
   };
   return (
     <Modal title="Como foi a sessão?" sub={`${sub?.name || ""} · ${fmtMin(s.duration_min)}`} onClose={onClose}>
       <form className="stack" style={{ gap: 16 }} onSubmit={submit}>
         <EvalFields v={v} set={setV} />
+        {wrong && <label className="check"><input type="checkbox" checked={logMistake} onChange={(e) => setLogMistake(e.target.checked)} />Registrar no banco de erros o que deu errado</label>}
         <div className="modal-f"><button type="button" className="btn ghost" onClick={onClose}>Pular</button><button className="btn pri">Salvar avaliação</button></div>
       </form>
     </Modal>
@@ -146,6 +155,7 @@ export function SubjectModal({ id, onClose }: { id: string | null; onClose: () =
     name: orig?.name || "", code: orig?.code || "", professor: orig?.professor || "", semester: orig?.semester ?? p?.current_semester ?? "",
     min_avg: String(orig?.min_avg ?? p?.default_min_avg ?? 7).replace(".", ","), credits: orig?.credits != null ? String(orig.credits) : "", hours: orig?.hours != null ? String(orig.hours) : "",
     schedule: orig?.schedule || "", notes: orig?.notes || "", color: orig?.color || COLORS[st.subjects.length % COLORS.length], traits: { ...(orig?.traits || {}) } as Traits,
+    study_pref: (orig?.study_pref || "") as StudyPref | "",
   }));
   const up = (x: Partial<typeof f>) => setF({ ...f, ...x });
   const nSes = orig ? st.sessions.filter((x) => x.subject_id === orig.id).length : 0;
@@ -159,6 +169,7 @@ export function SubjectModal({ id, onClose }: { id: string | null; onClose: () =
       credits: parseNum(f.credits), hours: parseNum(f.hours), color: f.color, min_avg: min, schedule: f.schedule.trim(), notes: f.notes.trim(), traits: f.traits,
       exam_enabled: orig?.exam_enabled ?? false, exam_w_avg: orig?.exam_w_avg ?? 1, exam_w_exam: orig?.exam_w_exam ?? 1, exam_min_final: orig?.exam_min_final ?? 5,
       exam_min_take: orig?.exam_min_take ?? null, archived: orig?.archived ?? false,
+      study_pref: f.study_pref || null, recovery: orig?.recovery ?? "nenhuma", sub_replace_lower: orig?.sub_replace_lower ?? false,
     };
     if (await st.save("subjects", row)) {
       onClose();
@@ -176,7 +187,10 @@ export function SubjectModal({ id, onClose }: { id: string | null; onClose: () =
           <label className="f"><span>Média mínima</span><input type="text" inputMode="decimal" value={f.min_avg} onChange={(e) => up({ min_avg: e.target.value })} /></label>
           <label className="f"><span>Créditos</span><input type="number" min={0} value={f.credits} onChange={(e) => up({ credits: e.target.value })} /></label>
           <label className="f"><span>Carga horária (h)</span><input type="number" min={0} value={f.hours} onChange={(e) => up({ hours: e.target.value })} /></label>
-          <label className="f full"><span>Horários de aula</span><input type="text" value={f.schedule} onChange={(e) => up({ schedule: e.target.value })} placeholder="Ex.: Seg e Qua 08:20–10:00" /></label>
+          <label className="f full"><span>Horários de aula (anotação)</span><input type="text" value={f.schedule} onChange={(e) => up({ schedule: e.target.value })} placeholder="Ex.: Seg e Qua 08:20–10:00" />
+            <span className="small">Para o plano do dia usar as aulas, cadastre-as em Hoje → Rotina.</span></label>
+          <label className="f full"><span>Como prefere estudar esta disciplina</span><select value={f.study_pref} onChange={(e) => up({ study_pref: e.target.value as StudyPref | "" })}>
+            <option value="">Segue o padrão ({PREF[st.profile?.study_pref || "depois"].toLowerCase()})</option>{Object.entries(PREF).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
           <div className="f full"><span>Cor</span><div className="swatches">{COLORS.map((c) => <button key={c} type="button" style={{ ["--c" as string]: c }} aria-pressed={f.color === c} aria-label={`Cor ${c}`} onClick={() => up({ color: c })} />)}</div></div>
           <label className="f full"><span>Critérios de avaliação e observações</span><textarea value={f.notes} onChange={(e) => up({ notes: e.target.value })} /></label>
         </div>
@@ -207,7 +221,10 @@ export function TopicModal({ id, onClose }: { id: string; onClose: () => void })
   const t = st.topics.find((x) => x.id === id);
   const [name, setName] = useState(t?.name || "");
   const [parent, setParent] = useState(t?.parent_id || "");
+  const [taught, setTaught] = useState(t?.taught_on || "");
+  const [exam, setExam] = useState(t?.assessment_id || "");
   if (!t) return null;
+  const exams = st.assessments.filter((a) => a.subject_id === t.subject_id && (a.kind === "prova" || a.kind === "sub")).sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
   const desc = new Set([t.id]);
   let grew = true;
   while (grew) { grew = false; for (const x of st.topics) if (x.parent_id && desc.has(x.parent_id) && !desc.has(x.id)) { desc.add(x.id); grew = true; } }
@@ -216,13 +233,19 @@ export function TopicModal({ id, onClose }: { id: string; onClose: () => void })
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    if (await st.save("topics", { ...t, name: name.trim(), parent_id: parent || null })) onClose();
+    if (await st.save("topics", { ...t, name: name.trim(), parent_id: parent || null, taught_on: taught || null, assessment_id: exam || null })) onClose();
   };
   return (
     <Modal title="Editar conteúdo" sub={sub?.name} onClose={onClose}>
       <form className="stack" style={{ gap: 14 }} onSubmit={submit}>
         <label className="f"><span>Nome</span><input type="text" value={name} onChange={(e) => setName(e.target.value)} required /></label>
         <label className="f"><span>Dentro de</span><select value={parent} onChange={(e) => setParent(e.target.value)}><option value="">Nível principal</option><TopicOptions topics={st.topics} subjectId={t.subject_id} exclude={desc} /></select></label>
+        <div className="fgrid">
+          <label className="f"><span>Data da aula</span><input type="date" value={taught} onChange={(e) => setTaught(e.target.value)} /></label>
+          <label className="f"><span>Cai na prova</span><select value={exam} onChange={(e) => setExam(e.target.value)}><option value="">Próxima prova da disciplina</option>
+            {exams.map((a) => <option key={a.id} value={a.id}>{a.name}{a.date ? ` (${a.date.slice(8, 10)}/${a.date.slice(5, 7)})` : " (sem data)"}</option>)}</select></label>
+        </div>
+        <p className="small muted" style={{ margin: 0 }}>A data da aula ajuda o plano do dia a sugerir o que adiantar ou consolidar. A prova define até quando este conteúdo é revisado.</p>
         <div className="modal-f">
           <span style={{ marginRight: "auto" }}><ConfirmButton label={<><Icon d={I.trash} s={15} />Excluir</>} question={n > 0 ? `${n} sessão(ões) ficarão como "geral da disciplina".` : "Excluir?"} confirmLabel="Excluir"
             onConfirm={async () => {
@@ -283,8 +306,8 @@ export function EventModal({ id, src, date, onClose }: { id: string | null; src?
           <label className="f"><span>Horário</span><input type="time" value={f.time} onChange={(e) => up({ time: e.target.value })} /></label>
           <label className="f"><span>Prioridade</span><select value={f.priority} onChange={(e) => up({ priority: e.target.value as Priority })}>{Object.entries(PRIO).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
           <label className="f"><span>Status</span><select value={f.status} onChange={(e) => up({ status: e.target.value as Status })}>{Object.entries(STATUS).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
-          {canCount && <div className="full row"><label className="check"><input type="checkbox" checked={f.counted} onChange={(e) => up({ counted: e.target.checked })} />Conta na média da disciplina</label>
-            {f.counted && <label className="row small" style={{ gap: 6 }}>Peso <input type="text" inputMode="decimal" value={f.weight} onChange={(e) => up({ weight: e.target.value })} style={{ width: 70 }} /></label>}</div>}
+          {canCount && <div className="full row"><label className="check"><input type="checkbox" checked={f.counted} onChange={(e) => up({ counted: e.target.checked })} />{f.type === "sub" ? "Lançar em Notas (substitui a menor nota de prova)" : "Conta na média da disciplina"}</label>
+            {f.counted && f.type !== "sub" && <label className="row small" style={{ gap: 6 }}>Peso <input type="text" inputMode="decimal" value={f.weight} onChange={(e) => up({ weight: e.target.value })} style={{ width: 70 }} /></label>}</div>}
           <label className="f full"><span>Descrição</span><textarea value={f.description} onChange={(e) => up({ description: e.target.value })} /></label>
         </div>
         <div className="modal-f">

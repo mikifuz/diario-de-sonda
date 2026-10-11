@@ -107,6 +107,20 @@ export function signal(st: Stats): { k: SignalKind; t: string; why: string } {
 }
 
 /* ============ Médias ============ */
+export interface SubResult {
+  /** prova de menor nota, a que a SUB substituiria */
+  target: { id: string; name: string; value: number; weight: number } | null;
+  /** média sem a SUB (final, ou projeção do cenário) */
+  base: number | null;
+  /** nota necessária na SUB para chegar à média mínima */
+  need: number | null;
+  /** nota da SUB (oficial ou simulada) */
+  value: number | null;
+  official: boolean;
+  replaced: boolean;
+  /** média com a SUB aplicada */
+  final: number | null;
+}
 export interface GradeResult {
   W: number; Wk: number; Wr: number; Sk: number;
   min: number; max: number; nItems: number; nRem: number;
@@ -115,14 +129,18 @@ export interface GradeResult {
   final: number | null;
   proj: Record<Scenario, number | null>;
   exam: null | { wa: number; we: number; mf: number; minTake: number | null; base?: number; need?: number; eligible?: boolean };
+  sub: SubResult | null;
 }
 const has = (v: number | null | undefined): v is number => v != null && !isNaN(Number(v));
 const simOf = (a: Assessment, k: Scenario) => (k === "c" ? a.sim_c : k === "e" ? a.sim_e : a.sim_o);
 
+type GradeRules = Pick<Subject, "min_avg" | "recovery" | "sub_replace_lower" | "exam_w_avg" | "exam_w_exam" | "exam_min_final" | "exam_min_take">;
+
 /** Média ponderada Σ(peso × nota) ÷ Σpesos na escala 0–10.
- *  needed = média necessária nas avaliações sem nota para atingir a mínima. */
-export function gradeCalc(sub: Pick<Subject, "min_avg" | "exam_enabled" | "exam_w_avg" | "exam_w_exam" | "exam_min_final" | "exam_min_take">, items: Assessment[], scen?: Scenario): GradeResult {
-  const valid = items.filter((i) => Number(i.weight) > 0);
+ *  needed = média necessária nas avaliações sem nota para atingir a mínima.
+ *  A SUB não entra nos pesos: ela substitui a menor nota entre as provas. */
+export function gradeCalc(sub: GradeRules, items: Assessment[], scen?: Scenario): GradeResult {
+  const valid = items.filter((i) => i.kind !== "sub" && Number(i.weight) > 0);
   const min = Number(sub.min_avg ?? 7), max = 10;
   const W = valid.reduce((a, i) => a + Number(i.weight), 0);
   const known = valid.filter((i) => has(i.grade));
@@ -147,17 +165,41 @@ export function gradeCalc(sub: Pick<Subject, "min_avg" | "exam_enabled" | "exam_
     final: Wr === 0 && W ? Sk / W : null,
     proj: { c: proj("c"), e: proj("e"), o: proj("o") },
     exam: null,
+    sub: null,
   };
-  if (sub.exam_enabled) {
+  const base = r.final != null ? r.final : scen && r.proj[scen] != null ? r.proj[scen] : null;
+  if (sub.recovery === "exame") {
     const wa = Number(sub.exam_w_avg) || 1, we = Number(sub.exam_w_exam) || 1, mf = Number(sub.exam_min_final ?? 5);
     const minTake = has(sub.exam_min_take) ? Number(sub.exam_min_take) : null;
     r.exam = { wa, we, mf, minTake };
-    const base = r.final != null ? r.final : scen && r.proj[scen] != null ? r.proj[scen] : null;
     if (base != null && base < min) {
       r.exam.base = base;
       r.exam.need = (mf * (wa + we) - wa * base) / we;
       r.exam.eligible = minTake == null || base >= minTake;
     }
+  }
+  if (sub.recovery === "sub") {
+    // valor de cada prova: nota oficial, ou simulação do cenário quando ainda não há nota
+    const val = (a: Assessment) => (has(a.grade) ? Number(a.grade) : scen && has(simOf(a, scen)) ? Number(simOf(a, scen)) : null);
+    let target: SubResult["target"] = null;
+    for (const a of valid) {
+      if (a.kind !== "prova") continue;
+      const v = val(a);
+      if (v == null) continue;
+      // menor nota; no empate, a de maior peso (é a que mais pesa na média)
+      if (!target || v < target.value || (v === target.value && Number(a.weight) > target.weight)) target = { id: a.id, name: a.name, value: v, weight: Number(a.weight) };
+    }
+    const s = items.find((i) => i.kind === "sub");
+    const value = s ? val(s) : null;
+    const res: SubResult = { target, base, need: null, value, official: !!s && has(s.grade) && r.final != null, replaced: false, final: null };
+    if (target && base != null && W) {
+      if (base < min) res.need = target.value + ((min - base) * W) / target.weight;
+      if (value != null) {
+        res.replaced = value > target.value || (sub.sub_replace_lower && value !== target.value);
+        res.final = res.replaced ? base + ((value - target.value) * target.weight) / W : base;
+      }
+    }
+    r.sub = res;
   }
   return r;
 }

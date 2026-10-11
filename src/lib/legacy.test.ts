@@ -34,6 +34,7 @@ test("converte com novos ids e mantém relações", () => {
   assert.equal(r.subjects.length, 1);
   const sid = r.subjects[0].id;
   assert.equal(r.subjects[0].exam_enabled, true);
+  assert.equal(r.subjects[0].recovery, "exame");
   assert.equal(r.subjects[0].exam_min_take, null);
   // pai inserido antes do filho
   assert.equal(r.topics[0].name, "Escoamento");

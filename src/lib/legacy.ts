@@ -53,6 +53,7 @@ export function convertLegacy(j: Any, newId: () => string = () => crypto.randomU
       exam_enabled: !!ex.enabled, exam_w_avg: num(ex.wAvg) && num(ex.wAvg)! > 0 ? num(ex.wAvg)! : 1,
       exam_w_exam: num(ex.wExam) && num(ex.wExam)! > 0 ? num(ex.wExam)! : 1, exam_min_final: grade(ex.minFinal) ?? 5,
       exam_min_take: grade(ex.minTake), archived: !!s.archived,
+      study_pref: null, recovery: ex.enabled ? "exame" : "nenhuma", sub_replace_lower: false,
     });
     // conteúdos: pais antes dos filhos
     const ts = ((s.topics || []) as Any[]).filter((t) => t && str(t.name).trim());
@@ -66,7 +67,7 @@ export function convertLegacy(j: Any, newId: () => string = () => crypto.randomU
         const parentOk = !t.parentId || !topMap.has(String(t.parentId)) || placed.has(String(t.parentId));
         if (!parentOk) return;
         placed.add(key);
-        out.topics.push({ id: topMap.get(key)!, subject_id: id, parent_id: t.parentId && topMap.has(String(t.parentId)) ? topMap.get(String(t.parentId))! : null, name: str(t.name, 200).trim(), position: i });
+        out.topics.push({ id: topMap.get(key)!, subject_id: id, parent_id: t.parentId && topMap.has(String(t.parentId)) ? topMap.get(String(t.parentId))! : null, name: str(t.name, 200).trim(), position: i, taught_on: null, assessment_id: null });
       });
     }
     for (const i of ((s.grading && s.grading.items) || []) as Any[]) {

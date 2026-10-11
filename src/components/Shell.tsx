@@ -63,7 +63,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <header className="topbar">
           <div className="ttl"><span className="lbl">{isSubjectPage ? "Disciplina" : page.full}</span><h1 style={{ fontSize: "calc(1.25rem*var(--display-scale))" }}>{title}</h1></div>
           <TimerPill />
-          <Link className="btn icon ghost show-m" href="/configuracoes" aria-label="Configurações"><Icon d={PAGES[6].ic} s={20} /></Link>
+          <Link className="btn icon ghost show-m" href="/configuracoes" aria-label="Configurações"><Icon d={PAGES[PAGES.length - 1].ic} s={20} /></Link>
         </header>
         <main>{st.ready ? children : <div className="empty"><b>Abrindo o diário…</b><span>Carregando seus registros.</span></div>}</main>
       </div>

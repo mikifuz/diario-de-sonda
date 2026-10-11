@@ -3,15 +3,25 @@
 // grava de forma otimista e escuta mudanças feitas em outros aparelhos.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { sb, friendlyError } from "./supabase";
-import type { Assessment, CalEvent, Profile, Session, Subject, Timer, Topic } from "./types";
+import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Subject, Timer, Topic } from "./types";
 
-export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events";
-type Key = "subjects" | "topics" | "sessions" | "assessments" | "events";
-const KEY: Record<Table, Key> = { subjects: "subjects", topics: "topics", study_sessions: "sessions", assessments: "assessments", events: "events" };
-type RowOf = { subjects: Subject; topics: Topic; study_sessions: Session; assessments: Assessment; events: CalEvent };
+export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs";
+type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "mistakes" | "reviews" | "reviewLogs";
+const KEY: Record<Table, Key> = {
+  subjects: "subjects", topics: "topics", study_sessions: "sessions", assessments: "assessments", events: "events",
+  routine_blocks: "blocks", mistakes: "mistakes", review_items: "reviews", review_logs: "reviewLogs",
+};
+type RowOf = {
+  subjects: Subject; topics: Topic; study_sessions: Session; assessments: Assessment; events: CalEvent;
+  routine_blocks: RoutineBlock; mistakes: Mistake; review_items: ReviewItem; review_logs: ReviewLog;
+};
+export const TABLES = Object.keys(KEY) as Table[];
 
-interface Data { profile: Profile | null; subjects: Subject[]; topics: Topic[]; sessions: Session[]; assessments: Assessment[]; events: CalEvent[] }
-const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [] };
+interface Data {
+  profile: Profile | null; subjects: Subject[]; topics: Topic[]; sessions: Session[]; assessments: Assessment[]; events: CalEvent[];
+  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[];
+}
+const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [], blocks: [], mistakes: [], reviews: [], reviewLogs: [] };
 
 export interface Store extends Data {
   uid: string;
@@ -41,12 +51,18 @@ export function useStore() {
 
 export const timerMs = (t: Timer | null | undefined, now = Date.now()) => (t ? (t.accum || 0) + (t.running ? now - t.since : 0) : 0);
 const normTime = <T extends { time: string | null }>(r: T): T => ({ ...r, time: r.time ? r.time.slice(0, 5) : null });
+const normBlock = (r: RoutineBlock): RoutineBlock => ({ ...r, start_time: r.start_time.slice(0, 5), end_time: r.end_time.slice(0, 5) });
+const PROFILE_COLS = "id,name,course,university,current_semester,default_min_avg,weekly_goal_h,skin,timer,study_pref,review_steps";
 const COLS: Record<Table, string> = {
-  subjects: "id,name,code,professor,semester,credits,hours,color,min_avg,schedule,notes,traits,exam_enabled,exam_w_avg,exam_w_exam,exam_min_final,exam_min_take,archived",
-  topics: "id,subject_id,parent_id,name,position",
+  subjects: "id,name,code,professor,semester,credits,hours,color,min_avg,schedule,notes,traits,exam_enabled,exam_w_avg,exam_w_exam,exam_min_final,exam_min_take,archived,study_pref,recovery,sub_replace_lower",
+  topics: "id,subject_id,parent_id,name,position,taught_on,assessment_id",
   study_sessions: "id,subject_id,topic_id,activity,started_at,duration_min,questions,correct,notes,confidence,result,autonomy,difficulty,comprehension",
   assessments: "id,subject_id,name,kind,date,time,weight,grade,predicted,sim_c,sim_e,sim_o,priority,status,description",
   events: "id,subject_id,title,type,date,time,priority,status,description",
+  routine_blocks: "id,weekday,start_time,end_time,kind,subject_id,label",
+  mistakes: "id,subject_id,topic_id,session_id,category,description,correction,source,occurred_on",
+  review_items: "id,subject_id,topic_id,mistake_id,assessment_id,title,step,due,est_min,active,last_reviewed_at",
+  review_logs: "id,item_id,reviewed_at,result,autonomy,confidence,prev_step,new_step,prev_due,new_due",
 };
 
 export function DataProvider({ uid, email, children, onToast }: { uid: string; email: string; children: ReactNode; onToast: (m: string) => void }) {
@@ -60,11 +76,11 @@ export function DataProvider({ uid, email, children, onToast }: { uid: string; e
   const fetchTable = useCallback(async (t: Table | "profiles") => {
     const db = sb();
     if (t === "profiles") {
-      const { data: p, error } = await db.from("profiles").select("id,name,course,university,current_semester,default_min_avg,weekly_goal_h,skin,timer").eq("id", uid).maybeSingle();
+      const { data: p, error } = await db.from("profiles").select(PROFILE_COLS).eq("id", uid).maybeSingle();
       if (error) throw error;
       let prof = p as Profile | null;
       if (!prof) {
-        const ins = await db.from("profiles").upsert({ id: uid }).select("id,name,course,university,current_semester,default_min_avg,weekly_goal_h,skin,timer").single();
+        const ins = await db.from("profiles").upsert({ id: uid }).select(PROFILE_COLS).single();
         if (ins.error) throw ins.error;
         prof = ins.data as Profile;
       }
@@ -73,15 +89,17 @@ export function DataProvider({ uid, email, children, onToast }: { uid: string; e
     }
     let q = db.from(t).select(COLS[t]);
     if (t === "study_sessions") q = q.order("started_at", { ascending: false }).limit(10000);
+    if (t === "review_logs") q = q.order("reviewed_at", { ascending: false }).limit(10000);
     const { data: rows, error } = await q;
     if (error) throw error;
     let list = (rows || []) as unknown as RowOf[typeof t][];
     if (t === "assessments" || t === "events") list = (list as (Assessment | CalEvent)[]).map(normTime) as typeof list;
+    if (t === "routine_blocks") list = (list as RoutineBlock[]).map(normBlock) as typeof list;
     setData((d) => ({ ...d, [KEY[t]]: list }));
   }, [uid]);
 
   const reload = useCallback(async (t?: Table | "profiles") => {
-    const all: (Table | "profiles")[] = t ? [t] : ["profiles", "subjects", "topics", "study_sessions", "assessments", "events"];
+    const all: (Table | "profiles")[] = t ? [t] : ["profiles", ...TABLES];
     try {
       await Promise.all(all.map(fetchTable));
     } catch (e) {
@@ -96,7 +114,7 @@ export function DataProvider({ uid, email, children, onToast }: { uid: string; e
     const timers: Record<string, ReturnType<typeof setTimeout>> = {};
     const later = (t: Table | "profiles") => { clearTimeout(timers[t]); timers[t] = setTimeout(() => { if (alive) reload(t); }, 500); };
     const ch = sb().channel("own-" + uid);
-    (["subjects", "topics", "study_sessions", "assessments", "events"] as Table[]).forEach((t) =>
+    TABLES.forEach((t) =>
       ch.on("postgres_changes", { event: "*", schema: "public", table: t, filter: `user_id=eq.${uid}` }, () => later(t)));
     ch.on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `id=eq.${uid}` }, () => later("profiles"));
     ch.subscribe();
@@ -131,8 +149,15 @@ export function DataProvider({ uid, email, children, onToast }: { uid: string; e
     const { error } = await sb().from(t).delete().eq("id", id);
     if (error) { toast(friendlyError(error)); reload(t); return false; }
     // cascatas do banco: atualiza tabelas dependentes
-    if (t === "subjects") { reload("topics"); reload("study_sessions"); reload("assessments"); reload("events"); }
-    if (t === "topics") { reload("topics"); reload("study_sessions"); }
+    const deps: Partial<Record<Table, Table[]>> = {
+      subjects: ["topics", "study_sessions", "assessments", "events", "routine_blocks", "mistakes", "review_items", "review_logs"],
+      topics: ["topics", "study_sessions", "mistakes", "review_items"],
+      assessments: ["topics", "review_items"],
+      study_sessions: ["mistakes"],
+      mistakes: ["review_items", "review_logs"],
+      review_items: ["review_logs"],
+    };
+    deps[t]?.forEach((x) => reload(x));
     return true;
   }, [reload, toast]);
 

@@ -44,7 +44,7 @@ export default function Calendario() {
         <Dot c={color(e)} />
         <div className="grow">
           <div className="t" style={done(e) ? { textDecoration: "line-through", opacity: 0.7 } : undefined}>{e.title}</div>
-          <div className="m">{EVT[e.type]}{s ? " · " + s.name : ""}{e.time ? " · " + e.time : ""}{e.src === "item" ? ` · peso ${nf(e.weight ?? 0, 0)}${e.grade != null ? ` · nota ${nf(e.grade)}` : ""}` : ""}</div>
+          <div className="m">{EVT[e.type]}{s ? " · " + s.name : ""}{e.time ? " · " + e.time : ""}{e.src === "item" ? `${e.type === "sub" ? "" : ` · peso ${nf(e.weight ?? 0, 0)}`}${e.grade != null ? ` · nota ${nf(e.grade)}` : ""}` : ""}</div>
         </div>
         {e.priority === "alta" && e.status === "pendente" && <span className="chip bad">alta</span>}
       </div>

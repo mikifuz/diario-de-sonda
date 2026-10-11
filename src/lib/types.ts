@@ -5,7 +5,11 @@ export type Autonomy = "sozinho" | "anotacoes" | "ajuda" | "resolucao";
 export type Comprehension = "total" | "parcial" | "duvidas" | "nao";
 export type Priority = "baixa" | "media" | "alta";
 export type Status = "pendente" | "concluido" | "cancelado";
-export type AssessmentKind = "prova" | "trabalho" | "apresentacao" | "entrega";
+export type AssessmentKind = "prova" | "trabalho" | "apresentacao" | "entrega" | "sub";
+export type StudyPref = "antes" | "depois" | "ambos";
+export type Recovery = "nenhuma" | "sub" | "exame";
+export type BlockKind = "aula" | "estudo" | "trabalho" | "deslocamento" | "pessoal" | "descanso";
+export type MistakeCategory = "conceitual" | "algebrico" | "aritmetico" | "interpretacao" | "unidade" | "sinal" | "formula" | "metodo" | "atencao" | "tempo";
 export type EventType = AssessmentKind | "aula" | "atividade" | "simulado" | "estudo" | "revisao" | "pessoal" | "indisponivel";
 export type Scenario = "c" | "e" | "o";
 
@@ -32,6 +36,9 @@ export interface Profile {
   weekly_goal_h: number | null;
   skin: Skin;
   timer: Timer | null;
+  study_pref: StudyPref;
+  /** degraus da revisão espaçada, em dias */
+  review_steps: number[];
 }
 
 export interface Traits {
@@ -64,6 +71,11 @@ export interface Subject {
   exam_min_final: number;
   exam_min_take: number | null;
   archived: boolean;
+  /** null = segue a preferência do perfil */
+  study_pref: StudyPref | null;
+  recovery: Recovery;
+  /** a SUB substitui a menor nota de prova mesmo se for menor que ela */
+  sub_replace_lower: boolean;
 }
 
 export interface Topic {
@@ -72,6 +84,10 @@ export interface Topic {
   parent_id: string | null;
   name: string;
   position: number;
+  /** data da aula em que o conteúdo é (ou foi) dado */
+  taught_on: string | null;
+  /** prova em que o conteúdo cai */
+  assessment_id: string | null;
 }
 
 export interface Session {
@@ -148,4 +164,55 @@ export interface DailyTotal {
   user_id: string;
   day: string;
   minutes: number;
+}
+
+export interface RoutineBlock {
+  id: string;
+  /** 0 = domingo … 6 = sábado (como Date.getDay) */
+  weekday: number;
+  start_time: string;
+  end_time: string;
+  kind: BlockKind;
+  subject_id: string | null;
+  label: string;
+}
+
+export interface Mistake {
+  id: string;
+  subject_id: string;
+  topic_id: string | null;
+  session_id: string | null;
+  category: MistakeCategory;
+  description: string;
+  correction: string;
+  source: string;
+  occurred_on: string;
+}
+
+export interface ReviewItem {
+  id: string;
+  subject_id: string;
+  topic_id: string | null;
+  mistake_id: string | null;
+  /** prova em que a revisão se encerra */
+  assessment_id: string | null;
+  title: string;
+  step: number;
+  due: string;
+  est_min: number;
+  active: boolean;
+  last_reviewed_at: string | null;
+}
+
+export interface ReviewLog {
+  id: string;
+  item_id: string;
+  reviewed_at: string;
+  result: Result;
+  autonomy: Autonomy | null;
+  confidence: number | null;
+  prev_step: number;
+  new_step: number;
+  prev_due: string;
+  new_due: string | null;
 }
