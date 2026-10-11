@@ -8,10 +8,11 @@ import { SKINS } from "@/lib/constants";
 import { convertLegacy, isLegacyExport } from "@/lib/legacy";
 import type { Profile, Skin } from "@/lib/types";
 import { ConfirmButton, I, Icon } from "@/components/ui";
+import { DEFAULT_MASTERY, masteryCfg, type MasteryCfg } from "@/lib/mastery";
 
 // ordem das chaves estrangeiras: conteúdos apontam para provas, erros para sessões, revisões para erros
-const ORDER: Table[] = ["subjects", "assessments", "topics", "study_sessions", "events", "routine_blocks", "mistakes", "review_items", "review_logs"];
-const NONE = { routine_blocks: [], mistakes: [], review_items: [], review_logs: [] };
+const ORDER: Table[] = ["subjects", "assessments", "topics", "study_sessions", "events", "routine_blocks", "mistakes", "review_items", "review_logs", "tasks"];
+const NONE = { routine_blocks: [], mistakes: [], review_items: [], review_logs: [], tasks: [] };
 
 export default function Configuracoes() {
   const st = useStore();
@@ -32,7 +33,7 @@ export default function Configuracoes() {
 
   const exportData = () => {
     const payload = { app: "diario-de-sonda", version: 2, exportedAt: new Date().toISOString(), profile: { ...p, timer: null }, subjects: st.subjects, topics: st.topics, sessions: st.sessions, assessments: st.assessments, events: st.events,
-      routine_blocks: st.blocks, mistakes: st.mistakes, review_items: st.reviews, review_logs: st.reviewLogs };
+      routine_blocks: st.blocks, mistakes: st.mistakes, review_items: st.reviews, review_logs: st.reviewLogs, tasks: st.todos };
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 1)], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url; a.download = `diario-de-sonda-${todayKey()}.json`;
@@ -56,7 +57,7 @@ export default function Configuracoes() {
         const subjects = (j.subjects || []).map((x: Record<string, unknown>) => (x.recovery ? x : { ...x, recovery: x.exam_enabled ? "exame" : "nenhuma" }));
         rows = {
           subjects, topics: j.topics || [], assessments: j.assessments || [], study_sessions: j.sessions || [], events: j.events || [],
-          routine_blocks: j.routine_blocks || [], mistakes: j.mistakes || [], review_items: j.review_items || [], review_logs: j.review_logs || [],
+          routine_blocks: j.routine_blocks || [], mistakes: j.mistakes || [], review_items: j.review_items || [], review_logs: j.review_logs || [], tasks: j.tasks || [],
         };
         const { id: _id, timer: _t, ...rest } = j.profile || {};
         void _id; void _t;
@@ -90,7 +91,7 @@ export default function Configuracoes() {
     setBusy("Apagando…");
     try {
       if (room.me) await room.leave();
-      for (const t of ["events", "routine_blocks", "subjects"] as const) {
+      for (const t of ["events", "routine_blocks", "tasks", "subjects"] as const) {
         const { error } = await sb().from(t).delete().eq("user_id", st.uid);
         if (error) throw error;
       }
@@ -127,6 +128,7 @@ export default function Configuracoes() {
           <div className="full row"><button className="btn pri">Salvar perfil</button></div>
         </form>
       </section>
+      <MasterySettings />
       <section className="panel">
         <div className="panel-h"><h2>Seus dados</h2><span className="lbl">{st.subjects.length} disciplinas, {st.sessions.length} sessões, {st.assessments.length + st.events.length} itens de calendário</span></div>
         <div className="stack">
@@ -139,7 +141,7 @@ export default function Configuracoes() {
           </div>
           <p className="small muted" style={{ margin: 0 }}>A importação aceita a cópia exportada desta versão e a da primeira versão (a página publicada no Claude, em Configurações → Exportar cópia). Importar duas vezes a cópia antiga duplica os registros.</p>
           <div className="row" style={{ borderTop: "1px solid var(--line)", paddingTop: 12, marginTop: 4 }}>
-            <ConfirmButton small label="Apagar todos os meus dados" question="Isto apaga disciplinas, sessões, notas, eventos, rotina, erros e revisões. Exporte uma cópia antes se quiser guardar." confirmLabel="Apagar tudo" onConfirm={wipe} />
+            <ConfirmButton small label="Apagar todos os meus dados" question="Isto apaga disciplinas, sessões, notas, eventos, rotina, erros, revisões e tarefas. Exporte uma cópia antes se quiser guardar." confirmLabel="Apagar tudo" onConfirm={wipe} />
           </div>
         </div>
       </section>
@@ -153,12 +155,50 @@ export default function Configuracoes() {
       <section className="panel">
         <div className="panel-h"><h2>Próximas etapas</h2><span className="lbl">ainda não disponíveis</span></div>
         <div className="grid g2 small">
-          <div><b>Análise de desempenho</b><p className="muted" style={{ margin: ".3em 0 0" }}>Índice de domínio por conteúdo com metodologia explicada, planejamento reverso completo para provas, relatórios e modo demonstração. O banco de erros, a revisão espaçada e o plano do dia já estão em Hoje.</p></div>
+          <div><b>Análise de desempenho</b><p className="muted" style={{ margin: ".3em 0 0" }}>Planejamento reverso completo para provas, relatórios e modo demonstração. O banco de erros, a revisão espaçada, o plano do dia, o índice de domínio e os alertas já estão disponíveis.</p></div>
           <div><b>Inteligência artificial</b><p className="muted" style={{ margin: ".3em 0 0" }}>Gerador de simulados com gabarito e resolução, correção assistida de resoluções enviadas por foto e assistente que consulta seus dados.</p></div>
           <div><b>Engenharia de Petróleo</b><p className="muted" style={{ margin: ".3em 0 0" }}>Biblioteca de fórmulas com unidades, conversor SI ↔ unidades de campo (bbl, psi, ft, mD, cP, °API), verificação dimensional e histórico da graduação.</p></div>
           <div><b>Biblioteca de materiais</b><p className="muted" style={{ margin: ".3em 0 0" }}>Planos de ensino, listas e provas antigas por disciplina, que depois servirão de base para os simulados.</p></div>
         </div>
       </section>
     </>
+  );
+}
+
+const MFIELDS: [keyof MasteryCfg, string, number, number][] = [
+  ["w_acc", "Peso do acerto conferido", 0, 100], ["w_auto", "Peso da autonomia", 0, 100], ["w_rec", "Peso da prática recente", 0, 100], ["w_err", "Peso dos erros em aberto", 0, 100],
+  ["decay_days", "Dias sem praticar até a prática zerar", 7, 180], ["min_n", "Registros conferidos mínimos para dar nota", 1, 20],
+];
+function MasterySettings() {
+  const st = useStore();
+  const cur = masteryCfg(st.profile?.mastery_cfg);
+  const [f, setF] = useState<Record<string, string>>(() => Object.fromEntries(MFIELDS.map(([k]) => [k, String(cur[k])])));
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    const out: Record<string, number> = {};
+    for (const [k, label, min, max] of MFIELDS) {
+      const v = parseNum(f[k]);
+      if (v == null || v < min || v > max || ((k === "decay_days" || k === "min_n") && !Number.isInteger(v))) { st.toast(`${label}: use um número entre ${min} e ${max}.`); return; }
+      out[k] = v;
+    }
+    if (out.w_acc + out.w_auto + out.w_rec + out.w_err <= 0) { st.toast("Pelo menos um peso precisa ser maior que zero."); return; }
+    if (await st.updateProfile({ mastery_cfg: out })) st.toast("Índice de domínio atualizado.");
+  };
+  const reset = async () => {
+    setF(Object.fromEntries(MFIELDS.map(([k]) => [k, String(DEFAULT_MASTERY[k])])));
+    if (await st.updateProfile({ mastery_cfg: null })) st.toast("Índice de domínio de volta ao padrão.");
+  };
+  const W = ["w_acc", "w_auto", "w_rec", "w_err"].reduce((a, k) => a + (parseNum(f[k]) || 0), 0);
+  return (
+    <section className="panel">
+      <div className="panel-h"><h2>Índice de domínio</h2><span className="lbl">como a nota de 0 a 100 de cada conteúdo é calculada</span></div>
+      <form className="stack" style={{ gap: 12 }} onSubmit={save}>
+        <div className="fgrid">{MFIELDS.map(([k, label, min, max]) => (
+          <label key={k} className="f"><span>{label}</span><input type="number" min={min} max={max} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} /></label>
+        ))}</div>
+        <p className="small muted" style={{ margin: 0 }}>Os pesos não precisam somar 100: a conta divide pela soma (hoje {W}). A confiança nunca entra no índice. Padrão: acerto 50, autonomia 25, prática 15, erros 10; 30 dias; 3 registros.</p>
+        <div className="row"><button className="btn pri">Salvar</button><button type="button" className="btn ghost" onClick={reset}>Restaurar padrão</button></div>
+      </form>
+    </section>
   );
 }

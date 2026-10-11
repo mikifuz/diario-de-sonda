@@ -8,6 +8,7 @@ import { GRADED } from "@/lib/constants";
 import { ChartCalib, ChartDays, ChartLine, Gauge, type DayBar } from "@/components/charts";
 import { Dot, Empty, I, Icon, Tabs } from "@/components/ui";
 import { EventModal, SubjectModal } from "@/components/modals";
+import { AlertsPanel, TodoPanel } from "@/components/dashboard";
 
 export default function Painel() {
   const st = useStore();
@@ -72,14 +73,6 @@ export default function Painel() {
     const d = keyDate(a);
     wk.push({ lab: `${d.getDate()}/${d.getMonth() + 1}`, conf: s2.conf, acc: s2.acc });
   }
-  const alerts: { sub: string; text: string }[] = [];
-  for (const x of list) {
-    const s2 = stats(all.filter((s) => s.subject_id === x.id && inRange(s, periodRange("30"))));
-    if (s2.accN >= 3 && s2.conf != null && s2.acc != null) {
-      if (s2.conf >= 4 && s2.acc < 0.6) alerts.push({ sub: x.name, text: `você se avalia com confiança ${nf(s2.conf)}/5, mas acertou ${pct(s2.acc)} do que conferiu nos últimos 30 dias.` });
-      if (s2.conf <= 2.5 && s2.acc >= 0.8) alerts.push({ sub: x.name, text: `seus resultados (${pct(s2.acc)}) estão melhores do que sua confiança (${nf(s2.conf)}/5) sugere.` });
-    }
-  }
   const ag = agenda(st.subjects, st.assessments, st.events);
   const up = ag.filter((e) => e.date >= t && e.date <= addDays(t, 21) && GRADED.includes(e.type) && e.status === "pendente").slice(0, 6);
   const pend = ag.filter((e) => e.date >= t && e.status === "pendente").length;
@@ -94,7 +87,10 @@ export default function Painel() {
         <div className="kpi"><span className="lbl">Este mês</span><span className="v">{fmtMin(mMonth)}</span><span className="s">{all.filter((s) => inRange(s, periodRange("mes"))).length} sessões</span></div>
         <div className="kpi"><span className="lbl">Média parcial</span><span className="v">{avg == null ? "–" : nf(avg)}</span><span className="s">{avg == null ? "sem notas lançadas" : `média das ${avgs.length} disciplina(s) com notas`}</span></div>
       </section>
-      {alerts.length > 0 && <section className="callout" aria-label="Alertas"><div className="stack" style={{ gap: 6 }}>{alerts.map((a, i) => <div key={i}>Em <b>{a.sub}</b> {a.text}</div>)}</div></section>}
+      <section className="grid g3">
+        <div className="span2"><AlertsPanel /></div>
+        <TodoPanel />
+      </section>
       <section className="grid g3">
         <div className="panel span2">
           <div className="panel-h"><h2>Horas por dia</h2><span className="lbl">últimos 14 dias</span></div>

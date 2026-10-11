@@ -6,6 +6,7 @@ import { activeSubjects, topicName, useStore } from "@/lib/store";
 import { addDays, daysBetween, fmtMin, gradeCalc, keyDate, nf, todayKey } from "@/lib/calc";
 import { cleanSteps, dm, examLoads, firstDue, fromMin, itemState, parseSteps, planDay, weekCapacity, type PlanInput, type Task } from "@/lib/plan";
 import { BLOCK, MISTAKE, PREF, WD_S, WEEKDAYS } from "@/lib/constants";
+import { masteryCfg } from "@/lib/mastery";
 import type { Activity, MistakeCategory, ReviewItem, StudyPref } from "@/lib/types";
 import { Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
 import { BlockModal, MistakeModal, ReviewItemModal, ReviewModal } from "@/components/planning";
@@ -76,6 +77,7 @@ function PlanTab({ open, goRoutine }: { open: Open; goRoutine: () => void }) {
   const input: PlanInput = {
     today, nowMin: now.getHours() * 60 + now.getMinutes(), pref: st.profile?.study_pref || "depois", blocks: st.blocks, events: st.events,
     subjects: st.subjects, topics: st.topics, sessions: st.sessions, assessments: st.assessments, items: st.reviews, mistakes: st.mistakes,
+    logs: st.reviewLogs, cfg: masteryCfg(st.profile?.mastery_cfg),
   };
   const plan = planDay(input);
   const loads = examLoads(input);
@@ -188,7 +190,7 @@ function PlanTab({ open, goRoutine }: { open: Open; goRoutine: () => void }) {
         <ol className="muted" style={{ margin: ".5em 0 0", paddingLeft: "1.2em" }}>
           <li>Usa só os blocos de <b>estudo</b> da sua rotina para o dia da semana, a partir de agora. Compromissos e dias &quot;Indisponível&quot; do calendário tiram blocos.</li>
           <li>Entram as revisões com data até hoje (cuja prova ainda não passou) e as aulas: <b>consolidar</b> a de hoje (depois do fim da aula) ou <b>adiantar</b> a de amanhã, conforme a sua preferência ({PREF[st.profile?.study_pref || "depois"].toLowerCase()} por padrão; cada disciplina pode ter a sua).</li>
-          <li>Ordem: revisões de provas em até 3 dias; depois as aulas; depois as demais revisões pela prova mais próxima, atraso, peso da prova, menor acerto conferido no conteúdo e mais erros registrados.</li>
+          <li>Ordem: revisões de provas em até 3 dias; depois as aulas; depois as demais revisões pela prova mais próxima, atraso, peso da prova, menor índice de domínio do conteúdo e mais erros registrados.</li>
           <li>Cada tarefa entra inteira no primeiro bloco onde cabe. O que não couber aparece em &quot;Não coube hoje&quot;, sem ser escondido.</li>
         </ol>
       </details>
