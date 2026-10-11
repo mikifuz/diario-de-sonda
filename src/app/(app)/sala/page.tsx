@@ -3,7 +3,7 @@
 import { Suspense, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { activeSubjects, timerMs, topicName, useStore } from "@/lib/store";
-import { liveMs, todayMin, useRoom, weekMin } from "@/lib/room";
+import { liveMs, NUDGES, todayMin, useRoom, weekMin, type NudgeKey } from "@/lib/room";
 import { daysBetween, dkey, fmtClock, fmtMin, inRange, keyDate, nf, pct, periodRange, stats, streak, todayKey, type Period } from "@/lib/calc";
 import { dm, lastTaught } from "@/lib/plan";
 import { ACT } from "@/lib/constants";
@@ -193,10 +193,56 @@ function GroupsArea() {
         )}
       </div>
       <div className="stack" style={{ gap: 16 }}>
+        <FriendsPanel />
         <GroupsPanel onPick={setG} cur={cur?.code} />
         <MyPresence />
       </div>
     </section>
+  );
+}
+
+function FriendsPanel() {
+  const st = useStore();
+  const room = useRoom();
+  useNow(30_000);
+  const [code, setCode] = useState("");
+  const me = room.me!;
+  const friends = room.friends.filter((f) => f.status === "aceito");
+  const incoming = room.friends.filter((f) => f.status === "pendente" && f.incoming);
+  const outgoing = room.friends.filter((f) => f.status === "pendente" && !f.incoming);
+  const copy = () => { const c = me.friend_code || ""; try { navigator.clipboard.writeText(c).then(() => st.toast(`Código ${c} copiado.`), () => st.toast(`Seu código: ${c}`)); } catch { st.toast(`Seu código: ${c}`); } };
+  const add = async (e: FormEvent) => { e.preventDefault(); if (code.trim() && (await room.sendFriend(code))) setCode(""); };
+  return (
+    <div className="panel">
+      <div className="panel-h"><h3>Amigos</h3>{incoming.length > 0 && <span className="chip warn">{incoming.length} pedido(s)</span>}</div>
+      <div className="row small" style={{ gap: 6, marginBottom: 8 }}>Seu código de amigo: <b className="num" style={{ letterSpacing: ".1em" }}>{me.friend_code || "–"}</b>{me.friend_code && <button className="btn sm ghost" onClick={copy}>Copiar</button>}</div>
+      {incoming.map((f) => (
+        <div key={f.id} className="li"><div className="grow small"><b>{f.nick}</b> quer ser seu amigo</div>
+          <button className="btn sm pri" onClick={() => room.acceptFriend(f.id)}>Aceitar</button><button className="btn sm ghost" onClick={() => room.removeFriend(f.id)}>Recusar</button></div>
+      ))}
+      {friends.length > 0 && <div className="list">{friends.map((f) => {
+        const m = room.members.find((x) => x.user_id === f.other);
+        return (
+          <div key={f.id} className="li" style={{ gap: 8, alignItems: "flex-start" }}>
+            <i className="dot" style={{ background: m?.studying ? "var(--ok)" : "var(--muted)", flex: "none", marginTop: 7 }} />
+            <div className="grow" style={{ minWidth: 0 }}>
+              <div className="t">{f.nick}</div>
+              <div className="m">{m?.studying ? `estudando agora · ${fmtClock(liveMs(m))}${m.subject ? ` · ${m.subject}` : ""}` : m?.paused ? "pausado" : "fora da sala agora"}</div>
+              <select value="" onChange={(e) => { if (e.target.value) room.nudge(f.other, e.target.value as NudgeKey); }} aria-label={`Chamar ${f.nick} para estudar`} style={{ marginTop: 6, padding: "4px 6px", fontSize: ".82em" }}>
+                <option value="">Chamar para estudar…</option>{(Object.keys(NUDGES) as NudgeKey[]).map((k) => <option key={k} value={k}>{NUDGES[k]}</option>)}</select>
+            </div>
+            <ConfirmButton small label="✕" question={`Desfazer amizade com ${f.nick}?`} confirmLabel="Desfazer" onConfirm={() => room.removeFriend(f.id)} />
+          </div>
+        );
+      })}</div>}
+      {outgoing.map((f) => (
+        <div key={f.id} className="li small"><div className="grow muted">Pedido enviado para {f.nick}</div><button className="btn sm ghost" onClick={() => room.removeFriend(f.id)}>Cancelar</button></div>
+      ))}
+      {!room.friends.length && <p className="small muted" style={{ margin: "0 0 8px" }}>Passe seu código para um colega, ou digite o código dele. Amigos veem um ao outro na sala (como num grupo) e podem se chamar para estudar.</p>}
+      <form className="row" style={{ marginTop: 8, flexWrap: "nowrap" }} onSubmit={add}><input type="text" maxLength={8} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Código de amigo" aria-label="Código de amigo" style={{ fontFamily: "var(--f-mono)" }} /><button className="btn sm">Adicionar</button></form>
+      <label className="check small" style={{ marginTop: 10 }}><input type="checkbox" checked={me.accept_nudges !== false} onChange={(e) => room.setAcceptNudges(e.target.checked)} />Receber chamados dos amigos</label>
+      <p className="small muted" style={{ margin: "6px 0 0" }}>Chamados usam só mensagens prontas, no máximo um por hora para cada amigo.</p>
+    </div>
   );
 }
 
@@ -237,7 +283,7 @@ function MyPresence() {
       <form className="stack" style={{ gap: 10 }} onSubmit={(e) => { e.preventDefault(); if (nick.trim()) room.updateMe({ nick: nick.trim().slice(0, 30) }); }}>
         <label className="f"><span>Apelido</span><input type="text" maxLength={30} value={nick} onChange={(e) => setNick(e.target.value)} required /></label>
         <span className="small muted">Ao começar cada sessão você escolhe: {Object.values(SOCIAL).map((x) => x[0].toLowerCase()).join("; ")}.</span>
-        <div className="row"><button className="btn sm">Salvar</button><ConfirmButton small label="Sair da sala" question="Você sai de todos os placares." confirmLabel="Sair" onConfirm={room.leave} /></div>
+        <div className="row"><button className="btn sm">Salvar</button><ConfirmButton small label="Sair da sala" question="Você sai de todos os placares e grupos e desfaz suas amizades." confirmLabel="Sair" onConfirm={room.leave} /></div>
       </form>
       <details style={{ marginTop: 12 }}><summary className="small">O que os colegas veem</summary><div style={{ marginTop: 10 }}><Privacy /></div></details>
     </div>

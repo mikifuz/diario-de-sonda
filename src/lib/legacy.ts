@@ -76,7 +76,7 @@ export function convertLegacy(j: Any, newId: () => string = () => crypto.randomU
         id: newId(), subject_id: id, name: str(i.name, 200).trim(), kind: pick(i.kind, KIND, "prova")!, date: isDate(i.date) ? i.date : null,
         time: isTime(i.time) ? i.time : null, weight: num(i.weight)!, grade: grade(i.grade), predicted: grade(i.pred),
         sim_c: grade(i.sim && i.sim.c), sim_e: grade(i.sim && i.sim.e), sim_o: grade(i.sim && i.sim.o),
-        priority: pick(i.priority, PRIO, "alta")!, status: pick(i.status, STAT, "pendente")!, description: str(i.desc),
+        priority: pick(i.priority, PRIO, "alta")!, status: pick(i.status, STAT, "pendente")!, description: str(i.desc), sub_id: null,
       });
     }
   }

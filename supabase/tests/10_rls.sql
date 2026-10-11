@@ -232,6 +232,111 @@ do $$ begin
   if (select count(*) from public.tasks where done) <> 0 then raise exception 'Bruno alterou tarefas de Ana'; end if;
 end $$;
 
+-- ============ SUB por prova ============
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.assessments (id, subject_id, name, kind) values ('60000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'SUB A1/A2', 'sub');
+insert into public.assessments (subject_id, name, sub_id) values ('10000000-0000-0000-0000-000000000001', 'A1', '60000000-0000-0000-0000-000000000001');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+do $$ begin
+  begin
+    insert into public.assessments (subject_id, name, sub_id) values ('10000000-0000-0000-0000-00000000000b', 'P1', '60000000-0000-0000-0000-000000000001');
+    raise exception 'FALHOU: prova ligada à SUB de outra pessoa';
+  exception when foreign_key_violation then null;
+  end;
+end $$;
+
+-- ============ Notificações e amigos ============
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.notifications (kind, title, data) values ('relatorio', 'Relatório da semana', '{"week":"2026-10-11"}');
+do $$ begin
+  begin
+    insert into public.notifications (kind, title, data) values ('relatorio', 'De novo', '{"week":"2026-10-11"}');
+    raise exception 'FALHOU: dois relatórios na mesma semana';
+  exception when unique_violation then null;
+  end;
+end $$;
+reset role;
+update public.room_members set friend_code = 'ANACODE1' where user_id = '00000000-0000-0000-0000-00000000000a';
+set role authenticated;
+
+-- Carla (fora do grupo de Ana) não vê Ana, não chama Ana e não escreve nas notificações dela
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false);
+do $$ begin
+  if (select count(*) from public.room_members) <> 1 then raise exception 'Carla vê Ana antes da amizade'; end if;
+  if (select count(*) from public.notifications) <> 0 then raise exception 'Carla vê notificações alheias'; end if;
+  begin
+    perform public.nudge_friend('00000000-0000-0000-0000-00000000000a', 'bora');
+    raise exception 'FALHOU: chamado sem amizade';
+  exception when raise_exception then if sqlerrm like 'FALHOU%' then raise; end if;
+  end;
+  begin
+    insert into public.notifications (user_id, kind, title) values ('00000000-0000-0000-0000-00000000000a', 'aviso', 'spam');
+    raise exception 'FALHOU: notificação escrita para outra pessoa';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.notifications (kind, title, from_user) values ('chamado', 'falso', '00000000-0000-0000-0000-00000000000a');
+    raise exception 'FALHOU: chamado forjado';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.friendships (from_user, to_user, status) values ('00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-00000000000a', 'aceito');
+    raise exception 'FALHOU: amizade aceita sem o outro lado';
+  exception when insufficient_privilege then null;
+  end;
+  if public.send_friend_request('anacode1') <> 'enviado' then raise exception 'pedido de amizade não enviado'; end if;
+  if public.send_friend_request('ANACODE1') <> 'ja_pedido' then raise exception 'pedido duplicado'; end if;
+  begin
+    perform public.accept_friend((select id from public.friendships limit 1));
+    raise exception 'FALHOU: aceitou o próprio pedido';
+  exception when raise_exception then if sqlerrm like 'FALHOU%' then raise; end if;
+  end;
+  if (select count(*) from public.room_members) <> 1 then raise exception 'Carla vê Ana com o pedido ainda pendente'; end if;
+end $$;
+
+-- Ana recebe o pedido, aceita; Bruno não vê nada disso
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+do $$ begin
+  if (select count(*) from public.friendships) <> 0 then raise exception 'Bruno vê amizades alheias'; end if;
+  if (select count(*) from public.my_friendships()) <> 0 then raise exception 'Bruno lista amizades alheias'; end if;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+do $$ begin
+  if (select count(*) from public.notifications where kind = 'amizade') <> 1 then raise exception 'pedido de amizade não chegou'; end if;
+  if (select nick from public.my_friendships()) <> 'Carla' then raise exception 'pedido sem o apelido de quem pediu'; end if;
+  perform public.accept_friend((select id from public.my_friendships()));
+end $$;
+
+-- Carla agora vê Ana na sala e pode chamá-la uma vez por hora
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false);
+do $$ begin
+  if (select count(*) from public.room_members) <> 2 then raise exception 'amiga não aparece na sala'; end if;
+  if (select count(*) from public.notifications where kind = 'amizade') <> 1 then raise exception 'aviso de aceite não chegou'; end if;
+  perform public.nudge_friend('00000000-0000-0000-0000-00000000000a', 'bora');
+  begin
+    perform public.nudge_friend('00000000-0000-0000-0000-00000000000a', 'sala');
+    raise exception 'FALHOU: dois chamados na mesma hora';
+  exception when raise_exception then if sqlerrm like 'FALHOU%' then raise; end if;
+  end;
+  begin
+    perform public.nudge_friend('00000000-0000-0000-0000-00000000000a', 'qualquer texto');
+    raise exception 'FALHOU: mensagem livre aceita';
+  exception when raise_exception then if sqlerrm like 'FALHOU%' then raise; end if;
+  end;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+do $$ begin
+  if (select title from public.notifications where kind = 'chamado') <> 'Carla: Bora estudar?' then raise exception 'chamado não chegou'; end if;
+end $$;
+-- Ana desliga os chamados e desfaz a amizade: Carla volta a não ver Ana
+update public.room_members set accept_nudges = false where user_id = '00000000-0000-0000-0000-00000000000a';
+delete from public.friendships;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false);
+do $$ begin
+  if (select count(*) from public.room_members) <> 1 then raise exception 'amizade desfeita continua visível'; end if;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+
 -- Ana: apagar conteúdo mantém a sessão como "geral"
 delete from public.topics where id = '20000000-0000-0000-0000-000000000001';
 do $$ begin

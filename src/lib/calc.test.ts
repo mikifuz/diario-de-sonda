@@ -5,7 +5,7 @@ import type { Assessment, Session } from "./types";
 
 const A = (p: Partial<Assessment>): Assessment => ({
   id: Math.random().toString(), subject_id: "s", name: "x", kind: "prova", date: null, time: null, weight: 1,
-  grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "", ...p,
+  grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "", sub_id: null, ...p,
 });
 const sub = (p = {}) => ({ min_avg: 7, recovery: "nenhuma" as const, sub_replace_lower: false, exam_w_avg: 1, exam_w_exam: 1, exam_min_final: 5, exam_min_take: null, ...p });
 const S = (p: Partial<Session>): Session => ({
@@ -30,31 +30,49 @@ test("média final e exame", () => {
   assert.equal(r2.exam?.eligible, false);
 });
 
-test("SUB substitui a menor nota de prova, só se for maior", () => {
-  const items = [A({ id: "p1", name: "P1", weight: 1, grade: 3 }), A({ id: "p2", name: "P2", weight: 1, grade: 8 }), A({ id: "t", kind: "trabalho", weight: 1, grade: 2 })];
-  const r = gradeCalc(sub({ recovery: "sub" }), [...items, A({ kind: "sub", grade: 7 })]);
+test("SUB substitui a menor nota entre as provas marcadas, só se for maior", () => {
+  const items = [A({ id: "p1", name: "P1", weight: 1, grade: 3, sub_id: "S" }), A({ id: "p2", name: "P2", weight: 1, grade: 8, sub_id: "S" }), A({ id: "t", kind: "trabalho", weight: 1, grade: 2 })];
+  const r = gradeCalc(sub({ recovery: "sub" }), [...items, A({ id: "S", kind: "sub", grade: 7 })]);
   assert.ok(Math.abs((r.final ?? 0) - 13 / 3) < 1e-9); // SUB fora dos pesos
   assert.equal(r.sub?.target?.id, "p1"); // trabalho (nota 2) não é substituído
   assert.ok(r.sub?.replaced);
   assert.ok(Math.abs((r.sub?.final ?? 0) - 17 / 3) < 1e-9); // (7 + 8 + 2) ÷ 3
+  assert.ok(Math.abs((r.subFinal ?? 0) - 17 / 3) < 1e-9);
+  assert.equal(r.subOfficial, true);
   assert.ok(Math.abs((r.sub?.need ?? 0) - 11) < 1e-9); // 3 + (7 − 13/3) × 3 ÷ 1
-  assert.equal(r.sub?.official, true);
-  const menor = gradeCalc(sub({ recovery: "sub" }), [...items, A({ kind: "sub", grade: 1 })]);
+  const menor = gradeCalc(sub({ recovery: "sub" }), [...items, A({ id: "S", kind: "sub", grade: 1 })]);
   assert.equal(menor.sub?.replaced, false);
   assert.ok(Math.abs((menor.sub?.final ?? 0) - 13 / 3) < 1e-9);
-  const prof = gradeCalc(sub({ recovery: "sub", sub_replace_lower: true }), [...items, A({ kind: "sub", grade: 1 })]);
+  const prof = gradeCalc(sub({ recovery: "sub", sub_replace_lower: true }), [...items, A({ id: "S", kind: "sub", grade: 1 })]);
   assert.equal(prof.sub?.replaced, true); // regra do professor: substitui mesmo menor
   assert.ok(Math.abs((prof.sub?.final ?? 0) - 11 / 3) < 1e-9);
+  // prova sem SUB marcada não é substituída
+  const so2 = gradeCalc(sub({ recovery: "sub" }), [A({ id: "p1", grade: 3 }), A({ id: "p2", grade: 8, sub_id: "S" }), A({ id: "S", kind: "sub", grade: 9 })]);
+  assert.equal(so2.sub?.target?.id, "p2");
+  assert.equal(so2.sub?.covered, 1);
 });
 
-test("SUB com simulação e sem provas", () => {
-  const r = gradeCalc(sub({ recovery: "sub" }), [A({ weight: 2, grade: 6 }), A({ id: "p2", weight: 1, sim_e: 4 }), A({ kind: "sub", sim_e: 9 })], "e");
+test("duas SUBs (A1/A2 e A3/A4): cada uma vale só para as suas provas", () => {
+  const items = [
+    A({ id: "a1", name: "A1", grade: 4, sub_id: "S1" }), A({ id: "a2", name: "A2", grade: 8, sub_id: "S1" }),
+    A({ id: "a3", name: "A3", grade: 5, sub_id: "S2" }), A({ id: "a4", name: "A4", grade: 9, sub_id: "S2" }),
+    A({ id: "S1", name: "SUB A1/A2", kind: "sub", grade: 7 }), A({ id: "S2", name: "SUB A3/A4", kind: "sub", grade: 8 }),
+  ];
+  const r = gradeCalc(sub({ recovery: "sub" }), items);
+  assert.deepEqual(r.subs.map((x) => x.target?.id), ["a1", "a3"]);
+  assert.equal(r.final, 6.5);
+  assert.ok(Math.abs((r.subFinal ?? 0) - (7 + 8 + 8 + 9) / 4) < 1e-9); // as duas aplicadas
+});
+
+test("SUB com simulação e sem provas marcadas", () => {
+  const r = gradeCalc(sub({ recovery: "sub" }), [A({ weight: 2, grade: 6, sub_id: "S" }), A({ id: "p2", weight: 1, sim_e: 4, sub_id: "S" }), A({ id: "S", kind: "sub", sim_e: 9 })], "e");
   assert.equal(r.sub?.target?.id, "p2"); // usa a simulação enquanto não há nota
   assert.equal(r.sub?.official, false);
   assert.ok(Math.abs((r.sub?.final ?? 0) - 7) < 1e-9); // (12 + 9) ÷ 3
-  const sem = gradeCalc(sub({ recovery: "sub" }), [A({ kind: "trabalho", grade: 5 })]);
+  const sem = gradeCalc(sub({ recovery: "sub" }), [A({ grade: 5 }), A({ id: "S", kind: "sub" })]);
+  assert.equal(sem.sub?.covered, 0);
   assert.equal(sem.sub?.target, null);
-  assert.equal(sem.sub?.need, null);
+  assert.equal(gradeCalc(sub({ recovery: "sub" }), [A({ grade: 5 })]).sub, null);
 });
 
 test("pesos zerados são ignorados e média já garantida", () => {

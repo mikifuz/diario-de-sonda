@@ -272,3 +272,20 @@ export function docxCells(docXml: string): string[][] {
         (tc.match(/<w:p[ >][\s\S]*?<\/w:p>/g) || []).map((p) => [...p.matchAll(/<w:t(?: [^>]*)?>([^<]*)<\/w:t>/g)].map((m) => m[1]).join("")).join(" ").trim()));
   return out;
 }
+
+/** Quais provas cada SUB pode substituir: as citadas no nome ("SUB A1/A2" → A1 e A2);
+ *  sem citação, as provas anteriores a ela que ainda não têm SUB. */
+export function subCoverage(exams: PlanExam[]): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const provas = exams.filter((x) => x.kind === "prova").sort((a, b) => a.date.localeCompare(b.date));
+  const taken = new Set<string>();
+  for (const s of exams.filter((x) => x.kind === "sub").sort((a, b) => a.date.localeCompare(b.date))) {
+    const tokens = (s.name.match(/\b[A-Z]\d{1,2}\b/g) || []).map((t) => new RegExp(`\\b${t}\\b`));
+    const cov = tokens.length
+      ? provas.filter((p) => tokens.some((re) => re.test(p.name)))
+      : provas.filter((p) => p.date < s.date && !taken.has(p.key));
+    cov.forEach((p) => taken.add(p.key));
+    out.set(s.key, cov.map((p) => p.key));
+  }
+  return out;
+}
