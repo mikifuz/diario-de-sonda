@@ -21,7 +21,8 @@ alter table public.notifications add constraint notifications_data_size check (p
 alter table public.room_members add constraint room_members_friend_code check (friend_code ~ '^[0-9A-F]{8}$') not valid;
 
 -- ============ 1b. Quantidade de registros por pessoa ============
--- Limites folgados para o uso normal (ex.: 30 mil sessões = 20 por dia durante 4 anos).
+-- Limites folgados para o uso normal. Sessões de estudo não têm limite (pedido do dono: parar para
+-- comer ou ir ao banheiro vira uma sessão nova, e isso não pode virar problema).
 create or replace function public.limit_rows() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare col text := coalesce(tg_argv[1], 'user_id'); owner uuid; n bigint;
@@ -46,7 +47,6 @@ create index if not exists study_groups_creator_idx on public.study_groups (crea
 
 create trigger subjects_limit before insert on public.subjects for each row execute function public.limit_rows('500');
 create trigger topics_limit before insert on public.topics for each row execute function public.limit_rows('10000');
-create trigger study_sessions_limit before insert on public.study_sessions for each row execute function public.limit_rows('30000');
 create trigger assessments_limit before insert on public.assessments for each row execute function public.limit_rows('5000');
 create trigger events_limit before insert on public.events for each row execute function public.limit_rows('20000');
 create trigger routine_blocks_limit before insert on public.routine_blocks for each row execute function public.limit_rows('1000');
