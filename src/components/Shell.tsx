@@ -80,7 +80,7 @@ export function Shell({ children }: { children: ReactNode }) {
             </span>
           </div>
         )}
-        <main>{st.ready ? children : <div className="empty"><b>Abrindo o diário…</b><span>Carregando seus registros.</span></div>}</main>
+        <main>{st.ready ? children : <div className="empty"><b>Abrindo o app…</b><span>Carregando seus registros.</span></div>}</main>
       </div>
       <nav className="mobile-nav" aria-label="Navegação">
         {PAGES.filter((p) => p.href !== "/configuracoes").map((p) => (

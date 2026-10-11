@@ -16,7 +16,7 @@ export function useGuide() {
   const steps: Step[] = [
     {
       title: "Importe suas aulas do SIGA",
-      text: "No SIGA, baixe o Comprovante de matrícula (PDF) e envie aqui: o diário cria suas disciplinas e coloca os horários de aula na rotina. O arquivo não sai do seu aparelho.",
+      text: "No SIGA, baixe o Comprovante de matrícula (PDF) e envie aqui: o app cria suas disciplinas e coloca os horários de aula na rotina. O arquivo não sai do seu aparelho.",
       done: st.blocks.some((b) => b.kind === "aula"),
       doneText: "Aulas na rotina.",
       action: { label: "Importar do SIGA", href: "/hoje?aba=rotina&abrir=siga" },
@@ -24,7 +24,7 @@ export function useGuide() {
     },
     {
       title: "Envie o cronograma de cada disciplina",
-      text: "O cronograma do professor (Excel, Word, PDF ou texto) traz os conteúdos com a data de cada aula e as provas. Com ele o diário sabe o que cai em cada prova. Depois confira em Notas os pesos e se cada prova tem SUB.",
+      text: "O cronograma do professor (Excel, Word, PDF ou texto) traz os conteúdos com a data de cada aula e as provas. Com ele o app sabe o que cai em cada prova. Depois confira em Notas os pesos e se cada prova tem SUB.",
       done: subs.length > 0 && !pending,
       doneText: `Cronograma em ${subs.length === 1 ? "sua disciplina" : `todas as ${subs.length} disciplinas`}.`,
       action: pending ? { label: `Cronograma de ${pending.name}`, href: `/disciplinas/${pending.id}?abrir=cronograma` } : undefined,
@@ -65,10 +65,10 @@ export function GettingStarted({ first = false }: { first?: boolean }) {
   return (
     <section className="panel" style={first ? { padding: 28 } : undefined}>
       <div className="panel-h">
-        <h2>{first ? `Olá${name ? `, ${name}` : ""}! Boas-vindas ao Diário de Sonda` : "Primeiros passos"}</h2>
+        <h2>{first ? `Olá${name ? `, ${name}` : ""}! Boas-vindas ao Fundo do Poço` : "Primeiros passos"}</h2>
         <span className="row" style={{ gap: 8 }}><span className="lbl">{done} de {steps.length} feitos</span>{!first && <button className="btn sm ghost" onClick={hide}>Esconder</button>}</span>
       </div>
-      {first && <p style={{ margin: "0 0 12px", maxWidth: "66ch" }}>Faltam poucos passos para o diário montar seu plano de estudo sozinho: o que revisar, como se preparar para cada prova e o que pede atenção. Siga na ordem.</p>}
+      {first && <p style={{ margin: "0 0 12px", maxWidth: "66ch" }}>Faltam poucos passos para o app montar seu plano de estudo sozinho: o que revisar, como se preparar para cada prova e o que pede atenção. Siga na ordem.</p>}
       <ol className="list" style={{ listStyle: "none", padding: 0, margin: 0 }}>
         {steps.map((s, i) => {
           const now = i === next;

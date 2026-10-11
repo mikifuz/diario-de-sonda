@@ -304,7 +304,7 @@ export function SetupGrade() {
       <div className="stack" style={{ gap: 14, maxWidth: 720 }}>
         <span className="lbl">Meu curso</span>
         <h2>Monte a grade do seu curso</h2>
-        <p style={{ margin: 0 }}>Com a matriz, o diário mostra o fluxograma das disciplinas, o que cada uma exige e libera, o que você pode cursar no próximo semestre e quanto falta para formar.</p>
+        <p style={{ margin: 0 }}>Com a matriz, o app mostra o fluxograma das disciplinas, o que cada uma exige e libera, o que você pode cursar no próximo semestre e quanto falta para formar.</p>
         <div className="fgrid">
           <label className="f full"><span>Matriz</span>
             <select value={tpl} onChange={(e) => setTpl(e.target.value)}>{TEMPLATES.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}<option value="">Começar do zero (adicionar à mão)</option></select>

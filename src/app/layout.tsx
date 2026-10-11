@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Diário de Sonda",
+  title: "Fundo do Poço",
   description: "Acompanhamento de estudos: sessões cronometradas, confiança × acerto, calendário de provas, médias e sala de estudos com colegas.",
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };

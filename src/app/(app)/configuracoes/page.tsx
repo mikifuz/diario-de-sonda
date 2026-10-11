@@ -37,7 +37,7 @@ export default function Configuracoes() {
       routine_blocks: st.blocks, mistakes: st.mistakes, review_items: st.reviews, review_logs: st.reviewLogs, tasks: st.todos, curriculum: st.courses, habits: st.habits, habit_checks: st.habitChecks };
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 1)], { type: "application/json" }));
     const a = document.createElement("a");
-    a.href = url; a.download = `diario-de-sonda-${todayKey()}.json`;
+    a.href = url; a.download = `fundo-do-poco-${todayKey()}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
@@ -64,7 +64,7 @@ export default function Configuracoes() {
         void _id; void _t;
         prof = rest;
       } else {
-        st.toast("Este arquivo não é uma cópia do Diário de Sonda.");
+        st.toast("Este arquivo não é uma cópia do Fundo do Poço (nem do antigo Diário de Sonda).");
         return;
       }
       let n = 0;
@@ -107,7 +107,7 @@ export default function Configuracoes() {
   return (
     <>
       <section className="panel">
-        <div className="panel-h"><h2>Aparência</h2><span className="lbl">tema do diário</span></div>
+        <div className="panel-h"><h2>Aparência</h2><span className="lbl">tema do app</span></div>
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(170px,1fr))" }}>
           {SKINS.map((k) => (
             <button key={k.id} className="skin-card" aria-pressed={p.skin === k.id} onClick={() => st.updateProfile({ skin: k.id as Skin })}>

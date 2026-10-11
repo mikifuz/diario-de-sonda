@@ -2,10 +2,11 @@ export function Brand() {
   return (
     <div className="brand">
       <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
-        <path d="M15 2 L8 14 h4 l-3 14 h12 l-3-14 h4 Z" fill="none" stroke="var(--accent)" strokeWidth="1.6" strokeLinejoin="round" />
-        <path d="M11 20h8M10.4 24h9.2M12 16h6" stroke="var(--accent)" strokeWidth="1.2" />
+        <path d="M5 20C5 11.5 9.5 5.5 15 5.5S25 11.5 25 20Z" fill="none" stroke="var(--accent)" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M12.6 20V6.4M17.4 20V6.4" stroke="var(--accent)" strokeWidth="1.4" />
+        <rect x="2.5" y="20" width="25" height="4.6" rx="2.3" fill="none" stroke="var(--accent)" strokeWidth="1.6" />
       </svg>
-      <div><b>Diário de Sonda</b><span>BOLETIM DE ESTUDOS</span></div>
+      <div><b>Fundo do Poço</b><span>BOLETIM DE ESTUDOS</span></div>
     </div>
   );
 }

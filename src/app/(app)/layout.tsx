@@ -41,7 +41,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }, [toastMsg]);
   const toast = useCallback((m: string) => setToastMsg(m), []);
 
-  if (demo === undefined) return <div className="auth-wrap"><div className="empty"><b>Abrindo o diário…</b></div></div>;
+  if (demo === undefined) return <div className="auth-wrap"><div className="empty"><b>Abrindo o app…</b></div></div>;
   if (demo) return (
     <DataProvider uid={DEMO_UID} email="modo demonstração" onToast={toast} demo={demo.data}>
       <DemoRoomProvider demo={demo.room}>
@@ -51,7 +51,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     </DataProvider>
   );
   if (!configured) return <NotConfigured />;
-  if (!user) return <div className="auth-wrap"><div className="empty"><b>Abrindo o diário…</b></div></div>;
+  if (!user) return <div className="auth-wrap"><div className="empty"><b>Abrindo o app…</b></div></div>;
 
   return (
     <DataProvider key={user.id} uid={user.id} email={user.email} onToast={toast}>

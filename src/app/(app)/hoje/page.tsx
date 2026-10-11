@@ -74,7 +74,7 @@ function TaskRow({ t, at, open }: { t: Task; at?: string; open: Open }) {
 }
 
 /* ============ Plano do dia ============ */
-/** Planejamento reverso com os dados do diário */
+/** Planejamento reverso com os dados do app */
 function useReverse() {
   const st = useStore();
   const now = new Date(useNow(60_000));
@@ -314,7 +314,7 @@ function MistakesTab({ open }: { open: Open }) {
             ))}
             <p className="small muted" style={{ margin: "6px 0 0" }}>{bySub.length < 5 ? `Só ${qt(bySub.length, "erro registrado", "erros registrados")}: ainda é cedo para tirar conclusões sobre o tipo mais comum.` : "Clique num tipo para filtrar a lista."}</p>
           </div>
-        ) : <Empty title="Nenhum erro registrado">Ao avaliar uma sessão com resultado parcial ou errado, o diário oferece registrar o erro. Você também pode registrar aqui.</Empty>}
+        ) : <Empty title="Nenhum erro registrado">Ao avaliar uma sessão com resultado parcial ou errado, o app oferece registrar o erro. Você também pode registrar aqui.</Empty>}
       </section>
       {list.length > 0 && (
         <section className="panel">
@@ -410,7 +410,7 @@ function RoutineTab({ open }: { open: Open }) {
 function ExamsTab({ open }: { open: Open }) {
   const st = useStore();
   const { plans, today } = useReverse();
-  if (!plans.length) return <Empty title="Nenhuma prova nos próximos 30 dias">Cadastre as provas com data (ou importe o cronograma na disciplina) para o diário montar o plano até cada uma.</Empty>;
+  if (!plans.length) return <Empty title="Nenhuma prova nos próximos 30 dias">Cadastre as provas com data (ou importe o cronograma na disciplina) para o app montar o plano até cada uma.</Empty>;
   return (
     <>
       {plans.map((pl) => {

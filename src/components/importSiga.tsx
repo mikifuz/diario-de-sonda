@@ -35,7 +35,7 @@ export function ImportSigaModal({ onClose }: { onClose: () => void }) {
     try {
       const p = st.profile;
       const semester = res.period ? res.period.replace("/", ".") : p?.current_semester || "";
-      const idOf = new Map<string, string>(); // código do SIGA → disciplina no diário
+      const idOf = new Map<string, string>(); // código do SIGA → disciplina no app
       const newSubs: Subject[] = [], updSubs: Subject[] = [];
       res.subjects.forEach((s, i) => {
         const ex = findExisting(s.code, s.name);
@@ -74,8 +74,8 @@ export function ImportSigaModal({ onClose }: { onClose: () => void }) {
     <Modal title="Importar do comprovante de matrícula" sub="Rotina semanal · SIGA (UDESC)" onClose={onClose}>
       {!res ? (
         <div className="stack" style={{ gap: 12 }}>
-          <p style={{ margin: 0 }}>No SIGA, gere o <b>Comprovante de matrícula</b> (PDF) e escolha o arquivo aqui. O diário lê as disciplinas e a grade de horários e mostra tudo para você conferir antes de salvar.</p>
-          <p className="small muted" style={{ margin: 0 }}>O arquivo é lido aqui no seu aparelho e não é enviado para lugar nenhum. Funciona com o PDF original; foto ou print da tela não têm o texto que o diário precisa.</p>
+          <p style={{ margin: 0 }}>No SIGA, gere o <b>Comprovante de matrícula</b> (PDF) e escolha o arquivo aqui. O app lê as disciplinas e a grade de horários e mostra tudo para você conferir antes de salvar.</p>
+          <p className="small muted" style={{ margin: 0 }}>O arquivo é lido aqui no seu aparelho e não é enviado para lugar nenhum. Funciona com o PDF original; foto ou print da tela não têm o texto que o app precisa.</p>
           <label className="btn pri" style={{ alignSelf: "flex-start" }}>
             {busy || "Escolher PDF"}
             <input type="file" accept="application/pdf,.pdf" hidden disabled={!!busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) read(f); }} />
@@ -121,7 +121,7 @@ export function ImportSigaModal({ onClose }: { onClose: () => void }) {
               Apagar as {qt(oldClasses.length, "aula", "aulas")} que já estão na rotina (blocos de estudo e outros continuam)</label>
           )}
           {res.subjects.length > 0 && <p className="small muted" style={{ margin: 0 }}>
-            Disciplinas que já existem no diário (mesmo código ou mesmo nome) são reaproveitadas. {nNew ? `${nNew} serão criadas com a sua média mínima padrão; professor, SUB e o resto você completa depois em Disciplinas.` : ""}</p>}
+            Disciplinas que já existem no app (mesmo código ou mesmo nome) são reaproveitadas. {nNew ? `${nNew} serão criadas com a sua média mínima padrão; professor, SUB e o resto você completa depois em Disciplinas.` : ""}</p>}
           <div className="modal-f">
             <button type="button" className="btn ghost" onClick={() => setRes(null)} disabled={!!busy}>Escolher outro arquivo</button>
             <button type="button" className="btn pri" onClick={save} disabled={!!busy || !res.classes.length}>{busy || "Importar"}</button>

@@ -74,7 +74,7 @@ export function buildAlerts(p: AlertInput): Alert[] {
         out.push({
           key: `nd-${a.id}`, level: "warn", days: d,
           text: `${when} e ${nodata.length === 1 ? `${nodata[0].name} ainda não tem` : `${nodata.length} conteúdos ainda não têm`} resultado conferido suficiente${nodata.length > 1 ? ` (${list(nodata.slice(0, 4).map((t) => t.name))}${nodata.length > 4 ? "…" : ""})` : ""}. Faça exercícios e anote quantos acertou.`,
-          why: "Sem resultados conferidos não dá para saber o domínio; o diário não chuta.",
+          why: "Sem resultados conferidos não dá para saber o domínio; o app não chuta.",
           action: { label: "Fazer exercícios", href: study(s.id, nodata[0].id) },
         });
       }
