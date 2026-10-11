@@ -3,7 +3,7 @@
 import { Suspense, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { activeSubjects, timerMs, topicName, useStore } from "@/lib/store";
-import { liveMs, NUDGES, todayMin, useRoom, weekMin, type NudgeKey } from "@/lib/room";
+import { liveMs, memberDesk, NUDGES, todayMin, useRoom, weekMin, type NudgeKey } from "@/lib/room";
 import { dkey, fmtClock, fmtMin, inRange, keyDate, nf, pct, periodRange, stats, streak, todayKey, type Period, qt } from "@/lib/calc";
 import { lastTaught, studyHint, topicExams } from "@/lib/plan";
 import { ACT } from "@/lib/constants";
@@ -12,6 +12,7 @@ import { ConfirmButton, Dot, Empty, I, Icon, Tabs, useNow } from "@/components/u
 import { SessionModal, SubjectModal, TopicOptions } from "@/components/modals";
 import { SessionRow } from "@/components/SessionRow";
 import { SOCIAL, StartModal, type StartArgs } from "@/components/studyStart";
+import { Desk } from "@/components/desk";
 
 function Privacy() {
   const yes = ["Seu apelido, se está estudando agora e há quanto tempo", "Minutos estudados por dia (últimos 35 dias) e sequência de dias", "O nome da disciplina em andamento, só quando você escolhe mostrar"];
@@ -51,9 +52,12 @@ function TimerPanel({ onManual, onNewSubject }: { onManual: () => void; onNewSub
       <div className="panel">
         <div className="panel-h"><h2>Sessão em andamento</h2><span className={"chip " + (t.running ? "ok" : "warn")}>{t.running ? "cronometrando" : "pausada"}</span></div>
         <div className="row between" style={{ gap: 20 }}>
+          <div className="row" style={{ gap: 16, flexWrap: "nowrap" }}>
+          <Desk state={t.running ? "estudando" : "parou"} size={96} />
           <div className="stack" style={{ gap: 6 }}>
             <div className="clock">{fmtClock(timerMs(t, now))}</div>
             <div className="row" style={{ gap: 8 }}><Dot c={s?.color || "var(--muted)"} /><b>{s?.name || "Disciplina removida"}</b>{tn && <span className="muted">· {tn}</span>}<span className="chip">{ACT[t.activity]}</span></div>
+          </div>
           </div>
           <div className="row">
             {discard ? (
@@ -141,7 +145,10 @@ function GroupsArea() {
   const cur = groups.find((x) => x.code === g) || groups[0];
   const isMe = (uid: string) => uid === st.uid;
   const members = cur ? room.members.filter((m) => room.memberships.some((x) => x.code === cur.code && x.user_id === m.user_id)) : [];
-  const now = members.filter((m) => m.studying || m.paused).sort((a, b) => Number(b.studying) - Number(a.studying) || liveMs(b) - liveMs(a));
+  // estudando (abajur aceso) ou parou há menos de 1 h (cinza); depois disso some
+  const desk = (m: typeof members[number]) => memberDesk(m, room.totals[m.user_id]);
+  const now = members.filter((m) => desk(m)).sort((a, b) => Number(b.studying) - Number(a.studying) || Number(b.paused) - Number(a.paused) || liveMs(b) - liveMs(a));
+  const ago = (m: typeof members[number]) => Math.max(1, Math.round((Date.now() - new Date(m.updated_at).getTime()) / 60000));
   const val = (m: typeof members[number]) => (per === "hoje" ? todayMin(m, room.totals[m.user_id]) : weekMin(m, room.totals[m.user_id]));
   const rank = [...members].sort((a, b) => val(b) - val(a));
   const top = Math.max(1, ...rank.map(val));
@@ -156,20 +163,24 @@ function GroupsArea() {
               <span className="small muted">{qt(members.length, "pessoa", "pessoas")} no grupo</span>
             </div>
             <div className="panel-h"><h2>Estudando agora</h2><span className="chip ok">{now.filter((m) => m.studying).length} ao vivo</span></div>
+            <p className="small muted" style={{ margin: "-6px 0 10px" }}>Abajur aceso: estudando agora. Cinza: parou há menos de 1 hora. Depois disso a mesa sai daqui.</p>
             {now.length ? (
               <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 10 }}>
                 {now.map((m) => (
                   <div key={m.user_id} className="panel" style={{ padding: 14, background: "var(--panel2)", outline: isMe(m.user_id) ? "1px solid var(--accent)" : undefined }}>
+                    <div style={{ display: "grid", placeItems: "center", marginBottom: 8 }}><Desk state={desk(m)!} size={130} label={`${m.nick}: ${m.studying ? "estudando, abajur aceso" : "parou há pouco, abajur apagado"}`} /></div>
                     <div className="row between" style={{ flexWrap: "nowrap" }}>
                       <b className="t" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.nick}{isMe(m.user_id) ? " (você)" : ""}</b>
                       <i className="dot" style={{ background: m.studying ? "var(--ok)" : "var(--muted)", animation: m.studying ? "blink 1.6s infinite" : undefined }} />
                     </div>
-                    <div className="num" style={{ fontSize: "1.6rem", marginTop: 6 }}>{fmtClock(liveMs(m))}</div>
-                    <div className="small muted">{m.studying ? "estudando" : "pausado"}{m.subject ? ` · ${m.subject}` : ""}</div>
+                    {m.studying || m.paused
+                      ? <div className="num" style={{ fontSize: "1.6rem", marginTop: 6 }}>{fmtClock(liveMs(m))}</div>
+                      : <div className="num" style={{ fontSize: "1.6rem", marginTop: 6, color: "var(--muted)" }}>{fmtMin(todayMin(m, room.totals[m.user_id]))}</div>}
+                    <div className="small muted">{m.studying ? "estudando" : m.paused ? `pausado há ${qt(ago(m), "minuto", "minutos")}` : `parou há ${qt(ago(m), "minuto", "minutos")} · total de hoje`}{m.subject ? ` · ${m.subject}` : ""}</div>
                   </div>
                 ))}
               </div>
-            ) : <p className="small muted" style={{ margin: 0 }}>Ninguém do grupo está com o cronômetro ligado agora.</p>}
+            ) : <p className="small muted" style={{ margin: 0 }}>Ninguém do grupo estudou na última hora.</p>}
             <div className="panel-h" style={{ marginTop: 22 }}><h2>Placar</h2><Tabs value={per} onChange={setPer} options={[["hoje", "Hoje"], ["semana", "Semana"]]} /></div>
             <div className="list">{rank.map((m, i) => {
               const v = val(m), sk = streak(room.totals[m.user_id] || {}, m.studying);
@@ -223,7 +234,7 @@ function FriendsPanel() {
         const m = room.members.find((x) => x.user_id === f.other);
         return (
           <div key={f.id} className="li" style={{ gap: 8, alignItems: "flex-start" }}>
-            <i className="dot" style={{ background: m?.studying ? "var(--ok)" : "var(--muted)", flex: "none", marginTop: 7 }} />
+            {m && memberDesk(m, room.totals[m.user_id]) ? <Desk state={memberDesk(m, room.totals[m.user_id])!} size={44} /> : <i className="dot" style={{ background: "var(--muted)", flex: "none", marginTop: 7 }} />}
             <div className="grow" style={{ minWidth: 0 }}>
               <div className="t">{f.nick}</div>
               <div className="m">{m?.studying ? `estudando agora · ${fmtClock(liveMs(m))}${m.subject ? ` · ${m.subject}` : ""}` : m?.paused ? "pausado" : "fora da sala agora"}</div>

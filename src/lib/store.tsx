@@ -4,6 +4,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { sb, friendlyError } from "./supabase";
 import type { DemoData } from "./demo";
+import { autoStop, forgotten } from "./timer";
 import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic, AppNotification, Course, Habit, HabitCheck } from "./types";
 
 export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs" | "tasks" | "notifications" | "curriculum" | "habits" | "habit_checks";
@@ -218,6 +219,39 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     if (!exists) { toast("A disciplina desta sessão foi excluída; o tempo não foi salvo."); return; }
     if (await save("study_sessions", s)) setEvalId(s.id);
   }, [save, toast, updateProfile]);
+
+  // cronômetro esquecido: mais de 20 h seguidas sem pausa → desliga sozinho e avisa
+  const autoStopping = useRef(false);
+  useEffect(() => {
+    if (!ready) return;
+    const check = async () => {
+      const t = dataRef.current.profile?.timer;
+      if (!t || !forgotten(t) || autoStopping.current) return;
+      autoStopping.current = true;
+      const { keepMs, lostSince, minutes } = autoStop(t);
+      const subj = dataRef.current.subjects.find((x) => x.id === t.subject_id);
+      await updateProfile({ timer: null });
+      if (minutes >= 1 && subj) {
+        await save("study_sessions", {
+          id: crypto.randomUUID(), subject_id: t.subject_id, topic_id: t.topic_id || null, activity: t.activity,
+          started_at: new Date(t.started || lostSince - keepMs).toISOString(), duration_min: Math.min(1440, minutes),
+          questions: null, correct: null, notes: "Cronômetro desligado sozinho após 20 h sem pausa; salvo só o tempo até a última pausa.",
+          confidence: null, result: null, autonomy: null, difficulty: null, comprehension: null,
+        });
+      }
+      const from = new Date(lostSince).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      const body = `O cronômetro${subj ? ` de ${subj.name}` : ""} ficou ligado mais de 20 h sem pausa (desde ${from}) e foi desligado sozinho. ` +
+        "Esse trecho não foi salvo, porque não dá para saber quando você parou de verdade" +
+        (minutes >= 1 ? `; os ${minutes} min de antes da última pausa foram salvos. ` : ". ") +
+        "Se estudou nesse período, registre o tempo certo em Sala → Registrar manualmente.";
+      toast("Cronômetro desligado sozinho: ficou mais de 20 h ligado sem pausa.");
+      await save("notifications", { id: crypto.randomUUID(), kind: "aviso", title: "Cronômetro desligado sozinho", body, data: {}, from_user: null, created_at: new Date().toISOString(), read_at: null });
+      autoStopping.current = false;
+    };
+    check();
+    const iv = setInterval(check, 60000);
+    return () => clearInterval(iv);
+  }, [ready, updateProfile, save, toast]);
 
   const value = useMemo<Store>(() => ({
     ...data, uid, email, ready, demo: isDemo, save, saveMany, remove, updateProfile, reload, toast, evalId, setEvalId,

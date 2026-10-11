@@ -8,6 +8,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { sb, friendlyError } from "./supabase";
 import { useStore, timerMs } from "./store";
 import { addDays, todayKey, weekStartKey } from "./calc";
+import { deskState, type Desk } from "./timer";
 import type { DailyTotal, Friend, GroupMember, RoomMember, StudyGroup } from "./types";
 
 interface Room {
@@ -55,6 +56,12 @@ export function weekMin(m: RoomMember, days: Record<string, number> = {}) {
   let s = 0;
   for (const [k, v] of Object.entries(days)) if (k >= a) s += v;
   return s + (m.studying || m.paused ? liveMs(m) / 60000 : 0);
+}
+
+/** Mesinha de cada pessoa: acesa, cinza (parou há menos de 1 h) ou nada */
+export function memberDesk(m: RoomMember, days: Record<string, number> = {}, now = Date.now()): Desk {
+  const t = todayKey();
+  return deskState(m, (days[t] || 0) > 0 || (days[addDays(t, -1)] || 0) > 0, now);
 }
 
 export function RoomProvider({ children }: { children: ReactNode }) {
@@ -143,7 +150,8 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       (want.since ? !!me.since && Math.abs(new Date(me.since).getTime() - new Date(want.since).getTime()) < 1000 : !me.since);
     if (same) return;
     pushing.current = true;
-    setMembers((ms) => ms.map((m) => (m.user_id === uid ? { ...m, ...want } : m)));
+    // updated_at local para a mesinha ficar cinza logo ao parar (o banco devolve o valor certo em seguida)
+    setMembers((ms) => ms.map((m) => (m.user_id === uid ? { ...m, ...want, updated_at: new Date().toISOString() } : m)));
     sb().from("room_members").update(want).eq("user_id", uid).then(({ error }) => {
       pushing.current = false;
       if (error) console.error(error);
@@ -260,12 +268,16 @@ export function DemoRoomProvider({ demo, children }: { demo: import("./demo").De
   const st = useStore();
   const { uid, toast } = st;
   const timer = st.profile?.timer || null;
+  // hora da última mudança do meu cronômetro (para a mesinha); antes disso, a do exemplo
+  const [changedAt, setChangedAt] = useState<string | null>(null);
+  const first = useRef(true);
+  useEffect(() => { if (first.current) { first.current = false; return; } setChangedAt(new Date().toISOString()); }, [timer]);
   const members = useMemo(() => demo.members.map((m) => {
     if (m.user_id !== uid) return m;
     const t = timer && timer.social !== "sozinho" ? timer : null;
-    return { ...m, studying: !!(t && t.running), paused: !!(t && !t.running), since: t && t.running ? new Date(t.since).toISOString() : null,
+    return { ...m, updated_at: changedAt || new Date(0).toISOString(), studying: !!(t && t.running), paused: !!(t && !t.running), since: t && t.running ? new Date(t.since).toISOString() : null,
       accum_ms: t ? Math.round(t.running ? t.accum || 0 : timerMs(t)) : 0, subject: t && t.social === "materia" ? st.subjects.find((s) => s.id === t.subject_id)?.name || "" : "" };
-  }), [demo.members, uid, timer, st.subjects]);
+  }), [demo.members, uid, timer, st.subjects, changedAt]);
   const totals = useMemo(() => {
     const out: Record<string, Record<string, number>> = {};
     for (const r of demo.totals) (out[r.user_id] ||= {})[r.day] = r.minutes;
