@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { activeSubjects, useStore } from "@/lib/store";
 import { daysBetween, todayKey, qt } from "@/lib/calc";
 import { buildAlerts } from "@/lib/alerts";
+import { verdict } from "@/lib/verdict";
 import { masteryCfg } from "@/lib/mastery";
 import type { Todo } from "@/lib/types";
 import { ConfirmButton, Dot, I, Icon } from "./ui";
@@ -92,6 +93,27 @@ export function TodoPanel() {
           <ConfirmButton small label="Apagar concluídas" question={`Apagar ${qt(done.length, "tarefa concluída", "tarefas concluídas")}?`} confirmLabel="Apagar" onConfirm={async () => { for (const t of done) await st.remove("tasks", t.id); }} />
         </details>
       )}
+    </section>
+  );
+}
+
+/** "Geralzão" do Painel: frase direta (com um pingo de ironia) e o fato que a justifica */
+export function VerdictCard() {
+  const st = useStore();
+  const v = verdict({ today: todayKey(), sessions: st.sessions, subjects: st.subjects, assessments: st.assessments, weeklyGoalH: Number(st.profile?.weekly_goal_h) || null });
+  if (!v) return null;
+  const icon = { sumiu: "👀", parado: "⏳", agua: "🌊", prova_pouco: "⚠️", notas: "📉", pouco: "🐢", voando: "🚀", normal: "🧭" }[v.kind];
+  const color = { bad: "var(--bad)", warn: "var(--warn)", ok: "var(--ok)", info: "var(--accent)" }[v.level];
+  return (
+    <section className="panel verdict" style={{ borderLeft: `4px solid ${color}` }} aria-label="Como anda seu estudo">
+      <div className="row" style={{ gap: 12, alignItems: "flex-start", flexWrap: "nowrap" }}>
+        <span aria-hidden="true" style={{ fontSize: "1.8rem", lineHeight: 1 }}>{icon}</span>
+        <div className="grow" style={{ minWidth: 0 }}>
+          <b style={{ fontSize: "1.1rem", display: "block" }}>{v.title}</b>
+          <span className="small muted">{v.why}</span>
+          {v.action && <div style={{ marginTop: 8 }}><Link className="btn sm" href={v.action.href}>{v.action.label}</Link></div>}
+        </div>
+      </div>
     </section>
   );
 }

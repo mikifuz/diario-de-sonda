@@ -8,7 +8,7 @@ import { GRADED } from "@/lib/constants";
 import { ChartCalib, ChartDays, ChartLine, Gauge, type DayBar } from "@/components/charts";
 import { Dot, Empty, I, Icon, Tabs } from "@/components/ui";
 import { EventModal, SubjectModal } from "@/components/modals";
-import { AlertsPanel, TodoPanel } from "@/components/dashboard";
+import { AlertsPanel, TodoPanel, VerdictCard } from "@/components/dashboard";
 import { HabitsPanel } from "@/components/habits";
 import { GettingStarted } from "@/components/onboarding";
 
@@ -70,6 +70,7 @@ export default function Painel() {
   return (
     <>
       <GettingStarted />
+      <VerdictCard />
       <section className="kpis" aria-label="Resumo">
         <div className="kpi"><span className="lbl">Hoje</span><span className="v">{fmtMin(mToday)}</span><span className="s">{qt(all.filter((s) => dkey(s.started_at) === t).length, "sessão", "sessões")}</span></div>
         <div className="kpi"><span className="lbl">Esta semana</span><span className="v">{fmtMin(mWeek)}</span>
