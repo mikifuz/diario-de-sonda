@@ -7,7 +7,7 @@ import { addDays, daysBetween, fmtMin, gradeCalc, keyDate, nf, todayKey, qt } fr
 import { cleanSteps, dm, firstDue, fromMin, itemState, parseSteps, planDay, toMin, weekCapacity, type PlanInput, type Task } from "@/lib/plan";
 import { BLOCK, MISTAKE, PREF, WD_S, WEEKDAYS } from "@/lib/constants";
 import { BAND, masteryCfg } from "@/lib/mastery";
-import { FINAL_MIN, RESERVE, TARGET, reversePlan, todayTasks } from "@/lib/reverse";
+import { FINAL_MIN, RESERVE, TARGET, reversePlan, todayTasks, type ExamPlan } from "@/lib/reverse";
 import type { Activity, MistakeCategory, ReviewItem, StudyPref } from "@/lib/types";
 import { Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
 import { BlockModal, MistakeModal, ReviewItemModal, ReviewModal } from "@/components/planning";
@@ -145,7 +145,8 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
       )}
       {plan.notes.map((n) => <div key={n} className="callout">{n}</div>)}
       {plans.filter((pl) => pl.missing > 0 && pl.topics.length).map((pl) => (
-        <div key={pl.exam.id} className="callout"><b>{pl.exam.name} de {pl.subject.name} em {qt(pl.days, "dia", "dias")}: não cabe tudo.</b> Faltam {pl.missing} min de estudo antes da prova. <button className="btn sm ghost" onClick={goExams}>Ver o plano da prova</button></div>
+        <div key={pl.exam.id} className="callout"><b>{pl.exam.name} de {pl.subject.name} em {qt(pl.days, "dia", "dias")}: não cabe tudo.</b> Faltam {pl.missing} min de estudo antes da prova.
+          <PriorityList pl={pl} /> <button className="btn sm ghost" onClick={goExams}>Ver o plano da prova</button></div>
       ))}
       {subOffers.map((o) => (
         <div key={o.sub.id} className="callout info stack" style={{ gap: 8 }}>
@@ -419,6 +420,7 @@ function ExamsTab({ open }: { open: Open }) {
               <h2><Dot c={pl.subject.color} /> {pl.exam.name} · {pl.subject.name}</h2>
               <span className={"chip " + (pl.missing ? "bad" : pl.days <= 7 ? "warn" : "")}>{dm(pl.exam.date!)} · em {qt(pl.days, "dia", "dias")}</span>
             </div>
+            {pl.priority.length > 0 && <div className="callout small" style={{ marginBottom: 8 }}><PriorityList pl={pl} /></div>}
             {pl.notes.map((n) => <div key={n} className={"callout small" + (n.startsWith("Conteúdos que ainda") ? " info" : "")} style={{ marginBottom: 8 }}>{n}</div>)}
             {pl.topics.length > 0 && (
               <div className="tbl-wrap"><table>
@@ -460,5 +462,19 @@ function ExamsTab({ open }: { open: Open }) {
         </ol>
       </details>
     </>
+  );
+}
+
+/** Quando não cabe tudo: o que priorizar, por quê e como */
+function PriorityList({ pl }: { pl: ExamPlan }) {
+  if (!pl.priority.length) return null;
+  return (
+    <span style={{ display: "block", marginTop: 6 }}>
+      <b>Para chegar mais seguro, priorize:</b>
+      <ol style={{ margin: "4px 0 4px 18px", padding: 0 }}>
+        {pl.priority.map((x) => <li key={x.topic.id}><b>{x.topic.name}</b>: {x.why}. Como: {x.how}.</li>)}
+      </ol>
+      <span className="muted">O tempo que existe já vai primeiro para esses. Nos outros conteúdos, uma revisão rápida (resumo e dois ou três exercícios) ajuda a não ficar em branco.</span>
+    </span>
   );
 }

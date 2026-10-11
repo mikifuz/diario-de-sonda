@@ -1,7 +1,7 @@
 // Planejamento reverso: a partir da data de cada prova, distribui o estudo dos conteúdos
 // que caem nela pelos blocos de estudo da rotina, até a véspera. Calculado na hora (não
 // fica gravado): conforme você estuda, o que falta diminui e o plano se refaz.
-import { addDays, daysBetween, dkey } from "./calc";
+import { addDays, daysBetween, dkey, nf, qt } from "./calc";
 import { BAND, mastery, type Band, type MasteryCfg } from "./mastery";
 import { effortOf, scaleMin } from "./effort";
 import { dm, freeStudy, toMin, topicsForExam, type Task } from "./plan";
@@ -22,13 +22,17 @@ export interface RevInput {
   assessments: Assessment[]; items: ReviewItem[]; logs: ReviewLog[]; mistakes: Mistake[]; cfg?: MasteryCfg;
 }
 export interface Chunk { key: string; examId: string; subjectId: string; topicId: string | null; day: string; minutes: number; title: string; why: string; final?: boolean }
-export interface TopicNeed { topic: Topic; score: number | null; band: Band | null; target: number; done: number; need: number; available: string | null }
+export interface TopicNeed { topic: Topic; score: number | null; band: Band | null; target: number; done: number; need: number; available: string | null; mistakes: number; conf: number | null; urgency: number }
+/** Quando não cabe tudo: o que estudar primeiro, por quê e como */
+export interface Priority { topic: Topic; why: string; how: string }
 export interface ExamPlan {
   exam: Assessment; subject: Subject; days: number;
   topics: TopicNeed[];
   chunks: Chunk[];
   /** minutos que não couberam antes da prova */
   missing: number;
+  /** quando falta tempo: os conteúdos para priorizar */
+  priority: Priority[];
   notes: string[];
 }
 
@@ -75,8 +79,13 @@ export function reversePlan(p: RevInput): ExamPlan[] {
       const done = p.sessions.filter((s) => s.topic_id === t.id && dkey(s.started_at) >= from && dkey(s.started_at) <= p.today).reduce((a, s) => a + s.duration_min, 0);
       // conteúdo ainda não dado: só entra a partir da aula
       const available = t.taught_on && t.taught_on > p.today ? t.taught_on : null;
-      return { topic: t, score: m.score, band: m.band, target, done, need: r5(target - done), available };
-    }).sort((a, b) => (a.score ?? -1) - (b.score ?? -1));
+      const mistakes = p.mistakes.filter((x) => x.topic_id === t.id && x.occurred_on >= from).length;
+      const confs = p.sessions.filter((x) => x.topic_id === t.id && x.confidence != null && dkey(x.started_at) >= from).map((x) => x.confidence!);
+      const conf = confs.length ? confs.reduce((a, b) => a + b, 0) / confs.length : null;
+      // urgência: domínio baixo (ou sem dados), erros registrados, confiança baixa e nada estudado ainda
+      const urgency = (m.score == null ? 55 : 100 - m.score) + Math.min(3, mistakes) * 12 + (conf != null && conf <= 2.5 ? 20 : 0) + (done === 0 ? 10 : 0);
+      return { topic: t, score: m.score, band: m.band, target, done, need: r5(target - done), available, mistakes, conf, urgency };
+    }).sort((a, b) => b.urgency - a.urgency || (a.score ?? -1) - (b.score ?? -1));
     if (!topics.length) notes.push("Nenhum conteúdo ligado a esta prova. Importe o cronograma ou marque em cada conteúdo em que prova ele cai.");
 
     const chunks: Chunk[] = [];
@@ -113,9 +122,22 @@ export function reversePlan(p: RevInput): ExamPlan[] {
       }
     }
     missing += pending.reduce((a, x) => a + x.m, 0);
+    const priority: Priority[] = missing > 0 ? topics.filter((t) => t.need > 0).slice(0, 3).map((t) => {
+      const why = [
+        t.score == null ? "ainda sem resultado conferido" : `domínio ${t.score} (${BAND[t.band!][0].toLowerCase()})`,
+        t.mistakes ? qt(t.mistakes, "erro registrado", "erros registrados") : "",
+        t.conf != null && t.conf <= 2.5 ? `confiança baixa (${nf(t.conf)}/5)` : "",
+        t.done === 0 ? "nada estudado ainda para esta prova" : "",
+      ].filter(Boolean).join(", ");
+      const how = t.mistakes ? "refaça os exercícios em que errou e depois questões novas do mesmo tipo"
+        : t.conf != null && t.conf <= 2.5 ? "resolva exercícios e confira as respostas: é o que mostra se a insegurança tem fundamento"
+        : t.score == null ? "faça uma lista curta e anote quantas acertou"
+        : "exercícios do básico ao nível de prova";
+      return { topic: t.topic, why, how };
+    }) : [];
     if (missing > 0 && topics.length) notes.push(`Faltam ${missing} min de estudo antes da ${exam.name}: não couberam nos blocos de estudo até ${dm(eve)} (depois das provas anteriores e de ${Math.round(RESERVE * 100)}% reservado para revisões e aulas).`);
     if (topics.some((t) => t.available)) notes.push("Conteúdos que ainda não foram dados entram no plano a partir da data da aula.");
-    out.push({ exam, subject, days, topics, chunks: chunks.sort((a, b) => a.day.localeCompare(b.day)), missing, notes });
+    out.push({ exam, subject, days, topics, chunks: chunks.sort((a, b) => a.day.localeCompare(b.day)), missing, priority, notes });
   }
   return out;
 }

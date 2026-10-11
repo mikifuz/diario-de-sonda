@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { agenda, useStore } from "@/lib/store";
 import { daysBetween, fmtMin, keyDate, qt } from "@/lib/calc";
 import { BLOCK, EVT } from "@/lib/constants";
-import { dm, fromMin, planDay, toMin, type PlanInput, type Task } from "@/lib/plan";
+import { classOff, dm, fromMin, noClass, planDay, toMin, type PlanInput, type Task } from "@/lib/plan";
 
 const label = (t: Task) => (t.kind === "revisao" ? `Revisão: ${t.title}` : t.title);
 
@@ -31,8 +31,11 @@ export function DayPrint({ input, onDone }: { input: PlanInput; onDone: () => vo
 
   // linha do tempo: aulas e outros blocos da rotina, compromissos do calendário e as tarefas de estudo encaixadas
   const lines: Line[] = [];
+  const nc = noClass(day, st.events);
   for (const b of st.blocks.filter((x) => x.weekday === wd && x.kind !== "estudo")) {
     if (b.kind === "aula" && b.subject_id && st.subjects.find((s) => s.id === b.subject_id)?.archived) continue;
+    const off = b.kind === "aula" ? classOff(nc, b.subject_id) : null;
+    if (off) { lines.push({ at: toMin(b.start_time), end: toMin(b.end_time), text: `Sem aula de ${subName(b.subject_id) || "disciplina"}`, sub: off, box: false }); continue; }
     lines.push({ at: toMin(b.start_time), end: toMin(b.end_time), text: b.kind === "aula" ? `Aula de ${subName(b.subject_id) || "disciplina"}` : BLOCK[b.kind], sub: b.label || undefined, box: b.kind === "exercicio" });
   }
   const cal = agenda(st.subjects, st.assessments, st.events).filter((e) => e.date === day && e.status !== "cancelado" && e.status !== "concluido");

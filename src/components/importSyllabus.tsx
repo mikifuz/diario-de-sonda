@@ -4,12 +4,12 @@
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { buildPlan, classify, KIND_LABEL, norm, rowsFromText, subCoverage, type Entry, type EntryKind } from "@/lib/syllabus";
-import type { Assessment, Subject, Topic } from "@/lib/types";
+import type { Assessment, CalEvent, Subject, Topic } from "@/lib/types";
 import { Modal } from "./ui";
 import { qt } from "@/lib/calc";
 
 const dm = (k: string) => `${k.slice(8, 10)}/${k.slice(5, 7)}`;
-const DEFAULT_ON: Record<EntryKind, boolean> = { aula: true, prova: true, sub: true, trabalho: true, exercicios: false, sem_aula: false };
+const DEFAULT_ON: Record<EntryKind, boolean> = { aula: true, prova: true, sub: true, trabalho: true, exercicios: false, sem_aula: true };
 
 export function ImportSyllabusModal({ s, onClose }: { s: Subject; onClose: () => void }) {
   const st = useStore();
@@ -97,8 +97,14 @@ export function ImportSyllabusModal({ s, onClose }: { s: Subject; onClose: () =>
         created++;
       }
       if (rows.length && !(await st.saveMany("topics", rows))) return;
+      // dias sem aula do cronograma (feriado, recesso…): viram "Sem aula" no calendário, só desta disciplina
+      const offs = chosen.filter((e) => e.kind === "sem_aula" && !st.events.some((x) => x.type === "sem_aula" && x.date === e.date && (x.subject_id === s.id || !x.subject_id)));
+      const offRows: CalEvent[] = [...new Map(offs.map((e) => [e.date, e])).values()].map((e) => ({
+        id: crypto.randomUUID(), subject_id: s.id, title: e.raw.trim().slice(0, 120) || "Sem aula", type: "sem_aula", date: e.date, time: null, priority: "baixa", status: "pendente", description: "Do cronograma do professor",
+      }));
+      if (offRows.length && !(await st.saveMany("events", offRows))) return;
       const noWeight = plan.exams.some((x) => x.kind !== "sub" && x.weight == null);
-      st.toast(`${qt(created, "conteúdo novo", "conteúdos novos")}${updated ? `, ${qt(updated, "atualizado", "atualizados")}` : ""}, ${qt(newExams.length, "avaliação", "avaliações")}.${noWeight ? " Confira os pesos em Notas." : ""}`);
+      st.toast(`${qt(created, "conteúdo novo", "conteúdos novos")}${updated ? `, ${qt(updated, "atualizado", "atualizados")}` : ""}, ${qt(newExams.length, "avaliação", "avaliações")}${offRows.length ? `, ${qt(offRows.length, "dia sem aula", "dias sem aula")}` : ""}.${noWeight ? " Confira os pesos em Notas." : ""}`);
       onClose();
     } finally { setBusy(""); }
   };

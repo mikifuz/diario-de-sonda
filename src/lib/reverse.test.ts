@@ -67,3 +67,20 @@ test("sem conteúdos ligados, explica o que fazer", () => {
   const [pl] = reversePlan(inp({ topics: [] }));
   assert.match(pl.notes[0], /Nenhum conteúdo ligado/);
 });
+
+test("quando não cabe tudo: recomenda o que priorizar, com o motivo e o que fazer", () => {
+  const topics = [T({ id: "a", name: "Integrais duplas" }), T({ id: "b", name: "Teorema de Green" }), T({ id: "c", name: "Rotacional" })];
+  const sessions = [S({ topic_id: "b", confidence: 2 }), S({ topic_id: "b", confidence: 2 })];
+  const mistakes = [1, 2].map((i) => ({ id: `m${i}`, subject_id: "s", topic_id: "c", session_id: null, category: "sinal" as const, description: "x", correction: "", source: "", occurred_on: "2026-10-10" }));
+  const pouco = [B(1, "14:00", "15:00")]; // só 1 h na segunda
+  const [pl] = reversePlan(inp({ topics, sessions, mistakes, blocks: pouco }));
+  assert.ok(pl.missing > 0);
+  assert.deepEqual(pl.priority.map((x) => x.topic.name), ["Rotacional", "Teorema de Green", "Integrais duplas"]);
+  assert.match(pl.priority[0].why, /2 erros registrados/);
+  assert.match(pl.priority[0].how, /refaça os exercícios em que errou/);
+  assert.match(pl.priority[1].why, /confiança baixa \(2,0\/5\)/);
+  // o tempo que existe vai primeiro para o mais urgente
+  assert.equal(pl.chunks.find((c) => !c.final)?.topicId, "c");
+  // com tempo de sobra, não há recomendação
+  assert.equal(reversePlan(inp({ topics: topics.slice(0, 1) }))[0].priority.length, 0);
+});

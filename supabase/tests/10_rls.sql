@@ -380,6 +380,11 @@ do $$ begin
   if (select count(*) from public.curriculum where status = 'aprovada') <> 0 then raise exception 'Bruno alterou a matriz de Ana'; end if;
 end $$;
 
+-- ============ Sem aula / feriado ============
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.events (title, type, date) values ('Recesso', 'sem_aula', current_date + 3);
+delete from public.events where type = 'sem_aula';
+
 -- ============ Exercício físico e hábitos ============
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
 insert into public.routine_blocks (weekday, start_time, end_time, kind) values (2, '18:00', '19:00', 'exercicio');

@@ -1,4 +1,5 @@
 "use client";
+import { holidayOf } from "@/lib/holidays";
 import { useState } from "react";
 import { agenda, useStore, type AgendaItem } from "@/lib/store";
 import { addDays, daysBetween, dkey, keyDate, nf, todayKey, qt } from "@/lib/calc";
@@ -71,6 +72,7 @@ export default function Calendario() {
               return (
                 <button key={k} className={["day", k.slice(0, 7) !== month && "out", k === t && "today", k === sel && "sel"].filter(Boolean).join(" ")} onClick={() => pick(k)} aria-label={`${fmtDL(k)}, ${evs.length} item(ns)`}>
                   <span className="dn">{keyDate(k).getDate()}</span>
+                  {holidayOf(k) && <span className="ev" style={{ ["--c" as string]: "var(--muted)" }} title="Feriado nacional: sem aula">{holidayOf(k)}</span>}
                   {evs.slice(0, 3).map((e) => <span key={e.id} className="ev" style={{ ["--c" as string]: color(e) }}>{GRADED.includes(e.type) ? "● " : ""}{e.title}</span>)}
                   {evs.length > 3 && <span className="small muted">+{evs.length - 3}</span>}
                   <span className="dots">{evs.slice(0, 4).map((e) => <i key={e.id} style={{ ["--c" as string]: color(e) }} />)}</span>
@@ -82,6 +84,7 @@ export default function Calendario() {
         <div className="stack" style={{ gap: 16 }}>
           <div className="panel">
             <div className="panel-h"><h3>{fmtDL(sel)}</h3><button className="btn sm" onClick={() => setModal({ id: null, date: sel })}><Icon d={I.plus} s={14} />Adicionar</button></div>
+            {holidayOf(sel) && <p className="small" style={{ margin: "0 0 8px" }}>Feriado nacional: <b>{holidayOf(sel)}</b>. Sem aula; no plano, os horários de aula viram tempo de estudo.</p>}
             {dayEv.length ? <div className="list">{dayEv.map((e) => <Row key={e.id} e={e} />)}</div> : <p className="muted small" style={{ margin: 0 }}>Nada marcado neste dia.</p>}
           </div>
           <div className="panel">
