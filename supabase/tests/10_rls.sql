@@ -380,6 +380,50 @@ do $$ begin
   if (select count(*) from public.curriculum where status = 'aprovada') <> 0 then raise exception 'Bruno alterou a matriz de Ana'; end if;
 end $$;
 
+-- ============ Exercício físico e hábitos ============
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.routine_blocks (weekday, start_time, end_time, kind) values (2, '18:00', '19:00', 'exercicio');
+insert into public.habits (id, name) values ('80000000-0000-0000-0000-000000000001', 'Fiquei pouco tempo no celular');
+insert into public.habit_checks (habit_id, day) values ('80000000-0000-0000-0000-000000000001', current_date);
+do $$ begin
+  begin
+    insert into public.habit_checks (habit_id, day) values ('80000000-0000-0000-0000-000000000001', current_date);
+    raise exception 'FALHOU: hábito marcado duas vezes no mesmo dia';
+  exception when unique_violation then null;
+  end;
+  begin
+    insert into public.habits (name) values ('  ');
+    raise exception 'FALHOU: hábito sem nome';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into public.routine_blocks (weekday, start_time, end_time, kind) values (2, '18:00', '19:00', 'balada');
+    raise exception 'FALHOU: tipo de bloco inválido';
+  exception when check_violation then null;
+  end;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+delete from public.habit_checks;
+update public.habits set name = 'x';
+do $$ begin
+  if (select count(*) from public.habits) <> 0 or (select count(*) from public.habit_checks) <> 0 then raise exception 'Bruno vê os hábitos de Ana'; end if;
+  begin
+    insert into public.habit_checks (habit_id, day) values ('80000000-0000-0000-0000-000000000001', current_date - 1);
+    raise exception 'FALHOU: marcou hábito de outra pessoa';
+  exception when foreign_key_violation then null;
+  end;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+do $$ begin
+  if (select count(*) from public.habit_checks) <> 1 then raise exception 'Bruno apagou o registro de Ana'; end if;
+  if (select name from public.habits) <> 'Fiquei pouco tempo no celular' then raise exception 'Bruno alterou o hábito de Ana'; end if;
+end $$;
+delete from public.habits;
+do $$ begin
+  if (select count(*) from public.habit_checks) <> 0 then raise exception 'registro do hábito apagado continuou'; end if;
+end $$;
+delete from public.routine_blocks where kind = 'exercicio';
+
 -- Ana: apagar disciplina apaga sessões e avaliações dela
 delete from public.subjects where id = '10000000-0000-0000-0000-000000000001';
 do $$ begin

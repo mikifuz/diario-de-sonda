@@ -4,25 +4,25 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { sb, friendlyError } from "./supabase";
 import type { DemoData } from "./demo";
-import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic, AppNotification, Course } from "./types";
+import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic, AppNotification, Course, Habit, HabitCheck } from "./types";
 
-export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs" | "tasks" | "notifications" | "curriculum";
-type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "mistakes" | "reviews" | "reviewLogs" | "todos" | "notes" | "courses";
+export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs" | "tasks" | "notifications" | "curriculum" | "habits" | "habit_checks";
+type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "mistakes" | "reviews" | "reviewLogs" | "todos" | "notes" | "courses" | "habits" | "habitChecks";
 const KEY: Record<Table, Key> = {
   subjects: "subjects", topics: "topics", study_sessions: "sessions", assessments: "assessments", events: "events",
-  routine_blocks: "blocks", mistakes: "mistakes", review_items: "reviews", review_logs: "reviewLogs", tasks: "todos", notifications: "notes", curriculum: "courses",
+  routine_blocks: "blocks", mistakes: "mistakes", review_items: "reviews", review_logs: "reviewLogs", tasks: "todos", notifications: "notes", curriculum: "courses", habits: "habits", habit_checks: "habitChecks",
 };
 type RowOf = {
   subjects: Subject; topics: Topic; study_sessions: Session; assessments: Assessment; events: CalEvent;
-  routine_blocks: RoutineBlock; mistakes: Mistake; review_items: ReviewItem; review_logs: ReviewLog; tasks: Todo; notifications: AppNotification; curriculum: Course;
+  routine_blocks: RoutineBlock; mistakes: Mistake; review_items: ReviewItem; review_logs: ReviewLog; tasks: Todo; notifications: AppNotification; curriculum: Course; habits: Habit; habit_checks: HabitCheck;
 };
 export const TABLES = Object.keys(KEY) as Table[];
 
 interface Data {
   profile: Profile | null; subjects: Subject[]; topics: Topic[]; sessions: Session[]; assessments: Assessment[]; events: CalEvent[];
-  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[]; todos: Todo[]; notes: AppNotification[]; courses: Course[];
+  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[]; todos: Todo[]; notes: AppNotification[]; courses: Course[]; habits: Habit[]; habitChecks: HabitCheck[];
 }
-const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [], blocks: [], mistakes: [], reviews: [], reviewLogs: [], todos: [], notes: [], courses: [] };
+const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [], blocks: [], mistakes: [], reviews: [], reviewLogs: [], todos: [], notes: [], courses: [], habits: [], habitChecks: [] };
 
 export interface Store extends Data {
   uid: string;
@@ -70,6 +70,8 @@ const COLS: Record<Table, string> = {
   tasks: "id,title,subject_id,due,done,done_at",
   notifications: "id,kind,title,body,data,from_user,created_at,read_at",
   curriculum: "id,name,code,phase,credits,kind,prereqs,min_pct,min_phase,status,grade,term,subject_id,position",
+  habits: "id,name,position,active",
+  habit_checks: "id,habit_id,day",
 };
 
 export function DataProvider({ uid, email, children, onToast, demo }: { uid: string; email: string; children: ReactNode; onToast: (m: string) => void; demo?: DemoData }) {
@@ -99,6 +101,7 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     if (t === "study_sessions") q = q.order("started_at", { ascending: false }).limit(10000);
     if (t === "review_logs") q = q.order("reviewed_at", { ascending: false }).limit(10000);
     if (t === "notifications") q = q.order("created_at", { ascending: false }).limit(200);
+    if (t === "habit_checks") q = q.order("day", { ascending: false }).limit(5000);
     const { data: rows, error } = await q;
     if (error) throw error;
     let list = (rows || []) as unknown as RowOf[typeof t][];
@@ -169,6 +172,7 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
       study_sessions: ["mistakes"],
       mistakes: ["review_items", "review_logs"],
       review_items: ["review_logs"],
+      habits: ["habit_checks"],
     };
     deps[t]?.forEach((x) => reload(x));
     return true;
@@ -236,6 +240,7 @@ function demoCascade(d: Data, t: Table, id: string): Data {
     Object.assign(x, { sessions: un(x.sessions), mistakes: un(x.mistakes), reviews: un(x.reviews), topics: x.topics.map((tp) => (tp.parent_id === id ? { ...tp, parent_id: null } : tp)) });
   }
   if (t === "assessments") Object.assign(x, { topics: x.topics.map((tp) => (tp.assessment_id === id ? { ...tp, assessment_id: null } : tp)), reviews: x.reviews.map((r) => (r.assessment_id === id ? { ...r, assessment_id: null } : r)), assessments: x.assessments.map((a) => (a.sub_id === id ? { ...a, sub_id: null } : a)) });
+  if (t === "habits") x.habitChecks = x.habitChecks.filter((c) => c.habit_id !== id);
   if (t === "mistakes") x.reviews = x.reviews.filter((r) => r.mistake_id !== id);
   const items = new Set(x.reviews.map((r) => r.id));
   x.reviewLogs = x.reviewLogs.filter((l) => items.has(l.item_id));

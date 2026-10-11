@@ -3,7 +3,7 @@
 import { addDays, dkey, keyDate, todayKey } from "./calc";
 import { buildReport, reportWeek } from "./report";
 import { fromTemplate } from "./curriculum";
-import type { Course,
+import type { Course, Habit, HabitCheck,
   AppNotification, Assessment, CalEvent, DailyTotal, Friend, Mistake, Profile, ReviewItem, ReviewLog, RoomMember, RoutineBlock, Session, StudyGroup,
   Subject, Todo, Topic, GroupMember,
 } from "./types";
@@ -13,7 +13,7 @@ export const DEMO_UID = "demo-voce";
 
 export interface DemoData {
   profile: Profile; subjects: Subject[]; topics: Topic[]; sessions: Session[]; assessments: Assessment[]; events: CalEvent[];
-  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[]; todos: Todo[]; notes: AppNotification[]; courses: Course[];
+  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[]; todos: Todo[]; notes: AppNotification[]; courses: Course[]; habits: Habit[]; habitChecks: HabitCheck[];
 }
 export interface DemoRoom { members: RoomMember[]; groups: StudyGroup[]; memberships: GroupMember[]; totals: DailyTotal[]; friends: Friend[] }
 
@@ -153,6 +153,7 @@ export function buildDemo(today = todayKey()): { data: DemoData; room: DemoRoom 
   [1, 2, 3, 4, 0].forEach((wd, k) => blocks.push({ id: `d-e${k}`, weekday: wd, start_time: "19:00", end_time: "21:00", kind: "estudo", subject_id: null, label: wd === 0 ? "Revisão da semana" : "" }));
   blocks.push({ id: "d-e9", weekday: 6, start_time: "09:00", end_time: "12:00", kind: "estudo", subject_id: null, label: "Biblioteca" });
   blocks.push({ id: "d-w0", weekday: 5, start_time: "14:00", end_time: "18:00", kind: "trabalho", subject_id: null, label: "Estágio" });
+  [2, 4].forEach((wd, k) => blocks.push({ id: `d-x${k}`, weekday: wd, start_time: "17:30", end_time: "18:30", kind: "exercicio", subject_id: null, label: "Academia" }));
 
   const events: CalEvent[] = [{ id: "d-ev0", subject_id: null, title: "Consulta médica", type: "pessoal", date: addDays(today, 3), time: "19:30", priority: "media", status: "pendente", description: "" }];
   const todos: Todo[] = [
@@ -198,5 +199,11 @@ export function buildDemo(today = todayKey()): { data: DemoData; room: DemoRoom 
   const courses = fromTemplate(3, subjects, () => `d-c${ci++}`).map((c) =>
     c.status === "aprovada" ? { ...c, grade: Math.round((6 + r() * 3.5) * 10) / 10, term: c.phase === 1 ? "2025/1" : "2025/2" }
       : c.name === "Química Orgânica II" ? { ...c, status: "reprovada" as const, grade: 4.5, term: "2025/2" } : c);
-  return { data: { profile, subjects, topics, sessions, assessments, events, blocks, mistakes, reviews, reviewLogs, todos, notes, courses }, room };
+  // hábitos: alguns marcados nos últimos dias
+  const habits: Habit[] = ["Fiquei pouco tempo no celular", "Dormi 7 horas ou mais", "Fiz exercício físico"].map((name, i) => ({ id: `d-h${i}`, name, position: i, active: true }));
+  const habitChecks: HabitCheck[] = [];
+  habits.forEach((h, i) => { for (let d = 1; d <= 9; d++) if (r() < [0.6, 0.75, 0.35][i]) habitChecks.push({ id: `d-hc${i}-${d}`, habit_id: h.id, day: addDays(today, -d) }); });
+  // Física II marcada como difícil pelo aluno (o plano reserva mais tempo)
+  const subs = subjects.map((s) => (s.name === "Física II" ? { ...s, traits: { ...s.traits, esforco: "dificil" as const } } : s));
+  return { data: { profile, subjects: subs, topics, sessions, assessments, events, blocks, mistakes, reviews, reviewLogs, todos, notes, courses, habits, habitChecks }, room };
 }

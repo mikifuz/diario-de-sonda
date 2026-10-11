@@ -157,3 +157,12 @@ test("cronograma: aula mais recente e aula remarcada empurra as seguintes", asyn
   // antecipar não mexe nas outras
   assert.equal(pushLessons(ts, "b", "2026-10-13", [1, 4]).length, 1);
 });
+
+test("matéria difícil para o aluno: mais tempo no plano, com o motivo", () => {
+  const blocks = [B({ kind: "aula", subject_id: "s", start_time: "08:20", end_time: "10:00" }), B({ start_time: "09:00", end_time: "12:00" })];
+  const normal = planDay(input({ blocks })).slots[0].placed[0];
+  assert.equal(normal.task.minutes, 30);
+  const dificil = planDay(input({ blocks, subjects: [SUB({ traits: { esforco: "dificil" } })] })).slots[0].placed[0];
+  assert.equal(dificil.task.minutes, 40); // 30 × 1,4 = 42 → 40
+  assert.match(dificil.task.why, /difícil para você: o plano reserva 40% a mais/);
+});

@@ -3,6 +3,7 @@
 import { addDays, daysBetween, keyDate, pad } from "./calc";
 import { mastery, topicFamily, type MasteryCfg } from "./mastery";
 import { DEFAULT_STEPS } from "./constants";
+import { effortOf, scaleMin } from "./effort";
 import type { Assessment, Autonomy, CalEvent, Mistake, Result, ReviewItem, ReviewLog, RoutineBlock, Session, StudyPref, Subject, Topic } from "./types";
 
 /* ============ Horas ============ */
@@ -265,10 +266,11 @@ export function dayTasks(p: PlanInput): Task[] {
     const start = toMin(b.start_time), end = toMin(b.end_time);
     if (todays.some((x) => x.subject_id === s.id && sessDay(x).m >= start)) continue;
     const t = lastTaught(p.topics, s.id, p.today);
+    const eff = effortOf(s, p.sessions);
     tasks.push({
       key: "c" + s.id, kind: "consolidar", title: `Consolidar a aula de ${s.name}${t ? `: ${t.name}` : ""}`, subject_id: s.id, topic_id: t?.id ?? null,
-      minutes: CLASS_MIN, notBefore: end,
-      why: `Aula de hoje às ${b.start_time.slice(0, 5)}; você prefere revisar depois da aula, enquanto está fresco.`,
+      minutes: scaleMin(CLASS_MIN, eff.factor), notBefore: end,
+      why: `Aula de hoje às ${b.start_time.slice(0, 5)}; você prefere revisar depois da aula, enquanto está fresco.${eff.why ? ` ${eff.why}` : ""}`,
       rank: [1, 0, 0, 0, 1, 0],
     });
   }
@@ -280,9 +282,10 @@ export function dayTasks(p: PlanInput): Task[] {
     seen.add(s.id);
     if (todays.some((x) => x.subject_id === s.id)) continue;
     const t = p.topics.filter((x) => x.subject_id === s.id && x.taught_on && x.taught_on >= tomorrow).sort((x, y) => x.taught_on!.localeCompare(y.taught_on!))[0];
+    const eff = effortOf(s, p.sessions);
     tasks.push({
-      key: "a" + s.id, kind: "adiantar", title: `Adiantar ${s.name}${t ? `: ${t.name}${t.taught_on !== tomorrow ? ` (previsto para ${dm(t.taught_on!)})` : ""}` : ""}`, subject_id: s.id, topic_id: t?.id ?? null, minutes: CLASS_MIN,
-      why: `Aula amanhã às ${b.start_time.slice(0, 5)}; você prefere chegar com o conteúdo adiantado.${t ? "" : " Cadastre a data das aulas nos conteúdos para saber qual é o próximo."}`,
+      key: "a" + s.id, kind: "adiantar", title: `Adiantar ${s.name}${t ? `: ${t.name}${t.taught_on !== tomorrow ? ` (previsto para ${dm(t.taught_on!)})` : ""}` : ""}`, subject_id: s.id, topic_id: t?.id ?? null, minutes: scaleMin(CLASS_MIN, eff.factor),
+      why: `Aula amanhã às ${b.start_time.slice(0, 5)}; você prefere chegar com o conteúdo adiantado.${t ? "" : " Cadastre a data das aulas nos conteúdos para saber qual é o próximo."}${eff.why ? ` ${eff.why}` : ""}`,
       rank: [1, 1, 0, 0, 1, 0],
     });
   }

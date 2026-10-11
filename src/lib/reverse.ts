@@ -3,6 +3,7 @@
 // fica gravado): conforme você estuda, o que falta diminui e o plano se refaz.
 import { addDays, daysBetween, dkey } from "./calc";
 import { BAND, mastery, type Band, type MasteryCfg } from "./mastery";
+import { effortOf, scaleMin } from "./effort";
 import { dm, freeStudy, toMin, topicsForExam, type Task } from "./plan";
 import type { Assessment, CalEvent, Mistake, ReviewItem, ReviewLog, RoutineBlock, Session, Subject, Topic } from "./types";
 
@@ -66,9 +67,11 @@ export function reversePlan(p: RevInput): ExamPlan[] {
     const eve = addDays(exam.date!, -1);
     const from = addDays(exam.date!, -45);
     const notes: string[] = [];
+    const eff = effortOf(subject, p.sessions);
+    if (eff.why) notes.push(eff.why);
     const topics: TopicNeed[] = examTopics(exam, p.topics, p.assessments, p.today).map((t) => {
       const m = mastery(new Set([t.id]), mIn);
-      const target = TARGET[m.band ?? "sem"];
+      const target = scaleMin(TARGET[m.band ?? "sem"], eff.factor);
       const done = p.sessions.filter((s) => s.topic_id === t.id && dkey(s.started_at) >= from && dkey(s.started_at) <= p.today).reduce((a, s) => a + s.duration_min, 0);
       // conteúdo ainda não dado: só entra a partir da aula
       const available = t.taught_on && t.taught_on > p.today ? t.taught_on : null;
