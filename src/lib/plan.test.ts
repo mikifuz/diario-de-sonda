@@ -166,3 +166,17 @@ test("matéria difícil para o aluno: mais tempo no plano, com o motivo", () => 
   assert.equal(dificil.task.minutes, 40); // 30 × 1,4 = 42 → 40
   assert.match(dificil.task.why, /difícil para você: o plano reserva 40% a mais/);
 });
+
+test("dia de prova não tem aula de conteúdo: nada de adiantar matéria nova nem consolidar a 'aula' da prova", () => {
+  // prova na quarta (14/10); o cronograma marca "Centróides" no mesmo dia
+  const topics = [T({ id: "c", name: "Centróides e baricentros", taught_on: "2026-10-14" })];
+  const prova = A({ id: "p2", subject_id: "s", name: "P2", kind: "prova", date: "2026-10-14" });
+  const terca = [B({ kind: "aula", subject_id: "s", weekday: 2, start_time: "08:20", end_time: "10:00" }), B({})];
+  // segunda (12/10), aula amanhã (13/10): a próxima aula de conteúdo seria no dia da prova → não adianta
+  assert.equal(planDay(input({ pref: "antes", blocks: terca, topics, assessments: [prova] })).slots[0].placed.length, 0);
+  // sem a prova, adiantaria normalmente
+  assert.equal(planDay(input({ pref: "antes", blocks: terca, topics })).slots[0].placed.length, 1);
+  // no dia da prova, a "aula" foi a prova: não sugere consolidar
+  const hoje = [B({ kind: "aula", subject_id: "s", start_time: "08:20", end_time: "10:00" }), B({ start_time: "09:00", end_time: "12:00" })];
+  assert.equal(dayTasksCount(input({ blocks: hoje, assessments: [A({ id: "p", subject_id: "s", kind: "prova", date: "2026-10-12" })] })), 0);
+});

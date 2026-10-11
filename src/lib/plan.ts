@@ -257,6 +257,8 @@ export function dayTasks(p: PlanInput): Task[] {
   const todays = p.sessions.filter((s) => sessDay(s).k === p.today);
   const classes = (w: number) => p.blocks.filter((b) => b.kind === "aula" && b.weekday === w && b.subject_id && active.has(b.subject_id))
     .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  // dia de prova não tem aula de conteúdo: a aula daquele dia é a prova
+  const examBetween = (sid: string, from: string, to: string) => p.assessments.find((a) => a.subject_id === sid && isExam(a) && a.status !== "cancelado" && a.date && a.date >= from && a.date <= to);
   const seen = new Set<string>();
   for (const b of classes(wd).reverse()) {
     const s = active.get(b.subject_id!)!;
@@ -265,6 +267,7 @@ export function dayTasks(p: PlanInput): Task[] {
     seen.add(s.id);
     const start = toMin(b.start_time), end = toMin(b.end_time);
     if (todays.some((x) => x.subject_id === s.id && sessDay(x).m >= start)) continue;
+    if (examBetween(s.id, p.today, p.today)) continue;
     const t = lastTaught(p.topics, s.id, p.today);
     const eff = effortOf(s, p.sessions);
     tasks.push({
@@ -282,6 +285,8 @@ export function dayTasks(p: PlanInput): Task[] {
     seen.add(s.id);
     if (todays.some((x) => x.subject_id === s.id)) continue;
     const t = p.topics.filter((x) => x.subject_id === s.id && x.taught_on && x.taught_on >= tomorrow).sort((x, y) => x.taught_on!.localeCompare(y.taught_on!))[0];
+    // prova antes (ou no dia) da próxima aula: o foco é a prova (o plano da prova já reserva o tempo), não matéria nova
+    if (examBetween(s.id, tomorrow, t?.taught_on ?? tomorrow)) continue;
     const eff = effortOf(s, p.sessions);
     tasks.push({
       key: "a" + s.id, kind: "adiantar", title: `Adiantar ${s.name}${t ? `: ${t.name}${t.taught_on !== tomorrow ? ` (previsto para ${dm(t.taught_on!)})` : ""}` : ""}`, subject_id: s.id, topic_id: t?.id ?? null, minutes: scaleMin(CLASS_MIN, eff.factor),
