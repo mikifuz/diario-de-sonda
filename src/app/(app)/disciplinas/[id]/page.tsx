@@ -13,12 +13,13 @@ import { SessionModal, SubjectModal, TopicModal, TopicOptions } from "@/componen
 import { SessionRow } from "@/components/SessionRow";
 import { MistakeModal, ReviewItemModal } from "@/components/planning";
 import { GradesPanel } from "@/components/grades";
+import { ImportSyllabusModal } from "@/components/importSyllabus";
 
 export default function Disciplina() {
   const { id } = useParams<{ id: string }>();
   const st = useStore();
   const router = useRouter();
-  const [modal, setModal] = useState<null | { k: "edit" } | { k: "topic"; id: string } | { k: "session"; id: string } | { k: "review"; topic: string } | { k: "mistake"; id: string | null }>(null);
+  const [modal, setModal] = useState<null | { k: "edit" } | { k: "topic"; id: string } | { k: "session"; id: string } | { k: "review"; topic: string } | { k: "mistake"; id: string | null } | { k: "syllabus" }>(null);
   const [newTopic, setNewTopic] = useState("");
   const [parent, setParent] = useState("");
   const [why, setWhy] = useState<string | null>(null);
@@ -36,7 +37,7 @@ export default function Disciplina() {
   const mIn = { sessions: st.sessions, logs: st.reviewLogs, items: st.reviews, mistakes: st.mistakes, today, cfg: masteryCfg(st.profile?.mastery_cfg) };
   const rows: ReactNode[] = [];
   const walk = (pid: string | null, depth: number) =>
-    ts.filter((t) => (t.parent_id || null) === pid).sort((a, b) => a.position - b.position || a.name.localeCompare(b.name, "pt-BR")).forEach((t: Topic) => {
+    ts.filter((t) => (t.parent_id || null) === pid).sort((a, b) => (a.taught_on || "9999").localeCompare(b.taught_on || "9999") || a.position - b.position || a.name.localeCompare(b.name, "pt-BR")).forEach((t: Topic) => {
       const ids = new Set([t.id, ...kidsOf(t.id)]);
       const tst = stats(ses.filter((x) => x.topic_id && ids.has(x.topic_id))), sg = signal(tst);
       const last = ses.find((x) => x.topic_id === t.id);
@@ -85,6 +86,7 @@ export default function Disciplina() {
       <div className="row between">
         <Link className="btn ghost" href="/disciplinas"><Icon d={I.back} s={16} />Disciplinas</Link>
         <div className="row">
+          <button className="btn" onClick={() => setModal({ k: "syllabus" })}>Importar cronograma</button>
           <button className="btn" onClick={() => setModal({ k: "edit" })}><Icon d={I.edit} s={15} />Editar</button>
           <button className="btn" onClick={async () => { if (await st.save("subjects", { ...s, archived: !s.archived })) st.toast(s.archived ? "Disciplina reativada." : "Disciplina arquivada."); }}><Icon d={I.archive} s={15} />{s.archived ? "Desarquivar" : "Arquivar"}</button>
         </div>
@@ -114,7 +116,7 @@ export default function Disciplina() {
       <section className="grid g2">
         <div className="panel">
           <div className="panel-h"><h2>Conteúdos</h2><span className="lbl">{ts.length} itens</span></div>
-          {rows.length ? <div>{rows}</div> : <Empty>Nenhum conteúdo ainda. Adicione os assuntos do plano de ensino.</Empty>}
+          {rows.length ? <div>{rows}</div> : <Empty>Nenhum conteúdo ainda. Importe o cronograma do professor (Excel, Word ou PDF) ou adicione os assuntos abaixo.<button className="btn pri sm" onClick={() => setModal({ k: "syllabus" })}>Importar cronograma</button></Empty>}
           <form className="row" style={{ marginTop: 14, flexWrap: "nowrap" }} onSubmit={addTopic}>
             <input type="text" value={newTopic} onChange={(e) => setNewTopic(e.target.value)} placeholder="Novo conteúdo, ex.: Equação característica" aria-label="Nome do conteúdo" required />
             <select value={parent} onChange={(e) => setParent(e.target.value)} aria-label="Dentro de" style={{ maxWidth: "40%" }}><option value="">No nível principal</option><TopicOptions topics={st.topics} subjectId={s.id} /></select>
@@ -150,6 +152,7 @@ export default function Disciplina() {
         {mistakes.length > 6 && <p className="small" style={{ margin: "8px 0 0" }}><Link href="/hoje?aba=erros">Ver todos os {mistakes.length} erros</Link></p>}
       </section>
       {modal?.k === "edit" && <SubjectModal id={s.id} onClose={() => setModal(null)} />}
+      {modal?.k === "syllabus" && <ImportSyllabusModal s={s} onClose={() => setModal(null)} />}
       {modal?.k === "review" && <ReviewItemModal id={null} preset={{ subject_id: s.id, topic_id: modal.topic }} onClose={() => setModal(null)} />}
       {modal?.k === "mistake" && (modal.id ? <MistakeModal id={modal.id} onClose={() => setModal(null)} /> : <MistakeModal id={null} preset={{ subject_id: s.id }} onClose={() => setModal(null)} />)}
       {modal?.k === "topic" && <TopicModal id={modal.id} onClose={() => setModal(null)} />}
