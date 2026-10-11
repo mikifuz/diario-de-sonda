@@ -220,3 +220,201 @@ export function summary(courses: Course[]): Summary {
 
 /** Disciplina do app que corresponde a uma da matriz (pelo nome) */
 export const matchSubject = (c: Course, subjects: Subject[]) => (c.subject_id ? subjects.find((s) => s.id === c.subject_id) : subjects.find((s) => !s.archived && norm(s.name) === norm(c.name))) ?? null;
+
+/* ============ Previsão de formatura ============ */
+/** Semestre letivo de uma data: jan–jun = /1, jul–dez = /2 */
+export const termOf = (d: Date) => `${d.getFullYear()}/${d.getMonth() < 6 ? 1 : 2}`;
+export const nextTerm = (t: string) => { const [y, s] = t.split("/").map(Number); return s === 1 ? `${y}/2` : `${y + 1}/1`; };
+
+/** Fase em que o aluno está: a mais alta entre as obrigatórias que ele cursa; sem nenhuma, a anterior à primeira pendente */
+export function studentPhase(courses: Course[]): number {
+  const req = courses.filter((c) => c.kind === "obrigatoria" && c.phase != null);
+  const now = req.filter((c) => c.status === "cursando").map((c) => c.phase!);
+  if (now.length) return Math.max(...now);
+  const pend = req.filter((c) => !isDone(c)).map((c) => c.phase!);
+  return pend.length ? Math.min(...pend) - 1 : Math.max(0, ...req.map((c) => c.phase!));
+}
+
+/** Acima disto o semestre é "puxado" (as fases da matriz têm de 20 a 30 créditos; quase todas até 28) */
+export const HEAVY = 28;
+export const SCENARIOS = {
+  conservadora: { cap: 30, ahead: false, name: "Conservadora" },
+  otimista: { cap: 36, ahead: true, name: "Otimista" },
+} as const;
+export type Scenario = keyof typeof SCENARIOS;
+
+export interface TermPlan { term: string; phase: number; items: { id: string; name: string; credits: number }[]; credits: number; heavy: boolean }
+export interface Forecast { kind: Scenario; cap: number; terms: TermPlan[]; finish: string | null; heavy: TermPlan[]; stuck: string[]; why: string; notes: string[]; together: boolean }
+
+interface Unit { id: string; name: string; credits: number; phase: number; prereqs: Prereq[]; min_pct: number | null; min_phase: number | null; final: boolean }
+
+/** Monta os próximos semestres até a formatura.
+ *  conservadora: segue a ordem da matriz (não adianta disciplina de fase seguinte), até 30 créditos;
+ *  otimista: adianta tudo o que os pré-requisitos deixam, até 36 créditos, priorizando as cadeias mais longas.
+ *  As duas: passa no que está cursando agora, sem reprovação; estágio e TCC por último. */
+export function forecast(courses: Course[], today: Date, kind: Scenario, capOverride?: number): Forecast {
+  const sc0 = SCENARIOS[kind];
+  if (kind === "otimista" && capOverride == null) {
+    // só aperta o quanto for preciso: a menor carga que dá a formatura mais cedo
+    const tries = [HEAVY, 30, 32, 34, sc0.cap].map((c) => forecast(courses, today, kind, c));
+    const best = Math.min(...tries.map((f) => (f.stuck.length ? 99 : f.terms.length)));
+    return tries.find((f) => (f.stuck.length ? 99 : f.terms.length) === best) ?? tries[tries.length - 1];
+  }
+  const sc = { ...sc0, cap: capOverride ?? sc0.cap };
+  let together = false;
+  const slots = fillSlots(courses);
+  const eff = new Map(courses.map((c) => [c.id, effective(c, slots)]));
+  // o que está cursando conta como feito no fim deste semestre
+  const done = new Set(courses.filter((c) => { const e = eff.get(c.id)!; return isDone(e) || e.status === "cursando"; }).map((c) => c.id));
+  const grid = courses.filter(inGrid);
+  const units: Unit[] = grid
+    .filter((c) => !done.has(c.id) && c.kind !== "complementar" && !(c.kind === "extensao" && c.phase == null))
+    .map((c) => ({
+      id: c.id, name: c.kind === "vaga" ? `${c.name} (qualquer do catálogo)` : c.name, credits: c.credits, phase: c.phase ?? 99,
+      prereqs: c.kind === "vaga" ? [] : c.prereqs, min_pct: c.min_pct, min_phase: c.min_phase, final: c.kind === "estagio" || c.kind === "tcc",
+    }));
+  const byId = new Map(units.map((u) => [u.id, u]));
+  // altura: quantos semestres em sequência dependem dela (prioriza as cadeias longas)
+  const height = new Map<string, number>();
+  const h = (id: string, seen: Set<string>): number => {
+    if (height.has(id)) return height.get(id)!;
+    seen.add(id);
+    let best = 1;
+    for (const u of units) if (!seen.has(u.id)) for (const p of u.prereqs) if (p.id === id) best = Math.max(best, h(u.id, seen) + (p.co ? 0 : 1));
+    seen.delete(id);
+    height.set(id, best);
+    return best;
+  };
+  units.forEach((u) => h(u.id, new Set()));
+  const credOk = (u: Unit) => {
+    if (!u.min_pct || !u.min_phase) return true;
+    const rows = grid.filter((c) => c.phase != null && c.phase <= u.min_phase!);
+    const total = rows.reduce((a, c) => a + c.credits, 0);
+    return rows.filter((c) => done.has(c.id)).reduce((a, c) => a + c.credits, 0) >= Math.ceil((u.min_pct / 100) * total);
+  };
+  // pré-requisito cumprido, inexistente (apagado) ou correquisito no mesmo semestre
+  const prereqOk = (u: Unit, chosen: Set<string>) => u.prereqs.every((p) => done.has(p.id) || (!byId.has(p.id) && !grid.some((c) => c.id === p.id)) || (p.co && chosen.has(p.id)));
+
+  let left = units.filter((u) => !u.final);
+  const finals = units.filter((u) => u.final);
+  const done0 = new Set(done), phase0 = studentPhase(courses) + 1;
+  let term = nextTerm(termOf(today)), phase = phase0;
+  const terms: TermPlan[] = [];
+  for (let k = 0; k < 24 && (left.length || finals.length); k++) {
+    const chosen = new Set<string>();
+    let cr = 0;
+    if (!left.length) {
+      // estágio e TCC no último semestre, depois das demais (como na 10ª fase da matriz)
+      if (!sc.ahead && phase < Math.min(...finals.map((f) => f.phase))) { terms.push({ term, phase, items: [], credits: 0, heavy: false }); term = nextTerm(term); phase++; continue; }
+      finals.forEach((f) => chosen.add(f.id));
+      cr = finals.reduce((a, f) => a + f.credits, 0);
+      finals.length = 0;
+    } else {
+      const order = left.filter((u) => sc.ahead || u.phase <= phase)
+        .sort((a, b) => sc.ahead ? height.get(b.id)! - height.get(a.id)! || a.phase - b.phase : a.phase - b.phase || height.get(b.id)! - height.get(a.id)!);
+      for (const u of order) {
+        if (chosen.has(u.id) || !credOk(u)) continue;
+        // correquisitos pendentes entram junto, se der
+        const co = u.prereqs.filter((p) => p.co && !done.has(p.id) && !chosen.has(p.id)).map((p) => byId.get(p.id));
+        if (co.some((c) => !c || c.final || !credOk(c) || !prereqOk(c, chosen))) continue;
+        const add = [...(co as Unit[]), u];
+        const extra = add.reduce((a, x) => a + x.credits, 0);
+        if (cr + extra > sc.cap) continue;
+        const tmp = new Set([...chosen, ...add.map((x) => x.id)]);
+        if (!prereqOk(u, tmp)) continue;
+        add.forEach((x) => chosen.add(x.id));
+        cr += extra;
+      }
+      if (!chosen.size) {
+        // nada coube: na conservadora pode ser só a ordem da matriz; senão travou
+        if (!sc.ahead && left.some((u) => u.phase > phase)) { terms.push({ term, phase, items: [], credits: 0, heavy: false }); term = nextTerm(term); phase++; continue; }
+        break;
+      }
+      left = left.filter((u) => !chosen.has(u.id));
+      // otimista: estágio e TCC junto com as últimas disciplinas, se couber
+      if (sc.ahead && !left.length && finals.length && cr + finals.reduce((a, f) => a + f.credits, 0) <= sc.cap) {
+        finals.forEach((f) => chosen.add(f.id));
+        cr += finals.reduce((a, f) => a + f.credits, 0);
+        finals.length = 0;
+        together = true;
+      }
+    }
+    const items = [...chosen].map((id) => byId.get(id)!).sort((a, b) => a.phase - b.phase).map((u) => ({ id: u.id, name: u.name, credits: u.credits }));
+    terms.push({ term, phase, items, credits: cr, heavy: cr > HEAVY });
+    chosen.forEach((id) => done.add(id));
+    term = nextTerm(term);
+    phase++;
+  }
+  // semestres vazios no fim não contam
+  while (terms.length && !terms[terms.length - 1].items.length) terms.pop();
+
+  // confere um plano inteiro (ids por semestre): carga, ordem da matriz, pré e correquisitos, 70%, estágio/TCC no fim
+  const valid = (plan: string[][]) => {
+    const at = new Map<string, number>();
+    plan.forEach((t, i) => t.forEach((id) => at.set(id, i)));
+    const lastRegular = Math.max(-1, ...plan.flatMap((t, i) => (t.some((id) => !byId.get(id)!.final) ? [i] : [])));
+    for (let i = 0; i < plan.length; i++) {
+      const us = plan[i].map((id) => byId.get(id)!);
+      if (us.reduce((a, u) => a + u.credits, 0) > sc.cap) return false;
+      for (const u of us) {
+        if (!sc.ahead && u.phase !== 99 && u.phase > phase0 + i) return false;
+        if (u.final) { if (lastRegular > i || (!sc.ahead && us.some((x) => !x.final))) return false; continue; }
+        for (const p of u.prereqs) {
+          if (done0.has(p.id)) continue;
+          const w = at.get(p.id);
+          if (w == null) { if (byId.has(p.id)) return false; continue; }
+          if (p.co ? w > i : w >= i) return false;
+        }
+        if (u.min_pct && u.min_phase) {
+          const rows = grid.filter((c) => c.phase != null && c.phase <= u.min_phase!);
+          const total = rows.reduce((a, c) => a + c.credits, 0);
+          const got = rows.filter((c) => done0.has(c.id) || (at.get(c.id) ?? 99) < i).reduce((a, c) => a + c.credits, 0);
+          if (got < Math.ceil((u.min_pct / 100) * total)) return false;
+        }
+      }
+    }
+    return true;
+  };
+  // equilíbrio: tira disciplinas dos semestres puxados para os mais leves, sem mudar a data nem quebrar regra
+  const plan = terms.map((t) => t.items.map((x) => x.id));
+  const cred = (t: string[]) => t.reduce((a, id) => a + byId.get(id)!.credits, 0);
+  if (!left.length && !finals.length && valid(plan)) {
+    for (let guard = 0; guard < 300; guard++) {
+      let moved = false;
+      for (let hI = 0; hI < plan.length && !moved; hI++) {
+        if (cred(plan[hI]) <= HEAVY) continue;
+        // mexe primeiro no que é menos crítico e de fase mais adiantada (atrasadas ficam onde estão, se der)
+        const cands = plan[hI].filter((id) => !byId.get(id)!.final).sort((a, b) => height.get(a)! - height.get(b)! || byId.get(b)!.phase - byId.get(a)!.phase);
+        for (const id of cands) {
+          const u = byId.get(id)!;
+          const targets = plan.map((_, j) => j).filter((j) => j !== hI && Math.abs(j - hI) <= 2 && cred(plan[j]) + u.credits <= HEAVY).sort((a, b) => Math.abs(a - hI) - Math.abs(b - hI) || cred(plan[a]) - cred(plan[b]));
+          for (const j of targets) {
+            const next = plan.map((t) => [...t]);
+            next[hI] = next[hI].filter((x) => x !== id);
+            next[j].push(id);
+            if (valid(next)) { plan.splice(0, plan.length, ...next); moved = true; break; }
+          }
+          if (moved) break;
+        }
+      }
+      if (!moved) break;
+    }
+    plan.forEach((ids, i) => {
+      const us = ids.map((id) => byId.get(id)!).sort((a, b) => a.phase - b.phase);
+      const credits = cred(ids);
+      terms[i] = { ...terms[i], items: us.map((u) => ({ id: u.id, name: u.name, credits: u.credits })), credits, heavy: credits > HEAVY };
+    });
+  }
+  const stuck = [...left, ...finals].map((u) => u.name);
+  const heavy = terms.filter((t) => t.heavy);
+  const notes: string[] = [];
+  const outside = courses.filter((c) => (c.kind === "complementar" || (c.kind === "extensao" && c.phase == null)) && !isDone(c));
+  if (outside.length) notes.push(`Faltam ${outside.map((c) => `${c.credits} créditos de ${c.name.toLowerCase()}`).join(" e ")}: são feitos fora das disciplinas, ao longo do curso.`);
+  if (together) notes.push("Estágio e TCC no mesmo semestre das últimas disciplinas: confira com a coordenação se o curso permite.");
+  if (stuck.length) notes.push(`Não consegui encaixar: ${stuck.join(", ")}. Confira os pré-requisitos dessas disciplinas.`);
+  const why = (sc.ahead
+    ? `Adiantando tudo o que os pré-requisitos permitem, começando pelas cadeias mais longas, com até ${sc.cap} créditos por semestre (a menor carga que dá a formatura mais cedo).`
+    : `Seguindo a ordem da matriz (sem adiantar disciplina de fase seguinte, recuperando primeiro o que ficou para trás), até ${sc.cap} créditos por semestre, o máximo de uma fase da matriz.`)
+    + ` Considera que você passa no que está cursando agora e não reprova; estágio e TCC ${sc.ahead ? "no fim" : "sozinhos no último semestre"}. Não sabe de choque de horário nem se a disciplina é oferecida naquele semestre (isso é com o SIGA).`;
+  return { kind, cap: sc.cap, together, terms, finish: stuck.length || !terms.length ? (terms.length ? null : termOf(today)) : terms[terms.length - 1].term, heavy, stuck, why, notes };
+}

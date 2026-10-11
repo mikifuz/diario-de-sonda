@@ -3,8 +3,8 @@ import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { friendlyError, sb } from "@/lib/supabase";
 import { pct, qt } from "@/lib/calc";
-import { summary } from "@/lib/curriculum";
-import { CourseDetail, CourseList, CourseModal, Flowchart, Legend, SetupGrade } from "@/components/curriculum";
+import { forecast, summary } from "@/lib/curriculum";
+import { CourseDetail, CourseList, CourseModal, Flowchart, ForecastPanel, Legend, OptativesPanel, SetupGrade } from "@/components/curriculum";
 import { ConfirmButton, I, Icon } from "@/components/ui";
 
 export default function Curso() {
@@ -12,7 +12,7 @@ export default function Curso() {
   const [sel, setSel] = useState<string | null>(null);
   const [edit, setEdit] = useState<string | null | undefined>(undefined);
   const s = useMemo(() => summary(st.courses), [st.courses]);
-  const [why, setWhy] = useState(false);
+  const fc = useMemo(() => ({ con: forecast(st.courses, new Date(), "conservadora"), oti: forecast(st.courses, new Date(), "otimista") }), [st.courses]);
 
   if (!st.courses.length) return <SetupGrade />;
 
@@ -36,9 +36,9 @@ export default function Curso() {
         <div className="kpi"><span className="lbl">Créditos cursados</span><span className="v">{pct(s.pct)}</span><span className="s">{s.done} de {s.total}</span><div className="bar" style={{ marginTop: 4 }}><i style={{ width: `${s.pct * 100}%`, background: "var(--ok)" }} /></div></div>
         <div className="kpi"><span className="lbl">Pode cursar</span><span className="v">{s.available.length}</span><span className="s">obrigatórias liberadas</span></div>
         <div className="kpi"><span className="lbl">Optativas</span><span className="v">{s.optDone}<small>/{s.optNeed}</small></span><span className="s">créditos</span></div>
-        <div className="kpi"><span className="lbl">Faltam no mínimo</span><span className="v">{s.minTerms ? qt(s.minTerms, "semestre", "semestres") : "–"}</span><span className="s"><button className="linkish" onClick={() => setWhy(!why)}>{why ? "fechar" : "por quê?"}</button></span></div>
+        <div className="kpi"><span className="lbl">Formatura prevista</span><span className="v">{fc.con.finish ?? "–"}</span><span className="s">{fc.oti.finish && fc.oti.finish !== fc.con.finish ? `otimista: ${fc.oti.finish} · ` : ""}<a href="#previsao">ver previsão</a></span></div>
       </section>
-      {why && <p className="callout" style={{ margin: 0 }}>{s.termsWhy}</p>}
+      <div id="previsao"><ForecastPanel /></div>
 
       {s.bottlenecks.length > 0 && (
         <section className="panel">
@@ -69,13 +69,7 @@ export default function Curso() {
         <p className="small muted" style={{ margin: "8px 0 0" }}>Conta só pré-requisitos e a regra dos 70%. Horário, vagas e oferta da disciplina no semestre são com o SIGA.</p>
       </section>
 
-      {hasOpt && (
-        <section className="panel">
-          <div className="panel-h"><h2>Optativas</h2><span className="lbl">{s.optDone} de {s.optNeed} créditos</span></div>
-          <p className="small muted" style={{ margin: "0 0 8px" }}>Marque como cursando ou aprovada: cada uma ocupa uma vaga de optativa no fluxograma.</p>
-          <CourseList kinds={["optativa"]} onSel={pick} />
-        </section>
-      )}
+      {(hasOpt || s.optNeed > 0) && <OptativesPanel onSel={pick} />}
       {hasOther && (
         <section className="panel">
           <div className="panel-h"><h2>Extensão e atividades complementares</h2></div>

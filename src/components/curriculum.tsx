@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useStore } from "@/lib/store";
 import { gradeCalc, nf, parseNum, qt } from "@/lib/calc";
-import { STATUS_NAME, TEMPLATES, courseState, effective, fillSlots, fromTemplate, matchSubject, requiresAll, unlocksAll, type CourseState, type State } from "@/lib/curriculum";
+import { HEAVY, STATUS_NAME, TEMPLATES, courseState, effective, fillSlots, forecast, fromTemplate, matchSubject, requiresAll, summary, unlocksAll, type CourseState, type Forecast, type State } from "@/lib/curriculum";
 import type { Course, CourseKind, CourseStatus, Prereq } from "@/lib/types";
 import { ConfirmButton, I, Icon, Modal } from "./ui";
 
@@ -329,4 +329,145 @@ export function SetupGrade() {
 function AddFirst() {
   const [open, setOpen] = useState(false);
   return <><button className="btn pri" onClick={() => setOpen(true)}><Icon d={I.plus} s={14} />Adicionar a primeira disciplina</button>{open && <CourseModal id={null} onClose={() => setOpen(false)} />}</>;
+}
+
+/* ============ Previsão de formatura ============ */
+function PlanCard({ f, title, open, onToggle }: { f: Forecast; title: string; open: boolean; onToggle: () => void }) {
+  return (
+    <div className="kpi" style={{ border: "1px solid var(--line)", borderRadius: "var(--radius)", padding: 14 }}>
+      <span className="lbl">{title}</span>
+      <span className="v">{f.finish ?? "—"}</span>
+      <span className="s">{f.terms.length ? `${qt(f.terms.length, "semestre", "semestres")}, de ${f.terms[0].term} a ${f.terms[f.terms.length - 1].term}` : "não falta nenhuma disciplina"}</span>
+      <span className="small" style={{ marginTop: 4 }}>{f.heavy.length ? <>Puxados: {f.heavy.map((t) => `${t.term} (${t.credits} cr)`).join(", ")}</> : <span className="muted">Nenhum semestre acima de {HEAVY} créditos.</span>}</span>
+      {f.terms.length > 0 && <button className="btn sm ghost" style={{ alignSelf: "flex-start", paddingLeft: 0 }} onClick={onToggle} aria-expanded={open}>{open ? "Fechar" : "Ver semestre a semestre"}</button>}
+    </div>
+  );
+}
+
+function PlanTerms({ f }: { f: Forecast }) {
+  return (
+    <div className="stack" style={{ gap: 8 }}>
+      <div className="list">{f.terms.map((t) => (
+        <div key={t.term} className="li" style={{ flexDirection: "column", alignItems: "stretch", gap: 4 }}>
+          <div className="row" style={{ gap: 8 }}><b className="num">{t.term}</b><span className={"chip " + (t.heavy ? "warn" : "")}>{t.credits} cr{t.heavy ? " · puxado" : ""}</span></div>
+          <div className="small">{t.items.length ? t.items.map((x) => x.name).join(" · ") : <span className="muted">sem disciplina (esperando a ordem da matriz)</span>}</div>
+        </div>
+      ))}</div>
+      {f.notes.map((n) => <p key={n} className="small" style={{ margin: 0 }}>{n}</p>)}
+      <p className="small muted" style={{ margin: 0 }}>{f.why}</p>
+    </div>
+  );
+}
+
+export function ForecastPanel() {
+  const st = useStore();
+  const [open, setOpen] = useState<"c" | "o" | null>(null);
+  const { con, oti, chain } = useMemo(() => {
+    const today = new Date();
+    return { con: forecast(st.courses, today, "conservadora"), oti: forecast(st.courses, today, "otimista"), chain: summary(st.courses).chain };
+  }, [st.courses]);
+  const idx = (f: Forecast) => new Map(f.terms.flatMap((t, i) => t.items.map((it) => [it.id, i] as const)));
+  const ci = idx(con), oi = idx(oti);
+  const ahead = oti.terms.flatMap((t) => t.items).filter((it) => !/^Optativa/.test(it.name) && (oi.get(it.id) ?? 99) < (ci.get(it.id) ?? 99)).map((it) => it.name);
+  const gain = con.stuck.length || oti.stuck.length ? 0 : con.terms.length - oti.terms.length;
+
+  return (
+    <section className="panel">
+      <div className="panel-h"><h2>Previsão de formatura</h2><span className="lbl">sem reprovações</span></div>
+      <div className="grid g2" style={{ gap: 12 }}>
+        <PlanCard f={con} title="Conservadora · seguindo a grade" open={open === "c"} onToggle={() => setOpen(open === "c" ? null : "c")} />
+        <PlanCard f={oti} title="Otimista · adiantando o que der" open={open === "o"} onToggle={() => setOpen(open === "o" ? null : "o")} />
+      </div>
+      <div className="callout" style={{ marginTop: 12 }}>
+        {gain > 0 ? <>
+          <b>Para formar em {oti.finish} em vez de {con.finish}</b> ({qt(gain, "semestre", "semestres")} antes), dá para adiantar {ahead.slice(0, 4).join(", ")}{ahead.length > 4 ? ` e mais ${ahead.length - 4}` : ""}
+          {oti.heavy.length ? <>, encarando {oti.heavy.length === 1 ? "um semestre puxado" : `${oti.heavy.length} semestres puxados`} ({oti.heavy.map((t) => `${t.term}: ${t.credits} cr`).join(", ")})</> : null}
+          {oti.together ? ", e fazer o estágio junto com as últimas disciplinas" : ""}.
+        </> : con.terms.length ? <>
+          <b>Adiantar não traz a formatura para antes de {con.finish}.</b>
+        </> : <b>Você já cumpriu todas as disciplinas da matriz.</b>}
+        {chain.length > 1 && <> Quem segura a data é a cadeia <b>{chain.join(" → ")}</b>: atrasar qualquer uma delas atrasa a formatura.</>}
+      </div>
+      {open === "c" && <div style={{ marginTop: 12 }}><h3 style={{ margin: "0 0 6px" }}>Conservadora</h3><PlanTerms f={con} /></div>}
+      {open === "o" && <div style={{ marginTop: 12 }}><h3 style={{ margin: "0 0 6px" }}>Otimista</h3><PlanTerms f={oti} /></div>}
+    </section>
+  );
+}
+
+/* ============ Optativas ============ */
+export function OptativesPanel({ onSel }: { onSel: (id: string) => void }) {
+  const st = useStore();
+  const [add, setAdd] = useState<string | null | undefined>(undefined);
+  const slots = fillSlots(st.courses);
+  const used = new Map([...slots.entries()].map(([vaga, o]) => [o.id, st.courses.find((c) => c.id === vaga)?.name ?? ""]));
+  const opts = st.courses.filter((c) => c.kind === "optativa").sort((a, b) => a.position - b.position);
+  const mine = opts.filter((c) => c.status !== "pendente");
+  const catalog = opts.filter((c) => c.status === "pendente");
+  const { optDone: got, optNeed: need } = summary(st.courses);
+  return (
+    <section className="panel">
+      <div className="panel-h"><h2>Optativas</h2><span className="row" style={{ gap: 8 }}><span className="lbl">{got} de {need} créditos</span><button className="btn sm pri" onClick={() => setAdd(null)}><Icon d={I.plus} s={14} />Adicionar optativa</button></span></div>
+      <p className="small muted" style={{ margin: "0 0 8px" }}>Podem ser feitas em qualquer fase, respeitando o pré-requisito de cada uma (e a oferta no SIGA). Cada optativa aprovada ou em curso ocupa uma vaga (Optativa I a IV) no fluxograma.</p>
+      {mine.length ? <div className="list">{mine.map((c) => (
+        <div key={c.id} className="li">
+          <div className="grow"><button className="linkish t" onClick={() => onSel(c.id)}>{c.name}</button>
+            <div className="m">{STATUS_NAME[c.status]}{c.term ? ` em ${c.term}` : ""}{c.grade != null ? ` · nota ${nf(c.grade)}` : ""} · {qt(c.credits, "crédito", "créditos")}{used.get(c.id) ? ` · ocupa a ${used.get(c.id)}` : ""}</div></div>
+          <button className="btn sm ghost" onClick={() => setAdd(c.id)} aria-label={`Editar ${c.name}`}><Icon d={I.edit} s={14} /></button>
+        </div>
+      ))}</div> : <p className="small muted" style={{ margin: 0 }}>Nenhuma optativa feita ainda. Já fez alguma? Toque em "Adicionar optativa".</p>}
+      {catalog.length > 0 && <details style={{ marginTop: 10 }}><summary className="small" style={{ cursor: "pointer" }}>Catálogo de optativas ({catalog.length})</summary>
+        <div className="list" style={{ marginTop: 6 }}>{catalog.map((c) => { const s = courseState(c, st.courses, slots); return (
+          <div key={c.id} className="li"><div className="grow"><button className="linkish t" onClick={() => setAdd(c.id)}>{c.name}</button><div className="m">{qt(c.credits, "crédito", "créditos")}{s.state === "bloqueada" ? ` · ${s.why}` : ""}</div></div></div>
+        ); })}</div></details>}
+      {add !== undefined && <OptativeModal id={add} onClose={() => setAdd(undefined)} />}
+    </section>
+  );
+}
+
+function OptativeModal({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const st = useStore();
+  const orig = id ? st.courses.find((c) => c.id === id) : null;
+  const catalog = st.courses.filter((c) => c.kind === "optativa" && (c.status === "pendente" || c.id === id)).sort((a, b) => a.position - b.position);
+  const [f, setF] = useState(() => ({
+    pick: orig?.id || "", name: "", credits: String(orig?.credits ?? 2),
+    status: (orig && orig.status !== "pendente" ? orig.status : "aprovada") as CourseStatus, term: orig?.term || "", grade: orig?.grade != null ? String(orig.grade).replace(".", ",") : "",
+  }));
+  const up = (x: Partial<typeof f>) => setF({ ...f, ...x });
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    const base = f.pick ? st.courses.find((c) => c.id === f.pick) : null;
+    if (!base && !f.name.trim()) { st.toast("Escolha a optativa ou escreva o nome."); return; }
+    const credits = parseNum(f.credits);
+    if (credits == null || credits < 1 || credits > 20 || !Number.isInteger(credits)) { st.toast("Créditos: número inteiro de 1 a 20."); return; }
+    const grade = f.grade.trim() ? parseNum(f.grade) : null;
+    if (grade != null && (grade < 0 || grade > 10)) { st.toast("A nota deve estar entre 0 e 10."); return; }
+    const row: Course = base ? { ...base, credits, status: f.status, term: f.term.trim(), grade }
+      : { id: crypto.randomUUID(), name: f.name.trim(), code: "", phase: null, credits, kind: "optativa", prereqs: [], min_pct: null, min_phase: null, status: f.status, grade, term: f.term.trim(), subject_id: null, position: Math.max(0, ...st.courses.map((c) => c.position)) + 1 };
+    if (await st.save("curriculum", row)) { st.toast(f.status === "cursando" ? "Optativa em curso: já ocupa uma vaga." : "Optativa registrada."); onClose(); }
+  };
+  const undo = async () => { if (orig && (await st.save("curriculum", { ...orig, status: "pendente", term: "", grade: null }))) onClose(); };
+  return (
+    <Modal title={orig && orig.status !== "pendente" ? "Editar optativa" : "Adicionar optativa"} sub="Meu curso" onClose={onClose}>
+      <form onSubmit={submit}>
+        <div className="fgrid">
+          <label className="f full"><span>Optativa</span>
+            <select value={f.pick} onChange={(e) => { const c = st.courses.find((x) => x.id === e.target.value); up({ pick: e.target.value, credits: String(c?.credits ?? 2) }); }}>
+              <option value="">Outra (escrever o nome)</option>
+              {catalog.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select></label>
+          {!f.pick && <label className="f full"><span>Nome da optativa</span><input type="text" value={f.name} onChange={(e) => up({ name: e.target.value })} maxLength={200} placeholder="Ex.: optativa feita em outro curso" /></label>}
+          <label className="f"><span>Situação</span><select value={f.status} onChange={(e) => up({ status: e.target.value as CourseStatus })}>
+            <option value="aprovada">Aprovada</option><option value="cursando">Cursando</option><option value="dispensada">Dispensada (aproveitamento)</option><option value="reprovada">Reprovada</option></select></label>
+          <label className="f"><span>Semestre</span><input type="text" value={f.term} onChange={(e) => up({ term: e.target.value })} placeholder="Ex.: 2025/2" maxLength={20} /></label>
+          <label className="f"><span>Nota final (opcional)</span><input type="text" inputMode="decimal" value={f.grade} onChange={(e) => up({ grade: e.target.value })} placeholder="Ex.: 8,5" /></label>
+          <label className="f"><span>Créditos</span><input type="text" inputMode="numeric" value={f.credits} onChange={(e) => up({ credits: e.target.value })} /></label>
+        </div>
+        <div className="modal-f">
+          {orig && orig.status !== "pendente" && <span style={{ marginRight: "auto" }}><button type="button" className="btn ghost" onClick={undo}>Desfazer (voltar ao catálogo)</button></span>}
+          <button type="button" className="btn ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn pri">Salvar</button>
+        </div>
+      </form>
+    </Modal>
+  );
 }
