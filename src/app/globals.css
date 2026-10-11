@@ -274,3 +274,40 @@ a.btn{text-decoration:none}
 .auth-wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:32px 16px}
 .auth-card{width:100%;max-width:420px;padding:26px}
 code{font-family:var(--f-mono);font-size:.9em;background:var(--panel2);padding:1px 5px;border-radius:3px;overflow-wrap:anywhere}
+
+/* ============ Meu curso: fluxograma ============ */
+.linkish{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:color-mix(in srgb,currentColor 35%,transparent);text-underline-offset:3px}
+.linkish:hover{color:var(--accent)}
+ul.plain{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}
+.t-aprovada{color:var(--ok)}.t-cursando{color:var(--accent)}.t-liberada{color:var(--warn)}.t-reprovada{color:var(--bad)}.t-bloqueada{color:var(--muted)}
+.flow{overflow-x:auto;margin:10px -4px 0;padding:0 4px 8px;-webkit-overflow-scrolling:touch}
+.flow-in{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:148px;gap:30px;width:max-content;padding:4px 4px 4px 26px}
+.flow-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.fl{fill:none;stroke:color-mix(in srgb,var(--muted) 55%,transparent);stroke-width:1.4;transition:opacity .15s}
+.fl.co{stroke-dasharray:4 3}
+.fl.req{stroke:var(--warn);stroke-width:2.2}
+.fl.lib{stroke:var(--ok);stroke-width:2.2}
+.fl.dim{opacity:.12}
+.flow-col{display:flex;flex-direction:column;gap:10px;position:relative}
+.flow-h{font-family:var(--f-mono);font-size:.78rem;color:var(--muted);text-align:center;padding:4px 0;border-bottom:1px solid var(--line);margin-bottom:2px}
+.fcard{position:relative;display:flex;flex-direction:column;gap:3px;text-align:left;padding:7px 9px;min-height:54px;border:1px solid var(--line);border-left:4px solid var(--line);border-radius:var(--radius);background:var(--panel);color:var(--fg);font:inherit;font-size:.8rem;line-height:1.25;cursor:pointer;transition:opacity .15s,box-shadow .15s}
+.fcard .fn{font-weight:600;overflow-wrap:anywhere}
+.fcard .fn small{font-weight:400;color:var(--muted)}
+.fcard .fm{font-family:var(--f-mono);font-size:.68rem;color:var(--muted)}
+.fcard.st-aprovada{border-left-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,var(--panel))}
+.fcard.st-cursando{border-left-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--panel))}
+.fcard.st-liberada{border-left-color:var(--warn);border-style:dashed solid dashed solid}
+.fcard.st-reprovada{border-left-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,var(--panel))}
+.fcard.st-bloqueada{color:var(--muted)}
+.fcard.sel{box-shadow:0 0 0 2px var(--fg)}
+.fcard.req{box-shadow:0 0 0 2px var(--warn)}
+.fcard.lib{box-shadow:0 0 0 2px var(--ok)}
+.fcard.dim{opacity:.35}
+.fcard:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.fleg{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.fleg i{display:inline-block;width:14px;height:10px;border:1px solid var(--line);border-left:4px solid var(--line);border-radius:2px}
+.fleg.st-aprovada i{border-left-color:var(--ok);background:color-mix(in srgb,var(--ok) 20%,transparent)}
+.fleg.st-cursando i{border-left-color:var(--accent);background:color-mix(in srgb,var(--accent) 20%,transparent)}
+.fleg.st-liberada i{border-left-color:var(--warn);border-style:dashed}
+.fleg.st-reprovada i{border-left-color:var(--bad)}
+.prq{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:var(--radius);padding:6px 8px;display:flex;flex-direction:column;gap:2px;margin:6px 0 4px}

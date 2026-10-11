@@ -12,8 +12,8 @@ import { DEFAULT_MASTERY, masteryCfg, type MasteryCfg } from "@/lib/mastery";
 import { DEMO_FLAG } from "@/lib/demo";
 
 // ordem das chaves estrangeiras: conteúdos apontam para provas, erros para sessões, revisões para erros
-const ORDER: Table[] = ["subjects", "assessments", "topics", "study_sessions", "events", "routine_blocks", "mistakes", "review_items", "review_logs", "tasks"];
-const NONE = { routine_blocks: [], mistakes: [], review_items: [], review_logs: [], tasks: [], notifications: [] };
+const ORDER: Table[] = ["subjects", "assessments", "topics", "study_sessions", "events", "routine_blocks", "mistakes", "review_items", "review_logs", "tasks", "curriculum"];
+const NONE = { routine_blocks: [], mistakes: [], review_items: [], review_logs: [], tasks: [], notifications: [], curriculum: [] };
 
 export default function Configuracoes() {
   const st = useStore();
@@ -34,7 +34,7 @@ export default function Configuracoes() {
 
   const exportData = () => {
     const payload = { app: "diario-de-sonda", version: 2, exportedAt: new Date().toISOString(), profile: { ...p, timer: null }, subjects: st.subjects, topics: st.topics, sessions: st.sessions, assessments: st.assessments, events: st.events,
-      routine_blocks: st.blocks, mistakes: st.mistakes, review_items: st.reviews, review_logs: st.reviewLogs, tasks: st.todos };
+      routine_blocks: st.blocks, mistakes: st.mistakes, review_items: st.reviews, review_logs: st.reviewLogs, tasks: st.todos, curriculum: st.courses };
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 1)], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url; a.download = `diario-de-sonda-${todayKey()}.json`;
@@ -58,7 +58,7 @@ export default function Configuracoes() {
         const subjects = (j.subjects || []).map((x: Record<string, unknown>) => (x.recovery ? x : { ...x, recovery: x.exam_enabled ? "exame" : "nenhuma" }));
         rows = {
           subjects, topics: j.topics || [], assessments: j.assessments || [], study_sessions: j.sessions || [], events: j.events || [],
-          routine_blocks: j.routine_blocks || [], mistakes: j.mistakes || [], review_items: j.review_items || [], review_logs: j.review_logs || [], tasks: j.tasks || [], notifications: [],
+          routine_blocks: j.routine_blocks || [], mistakes: j.mistakes || [], review_items: j.review_items || [], review_logs: j.review_logs || [], tasks: j.tasks || [], notifications: [], curriculum: j.curriculum || [],
         };
         const { id: _id, timer: _t, ...rest } = j.profile || {};
         void _id; void _t;
@@ -92,7 +92,7 @@ export default function Configuracoes() {
     setBusy("Apagando…");
     try {
       if (room.me) await room.leave();
-      for (const t of ["events", "routine_blocks", "tasks", "notifications", "subjects"] as const) {
+      for (const t of ["events", "routine_blocks", "tasks", "notifications", "curriculum", "subjects"] as const) {
         const { error } = await sb().from(t).delete().eq("user_id", st.uid);
         if (error) throw error;
       }
@@ -143,7 +143,7 @@ export default function Configuracoes() {
           <p className="small muted" style={{ margin: 0 }}>A importação aceita a cópia exportada desta versão e a da primeira versão (a página publicada no Claude, em Configurações → Exportar cópia). Importar duas vezes a cópia antiga duplica os registros.</p>
           {st.demo && <p className="small" style={{ margin: 0 }}>Na demonstração, importar e apagar ficam desligados: os dados são de exemplo e já somem ao sair.</p>}
           {!st.demo && <div className="row" style={{ borderTop: "1px solid var(--line)", paddingTop: 12, marginTop: 4 }}>
-            <ConfirmButton small label="Apagar todos os meus dados" question="Isto apaga disciplinas, sessões, notas, eventos, rotina, erros, revisões e tarefas. Exporte uma cópia antes se quiser guardar." confirmLabel="Apagar tudo" onConfirm={wipe} />
+            <ConfirmButton small label="Apagar todos os meus dados" question="Isto apaga disciplinas, sessões, notas, eventos, rotina, erros, revisões, tarefas e a grade do curso. Exporte uma cópia antes se quiser guardar." confirmLabel="Apagar tudo" onConfirm={wipe} />
           </div>}
         </div>
       </section>
