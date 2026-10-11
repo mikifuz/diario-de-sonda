@@ -4,25 +4,25 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { sb, friendlyError } from "./supabase";
 import type { DemoData } from "./demo";
-import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic, AppNotification } from "./types";
+import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic, AppNotification, Course } from "./types";
 
-export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs" | "tasks" | "notifications";
-type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "mistakes" | "reviews" | "reviewLogs" | "todos" | "notes";
+export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs" | "tasks" | "notifications" | "curriculum";
+type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "mistakes" | "reviews" | "reviewLogs" | "todos" | "notes" | "courses";
 const KEY: Record<Table, Key> = {
   subjects: "subjects", topics: "topics", study_sessions: "sessions", assessments: "assessments", events: "events",
-  routine_blocks: "blocks", mistakes: "mistakes", review_items: "reviews", review_logs: "reviewLogs", tasks: "todos", notifications: "notes",
+  routine_blocks: "blocks", mistakes: "mistakes", review_items: "reviews", review_logs: "reviewLogs", tasks: "todos", notifications: "notes", curriculum: "courses",
 };
 type RowOf = {
   subjects: Subject; topics: Topic; study_sessions: Session; assessments: Assessment; events: CalEvent;
-  routine_blocks: RoutineBlock; mistakes: Mistake; review_items: ReviewItem; review_logs: ReviewLog; tasks: Todo; notifications: AppNotification;
+  routine_blocks: RoutineBlock; mistakes: Mistake; review_items: ReviewItem; review_logs: ReviewLog; tasks: Todo; notifications: AppNotification; curriculum: Course;
 };
 export const TABLES = Object.keys(KEY) as Table[];
 
 interface Data {
   profile: Profile | null; subjects: Subject[]; topics: Topic[]; sessions: Session[]; assessments: Assessment[]; events: CalEvent[];
-  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[]; todos: Todo[]; notes: AppNotification[];
+  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[]; todos: Todo[]; notes: AppNotification[]; courses: Course[];
 }
-const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [], blocks: [], mistakes: [], reviews: [], reviewLogs: [], todos: [], notes: [] };
+const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [], blocks: [], mistakes: [], reviews: [], reviewLogs: [], todos: [], notes: [], courses: [] };
 
 export interface Store extends Data {
   uid: string;
@@ -69,6 +69,7 @@ const COLS: Record<Table, string> = {
   review_logs: "id,item_id,reviewed_at,result,autonomy,confidence,prev_step,new_step,prev_due,new_due",
   tasks: "id,title,subject_id,due,done,done_at",
   notifications: "id,kind,title,body,data,from_user,created_at,read_at",
+  curriculum: "id,name,code,phase,credits,kind,prereqs,min_pct,min_phase,status,grade,term,subject_id,position",
 };
 
 export function DataProvider({ uid, email, children, onToast, demo }: { uid: string; email: string; children: ReactNode; onToast: (m: string) => void; demo?: DemoData }) {
@@ -162,7 +163,7 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     if (error) { toast(friendlyError(error)); reload(t); return false; }
     // cascatas do banco: atualiza tabelas dependentes
     const deps: Partial<Record<Table, Table[]>> = {
-      subjects: ["topics", "study_sessions", "assessments", "events", "routine_blocks", "mistakes", "review_items", "review_logs", "tasks"],
+      subjects: ["topics", "study_sessions", "assessments", "events", "routine_blocks", "mistakes", "review_items", "review_logs", "tasks", "curriculum"],
       topics: ["topics", "study_sessions", "mistakes", "review_items"],
       assessments: ["topics", "review_items"],
       study_sessions: ["mistakes"],
@@ -229,6 +230,7 @@ function demoCascade(d: Data, t: Table, id: string): Data {
     const keep = <R extends { subject_id?: string | null }>(rs: R[]) => rs.filter((r) => r.subject_id !== id);
     Object.assign(x, { topics: keep(x.topics), sessions: keep(x.sessions), assessments: keep(x.assessments), events: keep(x.events), blocks: keep(x.blocks), mistakes: keep(x.mistakes), reviews: keep(x.reviews), todos: keep(x.todos) });
   }
+  if (t === "subjects") x.courses = x.courses.map((c) => (c.subject_id === id ? { ...c, subject_id: null } : c));
   if (t === "topics") {
     const un = <R extends { topic_id: string | null }>(rs: R[]) => rs.map((r) => (r.topic_id === id ? { ...r, topic_id: null } : r));
     Object.assign(x, { sessions: un(x.sessions), mistakes: un(x.mistakes), reviews: un(x.reviews), topics: x.topics.map((tp) => (tp.parent_id === id ? { ...tp, parent_id: null } : tp)) });

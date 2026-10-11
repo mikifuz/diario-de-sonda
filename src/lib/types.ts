@@ -257,3 +257,28 @@ export interface Friend {
   status: "pendente" | "aceito";
   incoming: boolean;
 }
+
+/* ============ Meu curso (matriz curricular informada pelo aluno) ============ */
+/** obrigatoria; vaga = lugar de uma optativa na grade; optativa = disciplina do catálogo de optativas */
+export type CourseKind = "obrigatoria" | "vaga" | "optativa" | "estagio" | "tcc" | "extensao" | "complementar";
+export type CourseStatus = "pendente" | "cursando" | "aprovada" | "reprovada" | "dispensada";
+/** pré-requisito; co = correquisito (pode ser cursado junto) */
+export interface Prereq { id: string; co?: boolean }
+export interface Course {
+  id: string;
+  name: string;
+  code: string;
+  /** fase da matriz (1ª, 2ª…); null = fora das fases (optativas do catálogo, atividades complementares) */
+  phase: number | null;
+  credits: number;
+  kind: CourseKind;
+  prereqs: Prereq[];
+  /** regra "X% dos créditos anteriores (fases 1 a N)" */
+  min_pct: number | null;
+  min_phase: number | null;
+  status: CourseStatus;
+  grade: number | null;
+  term: string;
+  subject_id: string | null;
+  position: number;
+}

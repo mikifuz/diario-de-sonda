@@ -347,12 +347,46 @@ delete from public.mistakes;
 do $$ begin
   if (select count(*) from public.review_items) <> 0 or (select count(*) from public.review_logs) <> 0 then raise exception 'revisão do erro apagado continuou'; end if;
 end $$;
+-- ============ Meu curso ============
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.curriculum (id, name, phase, credits, status, subject_id) values ('70000000-0000-0000-0000-000000000001', 'Cálculo Diferencial e Integral III', 3, 4, 'cursando', '10000000-0000-0000-0000-000000000001');
+insert into public.curriculum (name, phase, credits, prereqs) values ('Equações Diferenciais', 4, 4, '[{"id":"70000000-0000-0000-0000-000000000001"}]');
+do $$ begin
+  begin
+    insert into public.curriculum (name, status) values ('x', 'talvez');
+    raise exception 'FALHOU: situação inválida';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into public.curriculum (name, prereqs) values ('x', '{"id":1}');
+    raise exception 'FALHOU: pré-requisitos que não são lista';
+  exception when check_violation then null;
+  end;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+update public.curriculum set status = 'aprovada';
+delete from public.curriculum;
+do $$ begin
+  if (select count(*) from public.curriculum) <> 0 then raise exception 'Bruno vê a matriz de Ana'; end if;
+  begin
+    insert into public.curriculum (name, subject_id) values ('x', '10000000-0000-0000-0000-000000000001');
+    raise exception 'FALHOU: matriz ligada à disciplina de outra pessoa';
+  exception when foreign_key_violation then null;
+  end;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+do $$ begin
+  if (select count(*) from public.curriculum) <> 2 then raise exception 'Bruno apagou a matriz de Ana'; end if;
+  if (select count(*) from public.curriculum where status = 'aprovada') <> 0 then raise exception 'Bruno alterou a matriz de Ana'; end if;
+end $$;
+
 -- Ana: apagar disciplina apaga sessões e avaliações dela
 delete from public.subjects where id = '10000000-0000-0000-0000-000000000001';
 do $$ begin
   if (select count(*) from public.study_sessions) <> 0 or (select count(*) from public.assessments) <> 0 then raise exception 'cascata falhou'; end if;
   if (select count(*) from public.routine_blocks) <> 1 then raise exception 'aula da disciplina apagada continuou na rotina'; end if;
   if (select count(*) from public.tasks) <> 1 then raise exception 'tarefa da disciplina apagada continuou (ou a avulsa sumiu)'; end if;
+  if (select count(*) from public.curriculum where subject_id is null) <> 2 then raise exception 'matriz deveria continuar, só sem a ligação com a disciplina apagada'; end if;
 end $$;
 
 reset role;

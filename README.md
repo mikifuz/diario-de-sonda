@@ -11,6 +11,7 @@ Acompanhamento de estudos universitários, pensado para Engenharia de Petróleo.
 | Disciplinas | Importação do cronograma do professor (Excel, Word, PDF ou texto) com prévia: conteúdos com data da aula, provas e feriados; aula remarcada empurra as seguintes. Visão geral com uma linha por disciplina (média atual, situação, próxima prova, horas, acerto); dentro de cada uma: notas enxutas (uma linha por avaliação, simulação em 3 cenários, SUB ou exame configuráveis), conteúdos em árvore, perfil de avaliação do professor, erros e sessões; previsão × nota real |
 | Calendário | Visão mensal, itens por dia, próximos 30 dias; provas que "contam na média" vão direto para as notas |
 | Sala de estudos | Cronômetro com pausa que continua entre aparelhos e, ao começar, a escolha de entrar na sala (com ou sem a matéria) ou estudar sozinho; registro manual; autoavaliação rápida; histórico de sessões. Sala só por grupos (código de convite) e amigos (código de amigo, "chamar para estudar" com mensagens prontas): quem está estudando agora, placar do dia e da semana, sequência de dias |
+| Meu curso | Matriz curricular (modelo de Engenharia de Petróleo UDESC 2024, editável) com fluxograma interativo: toque numa disciplina e veja o que ela exige e o que libera; situação de cada disciplina, pré-requisitos e correquisitos, regra dos 70% dos créditos, o que dá para cursar no próximo semestre, gargalos, optativas e quantos semestres faltam no mínimo (com o motivo) |
 | Notificações | Relatório da semana todo domingo de manhã (horas, acerto × confiança, erros, provas da semana seguinte), pedidos de amizade e chamados para estudar |
 | Demonstração | Em `/demo` (link "Ver demonstração sem conta" na tela de login): um semestre de exemplo com 4 disciplinas, sessões, erros, revisões, rotina, sala e notificações, tudo só na memória da aba e marcado com uma faixa; nada é salvo |
 | Conta | Login por e-mail e senha, recuperação de senha, 5 temas visuais, exportar e importar dados (inclusive da primeira versão) |
@@ -97,5 +98,5 @@ Ao rodar localmente, adicione `http://localhost:3000/**` às Redirect URLs do Su
 
 1. **Análise de desempenho**: concluída (falta só a rodada de testes com o dono).
 2. **Inteligência artificial** (chave de API só no servidor): simulados com gabarito e resolução em PDF, correção assistida, assistente que consulta os dados.
-3. **Engenharia de Petróleo**: biblioteca de fórmulas com unidades, conversor SI ↔ unidades de campo, verificação dimensional, histórico da graduação.
+3. **Engenharia de Petróleo**: biblioteca de fórmulas com unidades, conversor SI ↔ unidades de campo, verificação dimensional (o histórico da graduação já está em Meu curso).
 4. **Biblioteca** de materiais por disciplina (Supabase Storage).

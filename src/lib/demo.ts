@@ -2,7 +2,8 @@
 // Nada aqui vai para o banco; tudo some ao sair. Determinístico (mesma data → mesmos dados).
 import { addDays, dkey, keyDate, todayKey } from "./calc";
 import { buildReport, reportWeek } from "./report";
-import type {
+import { fromTemplate } from "./curriculum";
+import type { Course,
   AppNotification, Assessment, CalEvent, DailyTotal, Friend, Mistake, Profile, ReviewItem, ReviewLog, RoomMember, RoutineBlock, Session, StudyGroup,
   Subject, Todo, Topic, GroupMember,
 } from "./types";
@@ -12,7 +13,7 @@ export const DEMO_UID = "demo-voce";
 
 export interface DemoData {
   profile: Profile; subjects: Subject[]; topics: Topic[]; sessions: Session[]; assessments: Assessment[]; events: CalEvent[];
-  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[]; todos: Todo[]; notes: AppNotification[];
+  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[]; todos: Todo[]; notes: AppNotification[]; courses: Course[];
 }
 export interface DemoRoom { members: RoomMember[]; groups: StudyGroup[]; memberships: GroupMember[]; totals: DailyTotal[]; friends: Friend[] }
 
@@ -192,5 +193,10 @@ export function buildDemo(today = todayKey()): { data: DemoData; room: DemoRoom 
     memberships: members.map((m) => ({ code: "PETRO7", user_id: m.user_id })),
     friends: [{ id: "d-f0", other: "demo-bia", nick: "Bia", status: "aceito", incoming: false }],
   };
-  return { data: { profile, subjects, topics, sessions, assessments, events, blocks, mistakes, reviews, reviewLogs, todos, notes }, room };
+  // grade do curso: 3ª fase, com as disciplinas da demonstração em curso
+  let ci = 0;
+  const courses = fromTemplate(3, subjects, () => `d-c${ci++}`).map((c) =>
+    c.status === "aprovada" ? { ...c, grade: Math.round((6 + r() * 3.5) * 10) / 10, term: c.phase === 1 ? "2025/1" : "2025/2" }
+      : c.name === "Química Orgânica II" ? { ...c, status: "reprovada" as const, grade: 4.5, term: "2025/2" } : c);
+  return { data: { profile, subjects, topics, sessions, assessments, events, blocks, mistakes, reviews, reviewLogs, todos, notes, courses }, room };
 }
