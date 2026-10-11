@@ -9,10 +9,11 @@ import { BLOCK, MISTAKE, PREF, WD_S, WEEKDAYS } from "@/lib/constants";
 import type { Activity, MistakeCategory, ReviewItem, StudyPref } from "@/lib/types";
 import { Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
 import { BlockModal, MistakeModal, ReviewItemModal, ReviewModal } from "@/components/planning";
+import { ImportSigaModal } from "@/components/importSiga";
 
 type Tab = "plano" | "revisoes" | "erros" | "rotina";
 const TABS: [Tab, string][] = [["plano", "Plano do dia"], ["revisoes", "Revisões"], ["erros", "Banco de erros"], ["rotina", "Rotina"]];
-type ModalState = null | { k: "review"; id: string } | { k: "item"; id: string | null } | { k: "mistake"; id: string | null } | { k: "block"; id: string | null; weekday?: number };
+type ModalState = null | { k: "review"; id: string } | { k: "item"; id: string | null } | { k: "mistake"; id: string | null } | { k: "block"; id: string | null; weekday?: number } | { k: "siga" };
 type Open = (m: ModalState) => void;
 
 export default function HojePage() {
@@ -36,6 +37,7 @@ function Hoje() {
       {modal?.k === "item" && <ReviewItemModal id={modal.id} onClose={close} />}
       {modal?.k === "mistake" && <MistakeModal id={modal.id} onClose={close} />}
       {modal?.k === "block" && <BlockModal id={modal.id} weekday={modal.weekday} onClose={close} />}
+      {modal?.k === "siga" && <ImportSigaModal onClose={close} />}
     </>
   );
 }
@@ -116,7 +118,7 @@ function PlanTab({ open, goRoutine }: { open: Open; goRoutine: () => void }) {
       {!plan.hasStudyBlocks && (
         <div className="callout info stack" style={{ gap: 8 }}>
           <span><b>Monte sua rotina para o plano funcionar.</b> Cadastre seus horários de aula e os blocos em que você costuma estudar. O plano encaixa revisões e aulas nesses blocos, sem inventar horários.</span>
-          <span><button className="btn sm pri" onClick={goRoutine}>Montar minha rotina</button></span>
+          <span className="row"><button className="btn sm pri" onClick={goRoutine}>Montar minha rotina</button><button className="btn sm" onClick={() => open({ k: "siga" })}>Importar aulas do SIGA (PDF)</button></span>
         </div>
       )}
       {plan.notes.map((n) => <div key={n} className="callout">{n}</div>)}
@@ -322,7 +324,7 @@ function RoutineTab({ open }: { open: Open }) {
   return (
     <>
       <section className="panel">
-        <div className="panel-h"><h2>Semana típica</h2><button className="btn sm pri" onClick={() => open({ k: "block", id: null })}><Icon d={I.plus} s={14} />Adicionar bloco</button></div>
+        <div className="panel-h"><h2>Semana típica</h2><span className="row" style={{ gap: 6 }}><button className="btn sm" onClick={() => open({ k: "siga" })}>Importar aulas do SIGA (PDF)</button><button className="btn sm pri" onClick={() => open({ k: "block", id: null })}><Icon d={I.plus} s={14} />Adicionar bloco</button></span></div>
         <p className="small muted" style={{ margin: "0 0 12px" }}>Cadastre aulas, blocos de estudo e o que mais ocupa sua semana (trabalho, deslocamento, descanso). Só os blocos de <b>estudo</b> recebem tarefas; os outros servem para você enxergar a semana. Exceções do dia a dia vão no calendário como &quot;Indisponível&quot; ou &quot;Compromisso pessoal&quot;.</p>
         <div className="week">
           {[1, 2, 3, 4, 5, 6, 0].map((d) => {
