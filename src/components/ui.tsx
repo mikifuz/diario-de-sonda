@@ -11,6 +11,7 @@ export const I = {
   back: "M15 18l-6-6 6-6",
   chev: "M9 6l6 6-6 6",
   archive: "M3 4h18v4H3zM5 8v12h14V8M10 12h4",
+  check: "M5 12l5 5L20 7",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
 };
 

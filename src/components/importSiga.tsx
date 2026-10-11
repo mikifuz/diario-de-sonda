@@ -7,6 +7,7 @@ import { matchSubject, parseSiga, sameName, type SigaResult } from "@/lib/siga";
 import { COLORS, WD_S } from "@/lib/constants";
 import type { RoutineBlock, Subject } from "@/lib/types";
 import { Dot, Modal } from "./ui";
+import { qt } from "@/lib/calc";
 
 export function ImportSigaModal({ onClose }: { onClose: () => void }) {
   const st = useStore();
@@ -62,7 +63,7 @@ export function ImportSigaModal({ onClose }: { onClose: () => void }) {
         return sid ? [{ id: crypto.randomUUID(), weekday: c.weekday, start_time: c.start, end_time: c.end, kind: "aula" as const, subject_id: sid, label: c.label }] : [];
       });
       if (!(await st.saveMany("routine_blocks", blocks))) return;
-      st.toast(`${blocks.length} aula(s) na rotina${newSubs.length ? `, ${newSubs.length} disciplina(s) nova(s)` : ""}. Agora adicione seus blocos de estudo.`);
+      st.toast(`${qt(blocks.length, "aula", "aulas")} na rotina${newSubs.length ? `, ${qt(newSubs.length, "disciplina nova", "disciplinas novas")}` : ""}. Agora adicione seus blocos de estudo.`);
       onClose();
     } finally { setBusy(""); }
   };
@@ -117,7 +118,7 @@ export function ImportSigaModal({ onClose }: { onClose: () => void }) {
           )}
           {res.classes.length > 0 && oldClasses.length > 0 && (
             <label className="check"><input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
-              Apagar as {oldClasses.length} aula(s) que já estão na rotina (blocos de estudo e outros continuam)</label>
+              Apagar as {qt(oldClasses.length, "aula", "aulas")} que já estão na rotina (blocos de estudo e outros continuam)</label>
           )}
           {res.subjects.length > 0 && <p className="small muted" style={{ margin: 0 }}>
             Disciplinas que já existem no diário (mesmo código ou mesmo nome) são reaproveitadas. {nNew ? `${nNew} serão criadas com a sua média mínima padrão; professor, SUB e o resto você completa depois em Disciplinas.` : ""}</p>}

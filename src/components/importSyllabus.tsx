@@ -6,6 +6,7 @@ import { useStore } from "@/lib/store";
 import { buildPlan, classify, KIND_LABEL, norm, rowsFromText, subCoverage, type Entry, type EntryKind } from "@/lib/syllabus";
 import type { Assessment, Subject, Topic } from "@/lib/types";
 import { Modal } from "./ui";
+import { qt } from "@/lib/calc";
 
 const dm = (k: string) => `${k.slice(8, 10)}/${k.slice(5, 7)}`;
 const DEFAULT_ON: Record<EntryKind, boolean> = { aula: true, prova: true, sub: true, trabalho: true, exercicios: false, sem_aula: false };
@@ -97,7 +98,7 @@ export function ImportSyllabusModal({ s, onClose }: { s: Subject; onClose: () =>
       }
       if (rows.length && !(await st.saveMany("topics", rows))) return;
       const noWeight = plan.exams.some((x) => x.kind !== "sub" && x.weight == null);
-      st.toast(`${created} conteúdo(s) novo(s)${updated ? `, ${updated} atualizado(s)` : ""}, ${newExams.length} avaliação(ões).${noWeight ? " Confira os pesos em Notas." : ""}`);
+      st.toast(`${qt(created, "conteúdo novo", "conteúdos novos")}${updated ? `, ${qt(updated, "atualizado", "atualizados")}` : ""}, ${qt(newExams.length, "avaliação", "avaliações")}.${noWeight ? " Confira os pesos em Notas." : ""}`);
       onClose();
     } finally { setBusy(""); }
   };
@@ -128,8 +129,8 @@ export function ImportSyllabusModal({ s, onClose }: { s: Subject; onClose: () =>
       ) : (
         <div className="stack" style={{ gap: 12 }}>
           <div className="small">
-            <b>{plan.topics.length}</b> conteúdo(s) em {chosen.filter((e) => e.kind === "aula").length} aula(s) · <b>{plan.exams.length}</b> avaliação(ões)
-            {entries.some((e) => e.kind === "sem_aula") && <> · {entries.filter((e) => e.kind === "sem_aula").length} dia(s) sem aula</>}
+            <b>{plan.topics.length}</b> {plan.topics.length === 1 ? "conteúdo" : "conteúdos"} em {qt(chosen.filter((e) => e.kind === "aula").length, "aula", "aulas")} · <b>{plan.exams.length}</b> {plan.exams.length === 1 ? "avaliação" : "avaliações"}
+            {entries.some((e) => e.kind === "sem_aula") && <> · {qt(entries.filter((e) => e.kind === "sem_aula").length, "dia", "dias")} sem aula</>}
           </div>
           <p className="small muted" style={{ margin: 0 }}>Desmarque o que não quer importar e corrija o tipo se precisar. Conteúdos repetidos viram um só, com a data da primeira aula. Feriados e aulas de exercícios vêm desmarcados.</p>
           <div className="list" style={{ maxHeight: "46vh", overflowY: "auto" }}>{entries.map((e, i) => (

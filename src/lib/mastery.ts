@@ -1,6 +1,6 @@
 // Índice de domínio por conteúdo (0–100) com metodologia aberta e configurável.
 // Confiança NÃO entra: só acerto conferido, autonomia, prática recente e erros em aberto.
-import { daysBetween, dkey, pct, verified } from "./calc";
+import { daysBetween, dkey, pct, verified, qt } from "./calc";
 import type { Autonomy, Mistake, ReviewItem, ReviewLog, Session, Topic } from "./types";
 
 export interface MasteryCfg {
@@ -102,14 +102,14 @@ export function mastery(topicIds: Set<string>, p: MasteryInput): Mastery {
   const err = Math.max(0, 1 - open / ERR_FULL);
 
   const parts: Part[] = [
-    { key: "acc", label: "acerto", v: acc, w: cfg.w_acc, why: acc == null ? "nenhum resultado conferido" : `${pct(acc)} em ${n} registro(s) conferido(s), os recentes valem mais` },
-    { key: "auto", label: "autonomia", v: auto, w: cfg.w_auto, why: auto == null ? "autonomia não informada" : `${pct(auto)} (sozinho = 100%, anotações = 60%, ajuda = 30%, resolução = 0%) em ${an} registro(s)` },
-    { key: "rec", label: "prática", v: rec, w: cfg.w_rec, why: age == null ? "nunca praticado" : age === 0 ? "praticou hoje" : `última prática há ${age} dia(s); zera com ${cfg.decay_days} dias` },
-    { key: "err", label: "erros", v: err, w: cfg.w_err, why: open ? `${open} erro(s) em aberto (cada um desconta ${Math.round(100 / ERR_FULL)}%)` : "nenhum erro em aberto" },
+    { key: "acc", label: "acerto", v: acc, w: cfg.w_acc, why: acc == null ? "nenhum resultado conferido" : `${pct(acc)} em ${qt(n, "registro conferido", "registros conferidos")}, os recentes valem mais` },
+    { key: "auto", label: "autonomia", v: auto, w: cfg.w_auto, why: auto == null ? "autonomia não informada" : `${pct(auto)} (sozinho = 100%, anotações = 60%, ajuda = 30%, resolução = 0%) em ${qt(an, "registro", "registros")}` },
+    { key: "rec", label: "prática", v: rec, w: cfg.w_rec, why: age == null ? "nunca praticado" : age === 0 ? "praticou hoje" : `última prática há ${qt(age, "dia", "dias")}; zera com ${cfg.decay_days} dias` },
+    { key: "err", label: "erros", v: err, w: cfg.w_err, why: open ? `${qt(open, "erro", "erros")} em aberto (cada um desconta ${Math.round(100 / ERR_FULL)}%)` : "nenhum erro em aberto" },
   ];
   if (n < cfg.min_n) {
     const falta = cfg.min_n - n;
-    return { score: null, band: null, n, parts, formula: "", why: n ? `Dados insuficientes: ${n} registro(s) conferido(s); faltam ${falta} para calcular.` : `Sem resultados conferidos ainda; são necessários ${cfg.min_n}.` };
+    return { score: null, band: null, n, parts, formula: "", why: n ? `Dados insuficientes: ${qt(n, "registro conferido", "registros conferidos")}; faltam ${falta} para calcular.` : `Sem resultados conferidos ainda; são necessários ${cfg.min_n}.` };
   }
   const used = parts.filter((x) => x.v != null && x.w > 0);
   const W = used.reduce((a, x) => a + x.w, 0);

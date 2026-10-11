@@ -105,3 +105,29 @@ test("alerta: conteúdo em construção com prova em até 7 dias", () => {
   assert.ok(al.some((a) => a.level === "warn" && /em construção/.test(a.text)));
   assert.ok(!buildAlerts(inp({ sessions, assessments: [A({ date: "2026-10-22" })] })).some((a) => /em construção/.test(a.text)));
 });
+
+test("alerta: conteúdo de prova que já passou não é cobrado na próxima (caso do dono)", () => {
+  // Física: P1 já foi; P2 daqui a 4 dias. "Oscilações" é um assunto do cronograma, sem prova marcada,
+  // com aulas ligadas à P1; "Amortecimento" não tem prova marcada, mas a aula foi antes da P1.
+  const p1 = A({ id: "p1", name: "P1", date: "2026-09-20", grade: 6, sub_id: "sub" });
+  const p2 = A({ id: "p2", name: "P2", date: "2026-10-16" });
+  const sub = A({ id: "sub", name: "SUB", kind: "sub", date: "2026-10-20" });
+  const topics = [
+    T({ id: "osc", name: "Oscilações" }),
+    T({ id: "mhs", name: "MHS", parent_id: "osc", taught_on: "2026-08-20", assessment_id: "p1" }),
+    T({ id: "amort", name: "Amortecimento", parent_id: "osc", taught_on: "2026-09-01" }),
+    T({ id: "ondas", name: "Ondas", taught_on: "2026-10-01" }),
+    T({ id: "grav", name: "Gravitação", taught_on: "2026-10-05", assessment_id: "p2" }),
+  ];
+  const nomes = (al: ReturnType<typeof buildAlerts>) => al.map((a) => a.text).join(" | ");
+  const al = nomes(buildAlerts(inp({ topics, assessments: [p1, p2] })));
+  assert.match(al, /P2 de Cálculo III é em 4 dias/);
+  assert.match(al, /Ondas/);
+  assert.match(al, /Gravitação/);
+  assert.doesNotMatch(al, /Oscilações|MHS|Amortecimento/);
+  // na SUB (que substitui a P1) os conteúdos da P1 voltam
+  const comSub = buildAlerts(inp({ today: "2026-10-17", topics, assessments: [p1, { ...p2, grade: 7 }, sub] }));
+  assert.match(nomes(comSub), /SUB de Cálculo III/);
+  assert.match(nomes(comSub), /MHS|Oscilações/);
+  assert.doesNotMatch(nomes(comSub), /Ondas|Gravitação/);
+});

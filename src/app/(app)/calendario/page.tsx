@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { agenda, useStore, type AgendaItem } from "@/lib/store";
-import { addDays, daysBetween, dkey, keyDate, nf, todayKey } from "@/lib/calc";
+import { addDays, daysBetween, dkey, keyDate, nf, todayKey, qt } from "@/lib/calc";
 import { EVT, GRADED } from "@/lib/constants";
 import { Dot, I, Icon } from "@/components/ui";
 import { EventModal } from "@/components/modals";
@@ -85,7 +85,7 @@ export default function Calendario() {
             {dayEv.length ? <div className="list">{dayEv.map((e) => <Row key={e.id} e={e} />)}</div> : <p className="muted small" style={{ margin: 0 }}>Nada marcado neste dia.</p>}
           </div>
           <div className="panel">
-            <div className="panel-h"><h3>Próximos 30 dias</h3><span className="lbl">{up.length} pendente(s)</span></div>
+            <div className="panel-h"><h3>Próximos 30 dias</h3><span className="lbl">{qt(up.length, "pendente", "pendentes")}</span></div>
             {up.length ? <div className="list">{up.slice(0, 10).map((e) => {
               const dd = daysBetween(t, e.date);
               return (

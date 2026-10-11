@@ -3,12 +3,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { activeSubjects, agenda, useStore } from "@/lib/store";
-import { addDays, daysBetween, dkey, fmtMin, gradeCalc, inRange, keyDate, nf, pct, periodRange, stats, todayKey, verified, weekStartKey, type Period } from "@/lib/calc";
+import { addDays, daysBetween, dkey, fmtMin, gradeCalc, inRange, keyDate, nf, pct, periodRange, stats, todayKey, verified, weekStartKey, type Period, qt } from "@/lib/calc";
 import { GRADED } from "@/lib/constants";
 import { ChartCalib, ChartDays, ChartLine, Gauge, type DayBar } from "@/components/charts";
 import { Dot, Empty, I, Icon, Tabs } from "@/components/ui";
 import { EventModal, SubjectModal } from "@/components/modals";
 import { AlertsPanel, TodoPanel } from "@/components/dashboard";
+import { GettingStarted } from "@/components/onboarding";
 
 export default function Painel() {
   const st = useStore();
@@ -21,19 +22,7 @@ export default function Painel() {
   if (!list.length && !all.length) {
     return (
       <>
-        <section className="panel" style={{ padding: 28 }}>
-          <div className="stack" style={{ gap: 16, maxWidth: 760 }}>
-            <span className="lbl">Primeiro acesso</span>
-            <h2 style={{ fontSize: "calc(1.6rem*var(--display-scale))" }}>Comece o boletim do seu semestre</h2>
-            <p style={{ margin: 0, maxWidth: "62ch" }}>O diário cruza três coisas que costumam ficar separadas: quanto você estudou, quão seguro se sentiu e quanto realmente acertou. Com poucas semanas de registros ele mostra onde a confiança e o resultado não andam juntos.</p>
-            <div className="steps">
-              <div><span className="n">PASSO 1</span><b>Cadastre as disciplinas</b><span className="small muted">Nome, professor, média mínima e os conteúdos de cada uma.</span><button className="btn pri sm" onClick={() => setModal({ k: "subject" })}><Icon d={I.plus} s={14} />Nova disciplina</button></div>
-              <div><span className="n">PASSO 2</span><b>Registre uma sessão</b><span className="small muted">Use o cronômetro e responda 3 perguntas rápidas ao terminar.</span><Link className="btn sm" href="/sala"><Icon d={I.play} s={14} />Ir para a sala</Link></div>
-              <div><span className="n">PASSO 3</span><b>Coloque as provas</b><span className="small muted">Com pesos e datas, o sistema calcula quanto você precisa tirar.</span><button className="btn sm" onClick={() => setModal({ k: "event", id: null })}><Icon d={I.plus} s={14} />Adicionar prova</button></div>
-            </div>
-            <p className="small muted" style={{ margin: 0 }}>Já usava a primeira versão? Importe sua cópia em <Link href="/configuracoes">Configurações</Link>.</p>
-          </div>
-        </section>
+        <GettingStarted first />
         {modals}
       </>
     );
@@ -79,13 +68,14 @@ export default function Painel() {
 
   return (
     <>
+      <GettingStarted />
       <section className="kpis" aria-label="Resumo">
-        <div className="kpi"><span className="lbl">Hoje</span><span className="v">{fmtMin(mToday)}</span><span className="s">{all.filter((s) => dkey(s.started_at) === t).length} sessão(ões)</span></div>
+        <div className="kpi"><span className="lbl">Hoje</span><span className="v">{fmtMin(mToday)}</span><span className="s">{qt(all.filter((s) => dkey(s.started_at) === t).length, "sessão", "sessões")}</span></div>
         <div className="kpi"><span className="lbl">Esta semana</span><span className="v">{fmtMin(mWeek)}</span>
           <span className="s">{goal ? `${pct(Math.min(1, mWeek / 60 / goal))} da meta de ${nf(goal, 0)}h` : <>{nWeek} sessões · <Link href="/configuracoes">definir meta</Link></>}</span>
           {goal > 0 && <div className="bar" style={{ marginTop: 4 }}><i style={{ width: `${Math.min(100, (mWeek / 60 / goal) * 100)}%`, background: "var(--accent)" }} /></div>}</div>
         <div className="kpi"><span className="lbl">Este mês</span><span className="v">{fmtMin(mMonth)}</span><span className="s">{all.filter((s) => inRange(s, periodRange("mes"))).length} sessões</span></div>
-        <div className="kpi"><span className="lbl">Média parcial</span><span className="v">{avg == null ? "–" : nf(avg)}</span><span className="s">{avg == null ? "sem notas lançadas" : `média das ${avgs.length} disciplina(s) com notas`}</span></div>
+        <div className="kpi"><span className="lbl">Média parcial</span><span className="v">{avg == null ? "–" : nf(avg)}</span><span className="s">{avg == null ? "sem notas lançadas" : avgs.length === 1 ? "média da disciplina com notas" : `média das ${avgs.length} disciplinas com notas`}</span></div>
       </section>
       <section className="grid g3">
         <div className="span2"><AlertsPanel /></div>
@@ -98,7 +88,7 @@ export default function Painel() {
           <div className="legend" style={{ marginTop: 8 }}>{list.map((s) => <span key={s.id}><i style={{ background: s.color }} />{s.name}</span>)}</div>
         </div>
         <div className="panel">
-          <div className="panel-h"><h2>Próximas avaliações</h2><span className="lbl">{pend} pendente(s)</span></div>
+          <div className="panel-h"><h2>Próximas avaliações</h2><span className="lbl">{qt(pend, "pendente", "pendentes")}</span></div>
           {up.length ? (
             <div className="list">{up.map((e) => {
               const s = list.find((x) => x.id === e.subject_id), dd = daysBetween(t, e.date), gc = s && e.src === "item" ? gradeCalc(s, itemsOf(s.id)) : null;
@@ -116,9 +106,9 @@ export default function Painel() {
         <div className="panel-h"><h2>Confiança × resultado</h2><Tabs value={per} onChange={setPer} label="Período" options={[["semana", "Semana"], ["mes", "Mês"], ["semestre", "Semestre"], ["tudo", "Tudo"]]} /></div>
         <div className="grid g3">
           <div className="stack">
-            <Gauge v={sp.acc} label="Acerto conferido" sub={`${sp.accN} registro(s) conferido(s)`} color="var(--ok)" />
-            <Gauge v={sp.conf == null ? null : (sp.conf - 1) / 4} label="Confiança declarada" sub={sp.conf == null ? "sem autoavaliações" : `média ${nf(sp.conf)} de 5 · ${sp.confN} registro(s)`} color="var(--accent)" />
-            <Gauge v={sp.solo} label="Resolvido sozinho" sub={sp.auN ? `${sp.auN} registro(s) com autonomia` : "sem registros de autonomia"} color="var(--warn)" />
+            <Gauge v={sp.acc} label="Acerto conferido" sub={`${qt(sp.accN, "registro conferido", "registros conferidos")}`} color="var(--ok)" />
+            <Gauge v={sp.conf == null ? null : (sp.conf - 1) / 4} label="Confiança declarada" sub={sp.conf == null ? "sem autoavaliações" : `média ${nf(sp.conf)} de 5 · ${qt(sp.confN, "registro", "registros")}`} color="var(--accent)" />
+            <Gauge v={sp.solo} label="Resolvido sozinho" sub={sp.auN ? `${qt(sp.auN, "registro", "registros")} com autonomia` : "sem registros de autonomia"} color="var(--warn)" />
             <p className="small muted" style={{ margin: 0 }}>Os três medidores são independentes. Confiança é o que você sentiu; acerto é o que foi conferido; autonomia é quanto precisou de apoio.</p>
           </div>
           <div>

@@ -3,7 +3,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { useStore, type Table } from "@/lib/store";
 import { useRoom } from "@/lib/room";
 import { sb, friendlyError } from "@/lib/supabase";
-import { parseNum, todayKey } from "@/lib/calc";
+import { parseNum, todayKey, qt } from "@/lib/calc";
 import { SKINS } from "@/lib/constants";
 import { convertLegacy, isLegacyExport } from "@/lib/legacy";
 import type { Profile, Skin } from "@/lib/types";
@@ -78,7 +78,7 @@ export default function Configuracoes() {
       }
       if (Object.keys(prof).length) await st.updateProfile(prof as Partial<Profile>);
       await st.reload();
-      st.toast(`${n} registros importados${skipped ? `; ${skipped} ignorado(s) por estarem incompletos` : ""}.`);
+      st.toast(`${n} registros importados${skipped ? `; ${qt(skipped, "ignorado", "ignorados")} por estarem incompletos` : ""}.`);
     } catch (e) {
       st.toast(e instanceof SyntaxError ? "Arquivo inválido: não é um JSON." : "Falha na importação: " + friendlyError(e as { message?: string }));
       st.reload();

@@ -43,6 +43,8 @@ export const inRange = (s: Pick<Session, "started_at">, [a, b]: [string, string]
 export const nf = (n: number | null | undefined, d = 1) =>
   n == null || isNaN(n) ? "–" : Number(n).toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
 export const pct = (v: number | null | undefined) => (v == null ? "–" : Math.round(v * 100) + "%");
+/** Quantidade com singular/plural certo: qt(1, "sessão", "sessões") → "1 sessão" */
+export const qt = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 export function fmtMin(m: number) {
   m = Math.round(m || 0);
   const h = Math.floor(m / 60), r = m % 60;
@@ -95,15 +97,15 @@ export type SignalKind = "" | "ok" | "warn" | "bad" | "acc";
 export function signal(st: Stats): { k: SignalKind; t: string; why: string } {
   if (!st.n) return { k: "", t: "Não estudado", why: "Nenhuma sessão registrada neste conteúdo." };
   if (st.accN < 2 || st.acc == null)
-    return { k: "", t: "Poucos dados conferidos", why: `Há ${st.accN} resultado(s) conferido(s); são necessários pelo menos 2 para uma leitura.` };
+    return { k: "", t: "Poucos dados conferidos", why: `Há ${qt(st.accN, "resultado conferido", "resultados conferidos")}; são necessários pelo menos 2 para uma leitura.` };
   if (st.conf != null && st.conf >= 4 && st.acc < 0.6)
     return { k: "bad", t: "Confiança acima do resultado", why: `Confiança média ${nf(st.conf)} de 5, mas acerto conferido de ${pct(st.acc)}.` };
   if (st.conf != null && st.conf <= 2.5 && st.acc >= 0.8)
     return { k: "acc", t: "Resultado acima da confiança", why: `Acerto conferido de ${pct(st.acc)} com confiança média de ${nf(st.conf)} de 5.` };
   if (st.acc >= 0.8 && (st.solo == null || st.solo >= 0.5))
     return { k: "ok", t: "Bom resultado", why: `Acerto conferido de ${pct(st.acc)}${st.solo != null ? `, ${pct(st.solo)} resolvido sozinho` : ""}.` };
-  if (st.acc < 0.5) return { k: "bad", t: "Revisar", why: `Acerto conferido de ${pct(st.acc)} em ${st.accN} registro(s).` };
-  return { k: "warn", t: "Em desenvolvimento", why: `Acerto conferido de ${pct(st.acc)} em ${st.accN} registro(s).` };
+  if (st.acc < 0.5) return { k: "bad", t: "Revisar", why: `Acerto conferido de ${pct(st.acc)} em ${qt(st.accN, "registro", "registros")}.` };
+  return { k: "warn", t: "Em desenvolvimento", why: `Acerto conferido de ${pct(st.acc)} em ${qt(st.accN, "registro", "registros")}.` };
 }
 
 /* ============ Médias ============ */

@@ -163,7 +163,7 @@ export function Calibration({ subjects }: { subjects: Subject[] }) {
             <td className="n" style={{ color: Math.abs(d) < 0.5 ? "var(--muted)" : d > 0 ? "var(--ok)" : "var(--bad)" }}>{d > 0 ? "+" : ""}{nf(d)}</td></tr>
         ))}</tbody>
       </table></div>
-      <p className="small muted" style={{ margin: "10px 0 0" }}>Média da diferença: {nf(calib.reduce((x, c) => x + c.d, 0) / calib.length)} ponto(s). Valor negativo indica que você costuma esperar mais do que tira.</p>
+      <p className="small muted" style={{ margin: "10px 0 0" }}>Média da diferença: {nf(calib.reduce((x, c) => x + c.d, 0) / calib.length)} ponto. Valor negativo indica que você costuma esperar mais do que tira.</p>
     </>
   );
 }
