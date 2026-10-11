@@ -235,10 +235,11 @@ export function studentPhase(courses: Course[]): number {
   return pend.length ? Math.min(...pend) - 1 : Math.max(0, ...req.map((c) => c.phase!));
 }
 
-/** Acima disto o semestre é "puxado" (as fases da matriz têm de 20 a 30 créditos; quase todas até 28) */
-export const HEAVY = 28;
+/** Acima disto o semestre é "puxado": 24 créditos ou mais já é muito (dono). Conservador é até 20. */
+export const HEAVY = 23;
 export const SCENARIOS = {
-  conservadora: { cap: 30, ahead: false, name: "Conservadora" },
+  conservadora: { cap: 20, ahead: false, name: "Conservadora" },
+  equilibrada: { cap: HEAVY, ahead: true, name: "Equilibrada" },
   otimista: { cap: 36, ahead: true, name: "Otimista" },
 } as const;
 export type Scenario = keyof typeof SCENARIOS;
@@ -256,7 +257,7 @@ export function forecast(courses: Course[], today: Date, kind: Scenario, capOver
   const sc0 = SCENARIOS[kind];
   if (kind === "otimista" && capOverride == null) {
     // só aperta o quanto for preciso: a menor carga que dá a formatura mais cedo
-    const tries = [HEAVY, 30, 32, 34, sc0.cap].map((c) => forecast(courses, today, kind, c));
+    const tries = [20, 22, HEAVY + 1, 26, 28, 30, 32, 34, sc0.cap].map((c) => forecast(courses, today, kind, c));
     const best = Math.min(...tries.map((f) => (f.stuck.length ? 99 : f.terms.length)));
     return tries.find((f) => (f.stuck.length ? 99 : f.terms.length) === best) ?? tries[tries.length - 1];
   }
@@ -340,7 +341,7 @@ export function forecast(courses: Course[], today: Date, kind: Scenario, capOver
       }
     }
     const items = [...chosen].map((id) => byId.get(id)!).sort((a, b) => a.phase - b.phase).map((u) => ({ id: u.id, name: u.name, credits: u.credits }));
-    terms.push({ term, phase, items, credits: cr, heavy: cr > HEAVY });
+    terms.push({ term, phase, items, credits: cr, heavy: cr > HEAVY && [...chosen].some((id) => !byId.get(id)!.final) });
     chosen.forEach((id) => done.add(id));
     term = nextTerm(term);
     phase++;
@@ -355,7 +356,8 @@ export function forecast(courses: Course[], today: Date, kind: Scenario, capOver
     const lastRegular = Math.max(-1, ...plan.flatMap((t, i) => (t.some((id) => !byId.get(id)!.final) ? [i] : [])));
     for (let i = 0; i < plan.length; i++) {
       const us = plan[i].map((id) => byId.get(id)!);
-      if (us.reduce((a, u) => a + u.credits, 0) > sc.cap) return false;
+      // semestre só de estágio/TCC não segue o limite (o estágio ocupa o semestre)
+      if (us.some((u) => !u.final) && us.reduce((a, u) => a + u.credits, 0) > sc.cap) return false;
       for (const u of us) {
         if (!sc.ahead && u.phase !== 99 && u.phase > phase0 + i) return false;
         if (u.final) { if (lastRegular > i || (!sc.ahead && us.some((x) => !x.final))) return false; continue; }
@@ -402,7 +404,7 @@ export function forecast(courses: Course[], today: Date, kind: Scenario, capOver
     plan.forEach((ids, i) => {
       const us = ids.map((id) => byId.get(id)!).sort((a, b) => a.phase - b.phase);
       const credits = cred(ids);
-      terms[i] = { ...terms[i], items: us.map((u) => ({ id: u.id, name: u.name, credits: u.credits })), credits, heavy: credits > HEAVY };
+      terms[i] = { ...terms[i], items: us.map((u) => ({ id: u.id, name: u.name, credits: u.credits })), credits, heavy: credits > HEAVY && us.some((u) => !u.final) };
     });
   }
   const stuck = [...left, ...finals].map((u) => u.name);
@@ -412,9 +414,11 @@ export function forecast(courses: Course[], today: Date, kind: Scenario, capOver
   if (outside.length) notes.push(`Faltam ${outside.map((c) => `${c.credits} créditos de ${c.name.toLowerCase()}`).join(" e ")}: são feitos fora das disciplinas, ao longo do curso.`);
   if (together) notes.push("Estágio e TCC no mesmo semestre das últimas disciplinas: confira com a coordenação se o curso permite.");
   if (stuck.length) notes.push(`Não consegui encaixar: ${stuck.join(", ")}. Confira os pré-requisitos dessas disciplinas.`);
-  const why = (sc.ahead
+  const why = (kind === "equilibrada"
+    ? `Adiantando o que os pré-requisitos deixam, mas sem semestre puxado: até ${sc.cap} créditos.`
+    : sc.ahead
     ? `Adiantando tudo o que os pré-requisitos permitem, começando pelas cadeias mais longas, com até ${sc.cap} créditos por semestre (a menor carga que dá a formatura mais cedo).`
-    : `Seguindo a ordem da matriz (sem adiantar disciplina de fase seguinte, recuperando primeiro o que ficou para trás), até ${sc.cap} créditos por semestre, o máximo de uma fase da matriz.`)
+    : `Carga tranquila: até ${sc.cap} créditos por semestre (o estágio ocupa o semestre dele), seguindo a ordem da matriz sem adiantar disciplina de fase seguinte e recuperando primeiro o que ficou para trás.`)
     + ` Considera que você passa no que está cursando agora e não reprova; estágio e TCC ${sc.ahead ? "no fim" : "sozinhos no último semestre"}. Não sabe de choque de horário nem se a disciplina é oferecida naquele semestre (isso é com o SIGA).`;
   return { kind, cap: sc.cap, together, terms, finish: stuck.length || !terms.length ? (terms.length ? null : termOf(today)) : terms[terms.length - 1].term, heavy, stuck, why, notes };
 }

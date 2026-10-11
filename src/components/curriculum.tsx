@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useStore } from "@/lib/store";
 import { gradeCalc, nf, parseNum, qt } from "@/lib/calc";
-import { HEAVY, STATUS_NAME, TEMPLATES, courseState, effective, fillSlots, forecast, fromTemplate, matchSubject, requiresAll, summary, unlocksAll, type CourseState, type Forecast, type State } from "@/lib/curriculum";
+import { HEAVY, SCENARIOS, STATUS_NAME, TEMPLATES, courseState, effective, fillSlots, forecast, fromTemplate, matchSubject, requiresAll, summary, unlocksAll, type CourseState, type Forecast, type Scenario, type State } from "@/lib/curriculum";
 import type { Course, CourseKind, CourseStatus, Prereq } from "@/lib/types";
 import { ConfirmButton, I, Icon, Modal } from "./ui";
 
@@ -338,7 +338,7 @@ function PlanCard({ f, title, open, onToggle }: { f: Forecast; title: string; op
       <span className="lbl">{title}</span>
       <span className="v">{f.finish ?? "—"}</span>
       <span className="s">{f.terms.length ? `${qt(f.terms.length, "semestre", "semestres")}, de ${f.terms[0].term} a ${f.terms[f.terms.length - 1].term}` : "não falta nenhuma disciplina"}</span>
-      <span className="small" style={{ marginTop: 4 }}>{f.heavy.length ? <>Puxados: {f.heavy.map((t) => `${t.term} (${t.credits} cr)`).join(", ")}</> : <span className="muted">Nenhum semestre acima de {HEAVY} créditos.</span>}</span>
+      <span className="small" style={{ marginTop: 4 }}>{f.heavy.length ? <>Puxados: {f.heavy.map((t) => `${t.term} (${t.credits} cr)`).join(", ")}</> : <span className="muted">Nenhum semestre puxado ({HEAVY + 1} créditos ou mais).</span>}</span>
       {f.terms.length > 0 && <button className="btn sm ghost" style={{ alignSelf: "flex-start", paddingLeft: 0 }} onClick={onToggle} aria-expanded={open}>{open ? "Fechar" : "Ver semestre a semestre"}</button>}
     </div>
   );
@@ -361,35 +361,38 @@ function PlanTerms({ f }: { f: Forecast }) {
 
 export function ForecastPanel() {
   const st = useStore();
-  const [open, setOpen] = useState<"c" | "o" | null>(null);
-  const { con, oti, chain } = useMemo(() => {
+  const [open, setOpen] = useState<Scenario | null>(null);
+  const { plans, chain } = useMemo(() => {
     const today = new Date();
-    return { con: forecast(st.courses, today, "conservadora"), oti: forecast(st.courses, today, "otimista"), chain: summary(st.courses).chain };
+    return { plans: { conservadora: forecast(st.courses, today, "conservadora"), equilibrada: forecast(st.courses, today, "equilibrada"), otimista: forecast(st.courses, today, "otimista") }, chain: summary(st.courses).chain };
   }, [st.courses]);
+  const { conservadora: con, equilibrada: eq, otimista: oti } = plans;
   const idx = (f: Forecast) => new Map(f.terms.flatMap((t, i) => t.items.map((it) => [it.id, i] as const)));
   const ci = idx(con), oi = idx(oti);
   const ahead = oti.terms.flatMap((t) => t.items).filter((it) => !/^Optativa/.test(it.name) && (oi.get(it.id) ?? 99) < (ci.get(it.id) ?? 99)).map((it) => it.name);
-  const gain = con.stuck.length || oti.stuck.length ? 0 : con.terms.length - oti.terms.length;
+  const ok = !con.stuck.length && !oti.stuck.length;
+  const gain = ok ? con.terms.length - oti.terms.length : 0;
+  const eqGain = ok && !eq.stuck.length ? con.terms.length - eq.terms.length : 0;
+  const titles: Record<Scenario, string> = { conservadora: "Conservadora · até 20 créditos", equilibrada: `Equilibrada · até ${HEAVY} créditos`, otimista: "Otimista · o mais cedo possível" };
+  const toggle = (k: Scenario) => setOpen(open === k ? null : k);
 
   return (
     <section className="panel">
       <div className="panel-h"><h2>Previsão de formatura</h2><span className="lbl">sem reprovações</span></div>
-      <div className="grid g2" style={{ gap: 12 }}>
-        <PlanCard f={con} title="Conservadora · seguindo a grade" open={open === "c"} onToggle={() => setOpen(open === "c" ? null : "c")} />
-        <PlanCard f={oti} title="Otimista · adiantando o que der" open={open === "o"} onToggle={() => setOpen(open === "o" ? null : "o")} />
+      <div className="grid g3" style={{ gap: 12 }}>
+        {(Object.keys(plans) as Scenario[]).map((k) => <PlanCard key={k} f={plans[k]} title={titles[k]} open={open === k} onToggle={() => toggle(k)} />)}
       </div>
       <div className="callout" style={{ marginTop: 12 }}>
-        {gain > 0 ? <>
-          <b>Para formar em {oti.finish} em vez de {con.finish}</b> ({qt(gain, "semestre", "semestres")} antes), dá para adiantar {ahead.slice(0, 4).join(", ")}{ahead.length > 4 ? ` e mais ${ahead.length - 4}` : ""}
+        {!con.terms.length ? <b>Você já cumpriu todas as disciplinas da matriz.</b> : gain > 0 ? <>
+          Na carga tranquila você forma em <b>{con.finish}</b>.
+          {eqGain > 0 && eq.finish !== oti.finish ? <> Adiantando sem nenhum semestre puxado, em <b>{eq.finish}</b>.</> : null}
+          {" "}Para formar em <b>{oti.finish}</b> ({qt(gain, "semestre", "semestres")} antes da conservadora), dá para adiantar {ahead.length > 3 ? `${ahead.length} disciplinas (por exemplo: ${ahead.slice(0, 3).join(", ")})` : ahead.join(", ")}
           {oti.heavy.length ? <>, encarando {oti.heavy.length === 1 ? "um semestre puxado" : `${oti.heavy.length} semestres puxados`} ({oti.heavy.map((t) => `${t.term}: ${t.credits} cr`).join(", ")})</> : null}
           {oti.together ? ", e fazer o estágio junto com as últimas disciplinas" : ""}.
-        </> : con.terms.length ? <>
-          <b>Adiantar não traz a formatura para antes de {con.finish}.</b>
-        </> : <b>Você já cumpriu todas as disciplinas da matriz.</b>}
+        </> : <b>Adiantar não traz a formatura para antes de {con.finish}.</b>}
         {chain.length > 1 && <> Quem segura a data é a cadeia <b>{chain.join(" → ")}</b>: atrasar qualquer uma delas atrasa a formatura.</>}
       </div>
-      {open === "c" && <div style={{ marginTop: 12 }}><h3 style={{ margin: "0 0 6px" }}>Conservadora</h3><PlanTerms f={con} /></div>}
-      {open === "o" && <div style={{ marginTop: 12 }}><h3 style={{ margin: "0 0 6px" }}>Otimista</h3><PlanTerms f={oti} /></div>}
+      {open && <div style={{ marginTop: 12 }}><h3 style={{ margin: "0 0 6px" }}>{SCENARIOS[open].name}</h3><PlanTerms f={plans[open]} /></div>}
     </section>
   );
 }
