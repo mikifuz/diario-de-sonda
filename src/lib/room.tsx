@@ -2,14 +2,13 @@
 // Sala de estudos: presença ao vivo, grupos e placar. Só lê/escreve as tabelas
 // compartilhadas (room_members, study_groups, group_members) e os totais agregados.
 // O banco só devolve quem divide algum grupo comigo (migration sala_por_grupos).
+// Criar e entrar em grupo, pedir e bloquear amigos passam por funções do banco, que limitam
+// as tentativas com código errado (migration seguranca).
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { sb, friendlyError } from "./supabase";
 import { useStore, timerMs } from "./store";
 import { addDays, todayKey, weekStartKey } from "./calc";
 import type { DailyTotal, Friend, GroupMember, RoomMember, StudyGroup } from "./types";
-
-const CODE_CH = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-export const newCode = () => Array.from({ length: 6 }, () => CODE_CH[Math.floor(Math.random() * CODE_CH.length)]).join("");
 
 interface Room {
   ready: boolean;
@@ -29,9 +28,14 @@ interface Room {
   sendFriend: (code: string) => Promise<boolean>;
   acceptFriend: (id: string) => Promise<void>;
   removeFriend: (id: string) => Promise<void>;
+  /** recusa ou desfaz e impede novos pedidos da pessoa */
+  blockFriend: (id: string) => Promise<void>;
+  blocks: Blocked[];
+  unblock: (userId: string) => Promise<void>;
   nudge: (to: string, msg: NudgeKey) => Promise<boolean>;
   setAcceptNudges: (v: boolean) => Promise<void>;
 }
+export interface Blocked { blocked: string; nick: string }
 export type NudgeKey = "bora" | "sala" | "revisao" | "prova";
 /** Mensagens prontas (o banco só aceita estas) */
 export const NUDGES: Record<NudgeKey, string> = { bora: "Bora estudar?", sala: "Tô na sala, vem estudar comigo!", revisao: "Bora revisar junto hoje?", prova: "Prova chegando: bora estudar?" };
@@ -62,6 +66,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const [memberships, setMemberships] = useState<GroupMember[]>([]);
   const [totalsRaw, setTotalsRaw] = useState<DailyTotal[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
+  const [blocks, setBlocks] = useState<Blocked[]>([]);
 
   const load = useCallback(async (what: "members" | "groups" | "totals" | "friends" | "all" = "all") => {
     const db = sb();
@@ -82,6 +87,9 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         const { data, error } = await db.rpc("my_friendships");
         if (error) throw error;
         setFriends((data || []) as Friend[]);
+        const b = await db.rpc("my_blocks");
+        if (b.error) throw b.error;
+        setBlocks((b.data || []) as Blocked[]);
       }
       if (what === "totals" || what === "all") {
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo";
@@ -163,30 +171,23 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     toast("Você saiu da sala.");
   }, [uid, load, toast]);
 
+  const rpcError = (e: { message?: string }) => toast(e.message && !/fetch|network/i.test(e.message) ? e.message : friendlyError(e));
+  // o código do grupo é gerado no banco
   const createGroup = useCallback(async (name: string) => {
-    for (let i = 0; i < 4; i++) {
-      const code = newCode();
-      const g = await sb().from("study_groups").insert({ code, name: name.trim().slice(0, 40), created_by: uid });
-      if (g.error && g.error.code === "23505") continue; // código repetido: tenta outro
-      if (g.error) { toast(friendlyError(g.error)); return null; }
-      const m = await sb().from("group_members").insert({ code, user_id: uid });
-      if (m.error) { toast(friendlyError(m.error)); return null; }
-      await load("groups");
-      return code;
-    }
-    toast("Não foi possível gerar um código. Tente de novo.");
-    return null;
-  }, [uid, load, toast]);
+    const { data, error } = await sb().rpc("create_group", { p_name: name.trim().slice(0, 40) });
+    if (error) { rpcError(error); return null; }
+    await load("groups");
+    return data as string;
+  }, [load, toast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const joinGroup = useCallback(async (code: string) => {
-    const c = code.trim().toUpperCase();
-    // os códigos não são listáveis: só dá para saber se existe tentando entrar
-    const { error } = await sb().from("group_members").insert({ code: c, user_id: uid });
-    if (error && error.code === "23503") { toast("Nenhum grupo com esse código. Confira com quem criou."); return false; }
-    if (error && error.code !== "23505") { toast(friendlyError(error)); return false; }
+    // os códigos não são listáveis: só dá para saber se existe tentando entrar (com limite de erros)
+    const { data, error } = await sb().rpc("join_group", { p_code: code.trim().toUpperCase() });
+    if (error) { rpcError(error); return false; }
+    if (data === "nao_encontrado") { toast("Nenhum grupo com esse código. Confira com quem criou."); return false; }
     await load("all");
     return true;
-  }, [uid, load, toast]);
+  }, [load, toast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const leaveGroup = useCallback(async (code: string) => {
     const { error } = await sb().from("group_members").delete().eq("code", code).eq("user_id", uid);
@@ -194,10 +195,10 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     await load("all");
   }, [uid, load, toast]);
 
-  const rpcError = (e: { message?: string }) => toast(e.message && !/fetch|network/i.test(e.message) ? e.message : friendlyError(e));
   const sendFriend = useCallback(async (code: string) => {
     const { data, error } = await sb().rpc("send_friend_request", { p_code: code.trim().toUpperCase() });
     if (error) { rpcError(error); return false; }
+    if (data === "nao_encontrado") { toast("Nenhuma pessoa com esse código."); return false; }
     toast(data === "enviado" ? "Pedido de amizade enviado." : data === "aceito" ? "Vocês agora são amigos." : data === "ja_amigos" ? "Vocês já são amigos." : "Você já mandou um pedido para essa pessoa.");
     await load("all");
     return true;
@@ -213,6 +214,18 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     if (error) { toast(friendlyError(error)); return; }
     await load("all");
   }, [load, toast]);
+  const blockFriend = useCallback(async (id: string) => {
+    const { error } = await sb().rpc("block_friend", { p_id: id });
+    if (error) { rpcError(error); return; }
+    toast("Pessoa bloqueada: ela não consegue mais mandar pedidos para você.");
+    await load("all");
+  }, [load, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+  const unblock = useCallback(async (userId: string) => {
+    const { error } = await sb().from("friend_blocks").delete().eq("user_id", uid).eq("blocked", userId);
+    if (error) { toast(friendlyError(error)); return; }
+    toast("Desbloqueado.");
+    await load("friends");
+  }, [uid, load, toast]);
   const nudge = useCallback(async (to: string, msg: NudgeKey) => {
     const { error } = await sb().rpc("nudge_friend", { p_to: to, p_msg: msg });
     if (error) { rpcError(error); return false; }
@@ -237,8 +250,8 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     return groups.filter((g) => codes.has(g.code)).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [groups, memberships, uid]);
 
-  const value = useMemo<Room>(() => ({ ready, members, groups, memberships, totals, me, myGroups, join, updateMe, leave, createGroup, joinGroup, leaveGroup, friends, sendFriend, acceptFriend, removeFriend, nudge, setAcceptNudges }),
-    [ready, members, groups, memberships, totals, me, myGroups, join, updateMe, leave, createGroup, joinGroup, leaveGroup, friends, sendFriend, acceptFriend, removeFriend, nudge, setAcceptNudges]);
+  const value = useMemo<Room>(() => ({ ready, members, groups, memberships, totals, me, myGroups, join, updateMe, leave, createGroup, joinGroup, leaveGroup, friends, sendFriend, acceptFriend, removeFriend, blockFriend, blocks, unblock, nudge, setAcceptNudges }),
+    [ready, members, groups, memberships, totals, me, myGroups, join, updateMe, leave, createGroup, joinGroup, leaveGroup, friends, sendFriend, acceptFriend, removeFriend, blockFriend, blocks, unblock, nudge, setAcceptNudges]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
@@ -265,6 +278,7 @@ export function DemoRoomProvider({ demo, children }: { demo: import("./demo").De
       join: only, updateMe: async () => { await only(); }, leave: async () => { await only(); }, createGroup: async () => { await only(); return null; },
       joinGroup: only, leaveGroup: async () => { await only(); }, friends: demo.friends, sendFriend: only,
       acceptFriend: async () => { await only(); }, removeFriend: async () => { await only(); },
+      blockFriend: async () => { await only(); }, blocks: [], unblock: async () => { await only(); },
       nudge: async (_to, msg) => { toast(`Exemplo: na conta de verdade, sua amiga receberia "${NUDGES[msg]}".`); return true; },
       setAcceptNudges: async () => { await only(); },
     };

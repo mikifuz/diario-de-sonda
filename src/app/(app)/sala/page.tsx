@@ -216,7 +216,8 @@ function FriendsPanel() {
       <div className="row small" style={{ gap: 6, marginBottom: 8 }}>Seu código de amigo: <b className="num" style={{ letterSpacing: ".1em" }}>{me.friend_code || "–"}</b>{me.friend_code && <button className="btn sm ghost" onClick={copy}>Copiar</button>}</div>
       {incoming.map((f) => (
         <div key={f.id} className="li"><div className="grow small"><b>{f.nick}</b> quer ser seu amigo</div>
-          <button className="btn sm pri" onClick={() => room.acceptFriend(f.id)}>Aceitar</button><button className="btn sm ghost" onClick={() => room.removeFriend(f.id)}>Recusar</button></div>
+          <button className="btn sm pri" onClick={() => room.acceptFriend(f.id)}>Aceitar</button><button className="btn sm ghost" onClick={() => room.removeFriend(f.id)}>Recusar</button>
+          <ConfirmButton small label="Bloquear" question={`Bloquear ${f.nick}? Essa pessoa não conseguirá mandar novos pedidos.`} confirmLabel="Bloquear" onConfirm={() => room.blockFriend(f.id)} /></div>
       ))}
       {friends.length > 0 && <div className="list">{friends.map((f) => {
         const m = room.members.find((x) => x.user_id === f.other);
@@ -238,6 +239,9 @@ function FriendsPanel() {
       ))}
       {!room.friends.length && <p className="small muted" style={{ margin: "0 0 8px" }}>Passe seu código para um colega, ou digite o código dele. Amigos veem um ao outro na sala (como num grupo) e podem se chamar para estudar.</p>}
       <form className="row" style={{ marginTop: 8, flexWrap: "nowrap" }} onSubmit={add}><input type="text" maxLength={8} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Código de amigo" aria-label="Código de amigo" style={{ fontFamily: "var(--f-mono)" }} /><button className="btn sm">Adicionar</button></form>
+      {room.blocks.length > 0 && <details className="small" style={{ marginTop: 10 }}><summary>{qt(room.blocks.length, "pessoa bloqueada", "pessoas bloqueadas")}</summary>
+        {room.blocks.map((b) => <div key={b.blocked} className="li small"><div className="grow muted">{b.nick}</div><button className="btn sm ghost" onClick={() => room.unblock(b.blocked)}>Desbloquear</button></div>)}
+      </details>}
       <label className="check small" style={{ marginTop: 10 }}><input type="checkbox" checked={me.accept_nudges !== false} onChange={(e) => room.setAcceptNudges(e.target.checked)} />Receber chamados dos amigos</label>
       <p className="small muted" style={{ margin: "6px 0 0" }}>Chamados usam só mensagens prontas, no máximo um por hora para cada amigo.</p>
     </div>

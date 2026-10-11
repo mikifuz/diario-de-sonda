@@ -23,7 +23,7 @@ export default function RedefinirSenha() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) { setMsg("A senha precisa ter pelo menos 6 caracteres."); return; }
+    if (password.length < 8) { setMsg("A senha precisa ter pelo menos 8 caracteres."); return; }
     const { error } = await sb().auth.updateUser({ password });
     if (error) { setMsg(friendlyError(error)); return; }
     router.replace("/painel");
@@ -36,7 +36,7 @@ export default function RedefinirSenha() {
         <h1 style={{ fontSize: "calc(1.3rem*var(--display-scale))" }}>Nova senha</h1>
         {ok === false ? <p>O link expirou ou já foi usado. <a href="/entrar">Peça um novo</a>.</p> : (
           <form className="stack" style={{ gap: 12 }} onSubmit={submit}>
-            <label className="f"><span>Nova senha</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} required autoComplete="new-password" /></label>
+            <label className="f"><span>Nova senha</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required autoComplete="new-password" /></label>
             {msg && <div className="callout" role="status">{msg}</div>}
             <button className="btn pri" disabled={!ok} style={{ justifyContent: "center" }}>Salvar nova senha</button>
           </form>
