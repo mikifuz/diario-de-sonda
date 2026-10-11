@@ -200,6 +200,38 @@ do $$ begin
   if (select assessment_id from public.review_items) is not null or (select count(*) from public.review_items) <> 1 then raise exception 'revisão não foi solta da prova apagada'; end if;
 end $$;
 
+-- ============ Tarefas ============
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.tasks (title, subject_id, due) values ('Lista 4 de Cálculo', '10000000-0000-0000-0000-000000000001', current_date + 2);
+insert into public.tasks (title) values ('Comprar calculadora');
+update public.profiles set mastery_cfg = '{"w_acc":60}';
+do $$ begin
+  begin
+    insert into public.tasks (title) values ('   ');
+    raise exception 'FALHOU: tarefa sem título';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.profiles set mastery_cfg = '[1,2]';
+    raise exception 'FALHOU: configuração do índice que não é objeto';
+  exception when check_violation then null;
+  end;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+update public.tasks set done = true;
+do $$ begin
+  if (select count(*) from public.tasks) <> 0 then raise exception 'Bruno vê as tarefas de Ana'; end if;
+  begin
+    insert into public.tasks (title, subject_id) values ('x', '10000000-0000-0000-0000-000000000001');
+    raise exception 'FALHOU: tarefa ligada à disciplina de outra pessoa';
+  exception when foreign_key_violation then null;
+  end;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+do $$ begin
+  if (select count(*) from public.tasks where done) <> 0 then raise exception 'Bruno alterou tarefas de Ana'; end if;
+end $$;
+
 -- Ana: apagar conteúdo mantém a sessão como "geral"
 delete from public.topics where id = '20000000-0000-0000-0000-000000000001';
 do $$ begin
@@ -215,6 +247,7 @@ delete from public.subjects where id = '10000000-0000-0000-0000-000000000001';
 do $$ begin
   if (select count(*) from public.study_sessions) <> 0 or (select count(*) from public.assessments) <> 0 then raise exception 'cascata falhou'; end if;
   if (select count(*) from public.routine_blocks) <> 1 then raise exception 'aula da disciplina apagada continuou na rotina'; end if;
+  if (select count(*) from public.tasks) <> 1 then raise exception 'tarefa da disciplina apagada continuou (ou a avulsa sumiu)'; end if;
 end $$;
 
 reset role;

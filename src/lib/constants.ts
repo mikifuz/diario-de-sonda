@@ -51,6 +51,5 @@ export const PAGES = [
   { href: "/sala", nm: "Sala", full: "Sala de estudos", t: "Sala de estudos", ic: "M16 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 20v-1a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" },
   { href: "/calendario", nm: "Agenda", full: "Calendário", t: "Calendário acadêmico", ic: "M3 6h18v15H3zM3 10h18M8 3v5M16 3v5" },
   { href: "/disciplinas", nm: "Disciplinas", full: "Disciplinas", t: "Minhas disciplinas", ic: "M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3zM18 20V7M8 8h6M8 12h6" },
-  { href: "/notas", nm: "Notas", full: "Notas", t: "Notas e médias", ic: "M5 3h14v18H5zM9 7h6M9 11h6M9 15h3" },
   { href: "/configuracoes", nm: "Ajustes", full: "Configurações", t: "Configurações", ic: "M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M14 4v4M8 10v4M16 16v4" },
 ] as const;

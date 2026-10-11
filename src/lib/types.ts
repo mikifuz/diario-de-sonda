@@ -42,6 +42,8 @@ export interface Profile {
   study_pref: StudyPref;
   /** degraus da revisão espaçada, em dias */
   review_steps: number[];
+  /** pesos do índice de domínio (null = padrão) */
+  mastery_cfg: Record<string, number> | null;
 }
 
 export interface Traits {
@@ -218,4 +220,14 @@ export interface ReviewLog {
   new_step: number;
   prev_due: string;
   new_due: string | null;
+}
+
+/** Tarefa da lista de tarefas (to-do) */
+export interface Todo {
+  id: string;
+  title: string;
+  subject_id: string | null;
+  due: string | null;
+  done: boolean;
+  done_at: string | null;
 }

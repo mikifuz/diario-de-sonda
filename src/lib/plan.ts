@@ -1,8 +1,9 @@
 // Rotina, revisão espaçada ancorada na prova e plano do dia. Funções puras, cobertas
 // por testes. Cada decisão devolve o motivo (why) para aparecer na tela.
-import { addDays, daysBetween, keyDate, pad, pct, verified } from "./calc";
+import { addDays, daysBetween, keyDate, pad } from "./calc";
+import { mastery, topicFamily, type MasteryCfg } from "./mastery";
 import { DEFAULT_STEPS } from "./constants";
-import type { Assessment, Autonomy, CalEvent, Mistake, Result, ReviewItem, RoutineBlock, Session, StudyPref, Subject, Topic } from "./types";
+import type { Assessment, Autonomy, CalEvent, Mistake, Result, ReviewItem, ReviewLog, RoutineBlock, Session, StudyPref, Subject, Topic } from "./types";
 
 /* ============ Horas ============ */
 export const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + (m || 0); };
@@ -153,19 +154,14 @@ export interface PlanInput {
   assessments: Assessment[];
   items: ReviewItem[];
   mistakes: Mistake[];
+  /** histórico de revisões e pesos do índice de domínio (opcionais) */
+  logs?: ReviewLog[];
+  cfg?: MasteryCfg;
 }
 
 const CLASS_MIN = 30;
 const cmpRank = (a: number[], b: number[]) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (a[i] ?? 0) - (b[i] ?? 0); if (d) return d; } return 0; };
 const sessDay = (s: Session) => { const d = new Date(s.started_at); return { k: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, m: d.getHours() * 60 + d.getMinutes() }; };
-
-/** Acerto conferido médio de um conteúdo (null sem dados) */
-function topicAcc(sessions: Session[], topicId: string | null): number | null {
-  if (!topicId) return null;
-  let s = 0, n = 0;
-  for (const x of sessions) { if (x.topic_id !== topicId) continue; const v = verified(x); if (v != null) { s += v; n++; } }
-  return n ? s / n : null;
-}
 
 /** Blocos de estudo que sobram no dia, descontando compromissos do calendário */
 export function freeStudy(blocks: RoutineBlock[], events: CalEvent[], day: string): { blocks: RoutineBlock[]; notes: string[] } {
@@ -197,19 +193,20 @@ export function dayTasks(p: PlanInput): Task[] {
     const a = it.assessment_id ? p.assessments.find((x) => x.id === it.assessment_id) : null;
     const daysTo = a?.date ? daysBetween(p.today, a.date) : null;
     const late = daysBetween(it.due, p.today);
-    const acc = topicAcc(p.sessions, it.topic_id);
+    const m = it.topic_id ? mastery(topicFamily(p.topics, it.topic_id), { sessions: p.sessions, logs: p.logs || [], items: p.items, mistakes: p.mistakes, today: p.today, cfg: p.cfg }) : null;
+    const dom = m?.score ?? null;
     const nMist = it.topic_id ? p.mistakes.filter((m) => m.topic_id === it.topic_id).length : 0;
     const why = [
       a ? (daysTo != null ? `${a.name} ${emDias(daysTo)}` : `${a.name} sem data`) : "sem prova ligada",
       late > 0 ? `atrasada há ${plural(late, "dia", "dias")}` : "",
-      acc != null ? `acerto conferido de ${pct(acc)} no conteúdo` : "",
+      dom != null ? `domínio ${dom} no conteúdo` : "",
       nMist > 1 ? `${nMist} erros registrados no conteúdo` : "",
     ].filter(Boolean).join("; ");
     tasks.push({
       key: "r" + it.id, kind: "revisao", title: it.title, subject_id: it.subject_id, topic_id: it.topic_id, item_id: it.id, minutes: it.est_min,
       why: why.charAt(0).toUpperCase() + why.slice(1) + ".",
-      // prova em até 3 dias vem antes de tudo; depois prova mais próxima, atraso, peso, menor acerto, mais erros
-      rank: [daysTo != null && daysTo <= 3 ? 0 : 2, daysTo ?? 999, -late, -(a ? Number(a.weight) : 0), acc ?? 1, -nMist],
+      // prova em até 3 dias vem antes de tudo; depois prova mais próxima, atraso, peso, menor domínio, mais erros
+      rank: [daysTo != null && daysTo <= 3 ? 0 : 2, daysTo ?? 999, -late, -(a ? Number(a.weight) : 0), dom ?? 50, -nMist],
     });
   }
 

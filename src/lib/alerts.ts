@@ -1,0 +1,102 @@
+// Alertas do painel: o que pede ação agora, com o motivo. Função pura e testada.
+// Confiança e acerto continuam separados: cada alerta diz qual dos dois está baixo.
+import { addDays, daysBetween, dkey, nf, pct, stats } from "./calc";
+import { itemState } from "./plan";
+import { mastery, topicFamily, type MasteryCfg } from "./mastery";
+import type { Assessment, Mistake, ReviewItem, ReviewLog, Session, Subject, Topic } from "./types";
+
+export type Level = "bad" | "warn" | "info";
+export interface Alert { key: string; level: Level; text: string; why?: string; action?: { label: string; href: string }; days?: number }
+export interface AlertInput {
+  today: string; subjects: Subject[]; topics: Topic[]; sessions: Session[]; assessments: Assessment[];
+  items: ReviewItem[]; logs: ReviewLog[]; mistakes: Mistake[]; cfg?: MasteryCfg;
+}
+
+const HORIZON = 14;
+const emDias = (n: number) => (n === 0 ? "é hoje" : n === 1 ? "é amanhã" : `é em ${n} dias`);
+const list = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} e ${xs[xs.length - 1]}`);
+const study = (s: string, t?: string | null) => `/sala?disciplina=${s}${t ? `&conteudo=${t}` : ""}&atividade=exercicios`;
+
+export function buildAlerts(p: AlertInput): Alert[] {
+  const out: Alert[] = [];
+  const active = p.subjects.filter((s) => !s.archived);
+  const mIn = { sessions: p.sessions, logs: p.logs, items: p.items, mistakes: p.mistakes, today: p.today, cfg: p.cfg };
+  const isExam = (a: Assessment) => (a.kind === "prova" || a.kind === "sub") && a.grade == null && a.status !== "cancelado" && !!a.date && a.date >= p.today;
+
+  for (const s of active) {
+    const exams = p.assessments.filter((a) => a.subject_id === s.id && isExam(a)).sort((a, b) => a.date!.localeCompare(b.date!));
+    const ts = p.topics.filter((t) => t.subject_id === s.id);
+    for (const a of exams) {
+      const d = daysBetween(p.today, a.date!);
+      if (d > HORIZON) break;
+      // conteúdos da prova: os marcados para ela; para a próxima prova, também os sem prova marcada
+      const inSet = ts.filter((t) => t.assessment_id === a.id || (!t.assessment_id && a.id === exams[0].id));
+      const ids = new Set(inSet.map((t) => t.id));
+      const tops = inSet.filter((t) => !t.parent_id || !ids.has(t.parent_id));
+      const fragile: { t: Topic; score: number; why: string }[] = [], building: { t: Topic; score: number; why: string }[] = [], nodata: Topic[] = [], lowconf: { t: Topic; conf: number }[] = [];
+      for (const t of tops) {
+        const fam = topicFamily(p.topics, t.id);
+        const m = mastery(fam, mIn);
+        if (m.score == null) nodata.push(t);
+        else if (m.band === "fragil") fragile.push({ t, score: m.score, why: `${m.why} ${m.formula}` });
+        else if (m.band === "construcao" && d <= 7) building.push({ t, score: m.score, why: `${m.why} ${m.formula}` });
+        const recent = p.sessions.filter((x) => x.topic_id && fam.has(x.topic_id) && daysBetween(dkey(x.started_at), p.today) <= 30);
+        const st = stats(recent);
+        if (st.conf != null && st.conf <= 2.5 && m.band !== "fragil") lowconf.push({ t, conf: st.conf });
+      }
+      const when = `${a.name} de ${s.name} ${emDias(d)}`;
+      if (fragile.length) {
+        fragile.sort((x, y) => x.score - y.score);
+        out.push({
+          key: `fr-${a.id}`, level: "bad", days: d,
+          text: `${when}: ${list(fragile.map((f) => `${f.t.name} (domínio ${f.score})`))} ${fragile.length > 1 ? "estão frágeis" : "está frágil"}. Faça exercícios ${fragile.length > 1 ? "desses conteúdos" : "desse conteúdo"}.`,
+          why: fragile[0].why, action: { label: `Exercícios de ${fragile[0].t.name}`, href: study(s.id, fragile[0].t.id) },
+        });
+      }
+      if (building.length) {
+        building.sort((x, y) => x.score - y.score);
+        out.push({
+          key: `bd-${a.id}`, level: "warn", days: d,
+          text: `${when}: ${list(building.map((b) => `${b.t.name} (domínio ${b.score})`))} ainda ${building.length > 1 ? "estão" : "está"} em construção. Priorize exercícios ${building.length > 1 ? "desses conteúdos" : "desse conteúdo"}.`,
+          why: building[0].why, action: { label: `Exercícios de ${building[0].t.name}`, href: study(s.id, building[0].t.id) },
+        });
+      }
+      for (const l of lowconf.slice(0, 2)) {
+        out.push({
+          key: `lc-${a.id}-${l.t.id}`, level: "warn", days: d,
+          text: `${when} e você marcou confiança baixa em ${l.t.name} (média ${nf(l.conf)}/5). Faça exercícios e confira o resultado: é falta de domínio ou só insegurança?`,
+          why: "Confiança é o que você sentiu; não conta como acerto. Só o resultado conferido mostra se a insegurança tem fundamento.",
+          action: { label: `Exercícios de ${l.t.name}`, href: study(s.id, l.t.id) },
+        });
+      }
+      if (nodata.length && d <= 7) {
+        out.push({
+          key: `nd-${a.id}`, level: "warn", days: d,
+          text: `${when} e ${nodata.length === 1 ? `${nodata[0].name} ainda não tem` : `${nodata.length} conteúdos ainda não têm`} resultado conferido suficiente${nodata.length > 1 ? ` (${list(nodata.slice(0, 4).map((t) => t.name))}${nodata.length > 4 ? "…" : ""})` : ""}. Faça exercícios e anote quantos acertou.`,
+          why: "Sem resultados conferidos não dá para saber o domínio; o diário não chuta.",
+          action: { label: "Fazer exercícios", href: study(s.id, nodata[0].id) },
+        });
+      }
+      if (!tops.length && d <= 7 && !p.sessions.some((x) => x.subject_id === s.id && dkey(x.started_at) >= addDays(p.today, -14))) {
+        out.push({
+          key: `ne-${a.id}`, level: "warn", days: d,
+          text: `${when} e não há estudo de ${s.name} registrado nos últimos 14 dias.`,
+          why: "Cadastre os conteúdos da prova na disciplina para alertas mais precisos.", action: { label: "Estudar agora", href: study(s.id) },
+        });
+      }
+    }
+    // confiança × resultado nos últimos 30 dias (métricas separadas)
+    const s30 = stats(p.sessions.filter((x) => x.subject_id === s.id && daysBetween(dkey(x.started_at), p.today) <= 30));
+    if (s30.accN >= 3 && s30.conf != null && s30.acc != null) {
+      if (s30.conf >= 4 && s30.acc < 0.6) out.push({ key: `cal-${s.id}`, level: "warn", text: `Em ${s.name} você se avalia com confiança ${nf(s30.conf)}/5, mas acertou ${pct(s30.acc)} do que conferiu nos últimos 30 dias.`, why: `${s30.accN} registro(s) conferido(s).` });
+      if (s30.conf <= 2.5 && s30.acc >= 0.8) out.push({ key: `cal2-${s.id}`, level: "info", text: `Em ${s.name} seus resultados (${pct(s30.acc)}) estão melhores do que sua confiança (${nf(s30.conf)}/5) sugere.`, why: `${s30.accN} registro(s) conferido(s).` });
+    }
+  }
+
+  const late = p.items.filter((i) => i.due < p.today && active.some((s) => s.id === i.subject_id) && itemState(i, p.assessments, p.today).open);
+  if (late.length) out.push({ key: "late", level: late.length >= 5 ? "warn" : "info", text: `${late.length === 1 ? "1 revisão atrasada" : `${late.length} revisões atrasadas`}.`, action: { label: "Ver revisões", href: "/hoje?aba=revisoes" } });
+
+  const rank: Record<Level, number> = { bad: 0, warn: 1, info: 2 };
+  return out.sort((a, b) => rank[a.level] - rank[b.level] || (a.days ?? 99) - (b.days ?? 99));
+}
+

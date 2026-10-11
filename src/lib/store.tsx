@@ -3,25 +3,25 @@
 // grava de forma otimista e escuta mudanças feitas em outros aparelhos.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { sb, friendlyError } from "./supabase";
-import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Social, Subject, Timer, Topic } from "./types";
+import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic } from "./types";
 
-export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs";
-type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "mistakes" | "reviews" | "reviewLogs";
+export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs" | "tasks";
+type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "mistakes" | "reviews" | "reviewLogs" | "todos";
 const KEY: Record<Table, Key> = {
   subjects: "subjects", topics: "topics", study_sessions: "sessions", assessments: "assessments", events: "events",
-  routine_blocks: "blocks", mistakes: "mistakes", review_items: "reviews", review_logs: "reviewLogs",
+  routine_blocks: "blocks", mistakes: "mistakes", review_items: "reviews", review_logs: "reviewLogs", tasks: "todos",
 };
 type RowOf = {
   subjects: Subject; topics: Topic; study_sessions: Session; assessments: Assessment; events: CalEvent;
-  routine_blocks: RoutineBlock; mistakes: Mistake; review_items: ReviewItem; review_logs: ReviewLog;
+  routine_blocks: RoutineBlock; mistakes: Mistake; review_items: ReviewItem; review_logs: ReviewLog; tasks: Todo;
 };
 export const TABLES = Object.keys(KEY) as Table[];
 
 interface Data {
   profile: Profile | null; subjects: Subject[]; topics: Topic[]; sessions: Session[]; assessments: Assessment[]; events: CalEvent[];
-  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[];
+  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[]; todos: Todo[];
 }
-const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [], blocks: [], mistakes: [], reviews: [], reviewLogs: [] };
+const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [], blocks: [], mistakes: [], reviews: [], reviewLogs: [], todos: [] };
 
 export interface Store extends Data {
   uid: string;
@@ -53,7 +53,7 @@ export function useStore() {
 export const timerMs = (t: Timer | null | undefined, now = Date.now()) => (t ? (t.accum || 0) + (t.running ? now - t.since : 0) : 0);
 const normTime = <T extends { time: string | null }>(r: T): T => ({ ...r, time: r.time ? r.time.slice(0, 5) : null });
 const normBlock = (r: RoutineBlock): RoutineBlock => ({ ...r, start_time: r.start_time.slice(0, 5), end_time: r.end_time.slice(0, 5) });
-const PROFILE_COLS = "id,name,course,university,current_semester,default_min_avg,weekly_goal_h,skin,timer,study_pref,review_steps";
+const PROFILE_COLS = "id,name,course,university,current_semester,default_min_avg,weekly_goal_h,skin,timer,study_pref,review_steps,mastery_cfg";
 const COLS: Record<Table, string> = {
   subjects: "id,name,code,professor,semester,credits,hours,color,min_avg,schedule,notes,traits,exam_enabled,exam_w_avg,exam_w_exam,exam_min_final,exam_min_take,archived,study_pref,recovery,sub_replace_lower",
   topics: "id,subject_id,parent_id,name,position,taught_on,assessment_id",
@@ -64,6 +64,7 @@ const COLS: Record<Table, string> = {
   mistakes: "id,subject_id,topic_id,session_id,category,description,correction,source,occurred_on",
   review_items: "id,subject_id,topic_id,mistake_id,assessment_id,title,step,due,est_min,active,last_reviewed_at",
   review_logs: "id,item_id,reviewed_at,result,autonomy,confidence,prev_step,new_step,prev_due,new_due",
+  tasks: "id,title,subject_id,due,done,done_at",
 };
 
 export function DataProvider({ uid, email, children, onToast }: { uid: string; email: string; children: ReactNode; onToast: (m: string) => void }) {
@@ -151,7 +152,7 @@ export function DataProvider({ uid, email, children, onToast }: { uid: string; e
     if (error) { toast(friendlyError(error)); reload(t); return false; }
     // cascatas do banco: atualiza tabelas dependentes
     const deps: Partial<Record<Table, Table[]>> = {
-      subjects: ["topics", "study_sessions", "assessments", "events", "routine_blocks", "mistakes", "review_items", "review_logs"],
+      subjects: ["topics", "study_sessions", "assessments", "events", "routine_blocks", "mistakes", "review_items", "review_logs", "tasks"],
       topics: ["topics", "study_sessions", "mistakes", "review_items"],
       assessments: ["topics", "review_items"],
       study_sessions: ["mistakes"],

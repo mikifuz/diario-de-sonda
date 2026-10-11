@@ -33,8 +33,10 @@ function TimerPanel({ onManual, onNewSubject }: { onManual: () => void; onNewSub
   const list = activeSubjects(st.subjects);
   const pre = params.get("disciplina");
   const [subjectId, setSubjectId] = useState(pre && list.some((s) => s.id === pre) ? pre : list[0]?.id || "");
-  const [topicId, setTopicId] = useState("");
-  const [activity, setActivity] = useState<Activity>("exercicios");
+  // vindo de um alerta: já traz conteúdo e atividade
+  const preTopic = params.get("conteudo"), preAct = params.get("atividade") as Activity | null;
+  const [topicId, setTopicId] = useState(preTopic && st.topics.some((x) => x.id === preTopic && x.subject_id === pre) ? preTopic : "");
+  const [activity, setActivity] = useState<Activity>(preAct && preAct in ACT ? preAct : "exercicios");
   const [discard, setDiscard] = useState(false);
   const [start, setStart] = useState<StartArgs | null>(null);
   const t = st.profile?.timer;

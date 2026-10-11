@@ -5,12 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { dkey, fmtMin, gradeCalc, keyDate, nf, pct, signal, stats, todayKey } from "@/lib/calc";
 import { dm, itemState } from "@/lib/plan";
+import { BAND, mastery, masteryCfg, topicFamily } from "@/lib/mastery";
 import { MISTAKE, WD_S } from "@/lib/constants";
 import type { Topic } from "@/lib/types";
 import { Dot, Empty, I, Icon } from "@/components/ui";
 import { SessionModal, SubjectModal, TopicModal, TopicOptions } from "@/components/modals";
 import { SessionRow } from "@/components/SessionRow";
 import { MistakeModal, ReviewItemModal } from "@/components/planning";
+import { GradesPanel } from "@/components/grades";
 
 export default function Disciplina() {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +21,7 @@ export default function Disciplina() {
   const [modal, setModal] = useState<null | { k: "edit" } | { k: "topic"; id: string } | { k: "session"; id: string } | { k: "review"; topic: string } | { k: "mistake"; id: string | null }>(null);
   const [newTopic, setNewTopic] = useState("");
   const [parent, setParent] = useState("");
+  const [why, setWhy] = useState<string | null>(null);
   const s = st.subjects.find((x) => x.id === id);
   if (!s) return <Empty title="Disciplina não encontrada">Ela pode ter sido excluída.<Link className="btn sm" href="/disciplinas">Ver disciplinas</Link></Empty>;
 
@@ -30,6 +33,7 @@ export default function Disciplina() {
   const mistakes = st.mistakes.filter((m) => m.subject_id === s.id).sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
   const classes = st.blocks.filter((b) => b.kind === "aula" && b.subject_id === s.id).sort((a, b) => ((a.weekday + 6) % 7) - ((b.weekday + 6) % 7) || a.start_time.localeCompare(b.start_time));
   const kidsOf = (tid: string) => ts.filter((c) => c.parent_id === tid).map((c) => c.id);
+  const mIn = { sessions: st.sessions, logs: st.reviewLogs, items: st.reviews, mistakes: st.mistakes, today, cfg: masteryCfg(st.profile?.mastery_cfg) };
   const rows: ReactNode[] = [];
   const walk = (pid: string | null, depth: number) =>
     ts.filter((t) => (t.parent_id || null) === pid).sort((a, b) => a.position - b.position || a.name.localeCompare(b.name, "pt-BR")).forEach((t: Topic) => {
@@ -39,16 +43,27 @@ export default function Disciplina() {
       const exam = t.assessment_id ? st.assessments.find((a) => a.id === t.assessment_id) : null;
       const rv = openReviews.filter((r) => r.topic_id === t.id).sort((a, b) => a.due.localeCompare(b.due))[0];
       const nMist = mistakes.filter((m) => m.topic_id === t.id).length;
+      const ms = mastery(topicFamily(st.topics, t.id), mIn);
+      const calib = sg.k === "bad" && sg.t.startsWith("Confiança") || sg.k === "acc";
       rows.push(
         <div key={t.id} className={"topic" + (depth ? " child" : "")} style={depth > 1 ? { marginLeft: (depth - 1) * 22 } : undefined}>
           <span className="tn">{t.name}</span>
           <span className="row" style={{ gap: 4, flexWrap: "nowrap" }}>
-            <span className={"chip " + sg.k} title={sg.why}>{sg.t}</span>
+            <button type="button" className={"chip " + (ms.band ? BAND[ms.band][1] : "")} style={{ cursor: "pointer", background: "transparent" }} title={ms.why} aria-expanded={why === t.id} onClick={() => setWhy(why === t.id ? null : t.id)}>
+              {ms.score != null ? `domínio ${ms.score} · ${BAND[ms.band!][0]}` : "domínio: sem dados"}</button>
+            {calib && <span className={"chip " + sg.k} title={sg.why}>{sg.t}</span>}
             {rv ? <span className={"chip " + (rv.due < today ? "warn" : "acc")} title={rv.title}>{rv.due < today ? "revisão atrasada" : rv.due === today ? "revisão hoje" : `revisão ${dm(rv.due)}`}</span>
               : <button className="btn sm ghost" onClick={() => setModal({ k: "review", topic: t.id })} title="Agendar revisão deste conteúdo">Revisar</button>}
             <button className="btn icon ghost" onClick={() => setModal({ k: "topic", id: t.id })} aria-label="Editar conteúdo"><Icon d={I.edit} s={15} /></button>
           </span>
           <div className="tm"><span>{fmtMin(tst.min)}</span><span>{tst.n} sessões</span><span>confiança {tst.conf == null ? "–" : nf(tst.conf)}/5</span><span>acerto {pct(tst.acc)} ({tst.accN})</span><span>autonomia {pct(tst.solo)}</span>{last && <span>último: {keyDate(dkey(last.started_at)).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span>}{t.taught_on && <span>aula {dm(t.taught_on)}</span>}{exam && <span>cai na {exam.name}</span>}{nMist > 0 && <span>{nMist} erro(s)</span>}</div>
+          {why === t.id && (
+            <div className="callout info small" style={{ gridColumn: "1/-1", marginTop: 4 }}>
+              <div><b>{ms.why}</b>{ms.formula && <> <span className="num">{ms.formula}</span></>}</div>
+              {ms.parts.map((x) => <div key={x.key}>{x.label} (peso {x.w}): {x.why}</div>)}
+              <div className="muted">Confiança não entra no índice. Pesos em Configurações.</div>
+            </div>
+          )}
         </div>,
       );
       walk(t.id, depth + 1);
@@ -92,9 +107,10 @@ export default function Disciplina() {
         <div className="kpi"><span className="lbl">Horas totais</span><span className="v">{fmtMin(sp.min)}</span><span className="s">{sp.n} sessões</span></div>
         <div className="kpi"><span className="lbl">Confiança média</span><span className="v">{sp.conf == null ? "–" : nf(sp.conf)}<small>/5</small></span><span className="s">{sp.confN} autoavaliação(ões)</span></div>
         <div className="kpi"><span className="lbl">Acerto conferido</span><span className="v">{pct(sp.acc)}</span><span className="s">{sp.accN} registro(s)</span></div>
-        <div className="kpi"><span className="lbl">Média parcial</span><span className="v" style={{ color: gc.partial == null ? "inherit" : gc.partial >= gc.min ? "var(--ok)" : "var(--bad)" }}>{gc.partial == null ? "–" : nf(gc.partial)}</span>
-          <span className="s">{gc.needed != null ? `precisa de ${nf(Math.max(0, gc.needed))} nas restantes` : `mínima ${nf(gc.min)}`} · <Link href="/notas">notas</Link></span></div>
+        <div className="kpi"><span className="lbl">Média atual</span><span className="v" style={{ color: gc.partial == null ? "inherit" : gc.partial >= gc.min ? "var(--ok)" : "var(--bad)" }}>{gc.partial == null ? "–" : nf(gc.partial)}</span>
+          <span className="s">{gc.needed != null ? `precisa de ${nf(Math.max(0, gc.needed))} nas restantes` : `mínima ${nf(gc.min)}`} · <a href="#notas">notas</a></span></div>
       </section>
+      <GradesPanel s={s} />
       <section className="grid g2">
         <div className="panel">
           <div className="panel-h"><h2>Conteúdos</h2><span className="lbl">{ts.length} itens</span></div>
@@ -105,8 +121,15 @@ export default function Disciplina() {
             <button className="btn pri icon" aria-label="Adicionar conteúdo"><Icon d={I.plus} s={16} /></button>
           </form>
           <details style={{ marginTop: 12 }}>
-            <summary className="small">Como a leitura de cada conteúdo é feita</summary>
-            <p className="small muted" style={{ margin: ".5em 0 0" }}>A etiqueta usa só dados conferidos e mostra o motivo ao passar o mouse. Sem pelo menos 2 resultados conferidos, não há leitura. &quot;Confiança acima do resultado&quot; aparece com confiança média ≥ 4 e acerto abaixo de 60%. &quot;Bom resultado&quot; exige acerto ≥ 80% com metade ou mais resolvido sozinho. &quot;Revisar&quot; aparece com acerto abaixo de 50%. Conteúdos-pai somam os registros dos filhos diretos.</p>
+            <summary className="small">Como o índice de domínio é calculado</summary>
+            <div className="small muted stack" style={{ margin: ".5em 0 0", gap: 4 }}>
+              <span>Nota de 0 a 100 por conteúdo, somando os subconteúdos. Clique na etiqueta para ver a conta.</span>
+              <span><b>Acerto conferido</b> (peso padrão 50): questões certas ÷ feitas, ou o resultado declarado; registros recentes valem mais (o peso cai pela metade a cada 14 dias). Revisões feitas também contam.</span>
+              <span><b>Autonomia</b> (25): sozinho = 100%, anotações = 60%, ajuda = 30%, viu a resolução = 0%.</span>
+              <span><b>Prática recente</b> (15): até 7 dias = 100%, caindo até 0% com 30 dias sem praticar.</span>
+              <span><b>Erros em aberto</b> (10): cada erro registrado cuja revisão ainda não foi resolvida sozinho desconta um terço.</span>
+              <span>Faixas: abaixo de 40 frágil; 40 a 69 em construção; 70 ou mais dominado. Com menos de 3 registros conferidos não há nota. A <b>confiança não entra</b>: quando ela destoa do acerto, aparece uma etiqueta à parte.</span>
+            </div>
           </details>
         </div>
         <div className="panel">
