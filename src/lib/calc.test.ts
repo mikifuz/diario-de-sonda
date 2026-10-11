@@ -7,7 +7,7 @@ const A = (p: Partial<Assessment>): Assessment => ({
   id: Math.random().toString(), subject_id: "s", name: "x", kind: "prova", date: null, time: null, weight: 1,
   grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "", ...p,
 });
-const sub = (p = {}) => ({ min_avg: 7, exam_enabled: false, exam_w_avg: 1, exam_w_exam: 1, exam_min_final: 5, exam_min_take: null, ...p });
+const sub = (p = {}) => ({ min_avg: 7, recovery: "nenhuma" as const, sub_replace_lower: false, exam_w_avg: 1, exam_w_exam: 1, exam_min_final: 5, exam_min_take: null, ...p });
 const S = (p: Partial<Session>): Session => ({
   id: "x", subject_id: "s", topic_id: null, activity: "exercicios", started_at: new Date().toISOString(), duration_min: 30,
   questions: null, correct: null, notes: "", confidence: null, result: null, autonomy: null, difficulty: null, comprehension: null, ...p,
@@ -22,12 +22,39 @@ test("média ponderada e nota necessária", () => {
 });
 
 test("média final e exame", () => {
-  const r = gradeCalc(sub({ exam_enabled: true }), [A({ grade: 4 }), A({ grade: 5 })]);
+  const r = gradeCalc(sub({ recovery: "exame" }), [A({ grade: 4 }), A({ grade: 5 })]);
   assert.equal(r.final, 4.5);
   assert.equal(r.exam?.need, 5.5); // (5×2 − 4,5) ÷ 1
   assert.equal(r.exam?.eligible, true);
-  const r2 = gradeCalc(sub({ exam_enabled: true, exam_min_take: 5 }), [A({ grade: 4 })]);
+  const r2 = gradeCalc(sub({ recovery: "exame", exam_min_take: 5 }), [A({ grade: 4 })]);
   assert.equal(r2.exam?.eligible, false);
+});
+
+test("SUB substitui a menor nota de prova, só se for maior", () => {
+  const items = [A({ id: "p1", name: "P1", weight: 1, grade: 3 }), A({ id: "p2", name: "P2", weight: 1, grade: 8 }), A({ id: "t", kind: "trabalho", weight: 1, grade: 2 })];
+  const r = gradeCalc(sub({ recovery: "sub" }), [...items, A({ kind: "sub", grade: 7 })]);
+  assert.ok(Math.abs((r.final ?? 0) - 13 / 3) < 1e-9); // SUB fora dos pesos
+  assert.equal(r.sub?.target?.id, "p1"); // trabalho (nota 2) não é substituído
+  assert.ok(r.sub?.replaced);
+  assert.ok(Math.abs((r.sub?.final ?? 0) - 17 / 3) < 1e-9); // (7 + 8 + 2) ÷ 3
+  assert.ok(Math.abs((r.sub?.need ?? 0) - 11) < 1e-9); // 3 + (7 − 13/3) × 3 ÷ 1
+  assert.equal(r.sub?.official, true);
+  const menor = gradeCalc(sub({ recovery: "sub" }), [...items, A({ kind: "sub", grade: 1 })]);
+  assert.equal(menor.sub?.replaced, false);
+  assert.ok(Math.abs((menor.sub?.final ?? 0) - 13 / 3) < 1e-9);
+  const prof = gradeCalc(sub({ recovery: "sub", sub_replace_lower: true }), [...items, A({ kind: "sub", grade: 1 })]);
+  assert.equal(prof.sub?.replaced, true); // regra do professor: substitui mesmo menor
+  assert.ok(Math.abs((prof.sub?.final ?? 0) - 11 / 3) < 1e-9);
+});
+
+test("SUB com simulação e sem provas", () => {
+  const r = gradeCalc(sub({ recovery: "sub" }), [A({ weight: 2, grade: 6 }), A({ id: "p2", weight: 1, sim_e: 4 }), A({ kind: "sub", sim_e: 9 })], "e");
+  assert.equal(r.sub?.target?.id, "p2"); // usa a simulação enquanto não há nota
+  assert.equal(r.sub?.official, false);
+  assert.ok(Math.abs((r.sub?.final ?? 0) - 7) < 1e-9); // (12 + 9) ÷ 3
+  const sem = gradeCalc(sub({ recovery: "sub" }), [A({ kind: "trabalho", grade: 5 })]);
+  assert.equal(sem.sub?.target, null);
+  assert.equal(sem.sub?.need, null);
 });
 
 test("pesos zerados são ignorados e média já garantida", () => {

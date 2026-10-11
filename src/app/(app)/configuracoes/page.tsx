@@ -9,7 +9,9 @@ import { convertLegacy, isLegacyExport } from "@/lib/legacy";
 import type { Profile, Skin } from "@/lib/types";
 import { ConfirmButton, I, Icon } from "@/components/ui";
 
-const ORDER: Table[] = ["subjects", "topics", "assessments", "study_sessions", "events"];
+// ordem das chaves estrangeiras: conteúdos apontam para provas, erros para sessões, revisões para erros
+const ORDER: Table[] = ["subjects", "assessments", "topics", "study_sessions", "events", "routine_blocks", "mistakes", "review_items", "review_logs"];
+const NONE = { routine_blocks: [], mistakes: [], review_items: [], review_logs: [] };
 
 export default function Configuracoes() {
   const st = useStore();
@@ -29,7 +31,8 @@ export default function Configuracoes() {
   };
 
   const exportData = () => {
-    const payload = { app: "diario-de-sonda", version: 2, exportedAt: new Date().toISOString(), profile: { ...p, timer: null }, subjects: st.subjects, topics: st.topics, sessions: st.sessions, assessments: st.assessments, events: st.events };
+    const payload = { app: "diario-de-sonda", version: 2, exportedAt: new Date().toISOString(), profile: { ...p, timer: null }, subjects: st.subjects, topics: st.topics, sessions: st.sessions, assessments: st.assessments, events: st.events,
+      routine_blocks: st.blocks, mistakes: st.mistakes, review_items: st.reviews, review_logs: st.reviewLogs };
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 1)], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url; a.download = `diario-de-sonda-${todayKey()}.json`;
@@ -44,12 +47,17 @@ export default function Configuracoes() {
       let rows: Record<Table, { id: string }[]>, prof: Record<string, unknown> = {}, skipped = 0;
       if (isLegacyExport(j)) {
         const r = convertLegacy(j);
-        rows = { subjects: r.subjects, topics: r.topics, assessments: r.assessments, study_sessions: r.sessions, events: r.events };
+        rows = { subjects: r.subjects, topics: r.topics, assessments: r.assessments, study_sessions: r.sessions, events: r.events, ...NONE };
         skipped = r.skipped;
         for (const [k, v] of Object.entries(r.profile)) if (v !== undefined && v !== null && v !== "") prof[k] = v;
         if (prof.skin && !SKINS.some((s) => s.id === prof.skin)) delete prof.skin;
       } else if (j && j.app === "diario-de-sonda" && j.version === 2) {
-        rows = { subjects: j.subjects || [], topics: j.topics || [], assessments: j.assessments || [], study_sessions: j.sessions || [], events: j.events || [] };
+        // cópias anteriores a esta versão não têm o modo de recuperação: o exame ligado vira "exame"
+        const subjects = (j.subjects || []).map((x: Record<string, unknown>) => (x.recovery ? x : { ...x, recovery: x.exam_enabled ? "exame" : "nenhuma" }));
+        rows = {
+          subjects, topics: j.topics || [], assessments: j.assessments || [], study_sessions: j.sessions || [], events: j.events || [],
+          routine_blocks: j.routine_blocks || [], mistakes: j.mistakes || [], review_items: j.review_items || [], review_logs: j.review_logs || [],
+        };
         const { id: _id, timer: _t, ...rest } = j.profile || {};
         void _id; void _t;
         prof = rest;
@@ -82,7 +90,7 @@ export default function Configuracoes() {
     setBusy("Apagando…");
     try {
       if (room.me) await room.leave();
-      for (const t of ["events", "subjects"] as const) {
+      for (const t of ["events", "routine_blocks", "subjects"] as const) {
         const { error } = await sb().from(t).delete().eq("user_id", st.uid);
         if (error) throw error;
       }
@@ -131,7 +139,7 @@ export default function Configuracoes() {
           </div>
           <p className="small muted" style={{ margin: 0 }}>A importação aceita a cópia exportada desta versão e a da primeira versão (a página publicada no Claude, em Configurações → Exportar cópia). Importar duas vezes a cópia antiga duplica os registros.</p>
           <div className="row" style={{ borderTop: "1px solid var(--line)", paddingTop: 12, marginTop: 4 }}>
-            <ConfirmButton small label="Apagar todos os meus dados" question="Isto apaga disciplinas, sessões, notas e eventos. Exporte uma cópia antes se quiser guardar." confirmLabel="Apagar tudo" onConfirm={wipe} />
+            <ConfirmButton small label="Apagar todos os meus dados" question="Isto apaga disciplinas, sessões, notas, eventos, rotina, erros e revisões. Exporte uma cópia antes se quiser guardar." confirmLabel="Apagar tudo" onConfirm={wipe} />
           </div>
         </div>
       </section>
@@ -145,7 +153,7 @@ export default function Configuracoes() {
       <section className="panel">
         <div className="panel-h"><h2>Próximas etapas</h2><span className="lbl">ainda não disponíveis</span></div>
         <div className="grid g2 small">
-          <div><b>Análise de desempenho</b><p className="muted" style={{ margin: ".3em 0 0" }}>Índice de domínio por conteúdo com metodologia explicada, banco de erros com categorias, revisão espaçada, planejamento reverso para provas e relatórios.</p></div>
+          <div><b>Análise de desempenho</b><p className="muted" style={{ margin: ".3em 0 0" }}>Índice de domínio por conteúdo com metodologia explicada, planejamento reverso completo para provas, relatórios e modo demonstração. O banco de erros, a revisão espaçada e o plano do dia já estão em Hoje.</p></div>
           <div><b>Inteligência artificial</b><p className="muted" style={{ margin: ".3em 0 0" }}>Gerador de simulados com gabarito e resolução, correção assistida de resoluções enviadas por foto e assistente que consulta seus dados.</p></div>
           <div><b>Engenharia de Petróleo</b><p className="muted" style={{ margin: ".3em 0 0" }}>Biblioteca de fórmulas com unidades, conversor SI ↔ unidades de campo (bbl, psi, ft, mD, cP, °API), verificação dimensional e histórico da graduação.</p></div>
           <div><b>Biblioteca de materiais</b><p className="muted" style={{ margin: ".3em 0 0" }}>Planos de ensino, listas e provas antigas por disciplina, que depois servirão de base para os simulados.</p></div>

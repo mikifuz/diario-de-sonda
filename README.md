@@ -6,11 +6,12 @@ Acompanhamento de estudos universitários, pensado para Engenharia de Petróleo.
 
 | Área | Recursos |
 |---|---|
+| Hoje | Plano do dia que encaixa revisões e aulas (consolidar a de hoje ou adiantar a de amanhã) nos seus blocos de estudo, com o motivo de cada tarefa e o que não coube; banco de erros com 10 categorias; revisão espaçada ancorada na prova (encerra depois dela, pode ser reativada até a SUB); rotina semanal em blocos; aviso quando as revisões não cabem antes de uma prova |
 | Painel | Horas do dia, semana e mês; meta semanal; horas por dia por disciplina; medidores de acerto, confiança e autonomia; gráfico de calibração; alertas quando confiança e resultado divergem; próximas avaliações |
 | Disciplinas | Cadastro completo, conteúdos em árvore, perfil de avaliação do professor, leitura transparente de cada conteúdo, arquivar/excluir |
 | Sessões | Cronômetro com pausa que continua entre aparelhos, registro manual, autoavaliação rápida (3 toques) com detalhes opcionais, histórico com filtros |
 | Calendário | Visão mensal, itens por dia, próximos 30 dias; provas que "contam na média" vão direto para as notas |
-| Notas | Média ponderada explicada, nota necessária nas restantes, cenários conservador/esperado/otimista, exame configurável, previsão × nota real |
+| Notas | Média ponderada explicada, nota necessária nas restantes, cenários conservador/esperado/otimista, recuperação configurável por disciplina (SUB que substitui a menor prova, ou exame), previsão × nota real |
 | Sala de estudos | Quem está estudando agora (ao vivo), placar do dia e da semana, sequência de dias, grupos com código de convite |
 | Conta | Login por e-mail e senha, recuperação de senha, 5 temas visuais, exportar e importar dados (inclusive da primeira versão) |
 
@@ -28,12 +29,13 @@ Todos os dados acadêmicos ficam protegidos por **Row Level Security** no Postgr
 ```
 src/
   app/
-    (app)/            telas logadas: painel, sessoes, sala, calendario, disciplinas, notas, configuracoes
+    (app)/            telas logadas: painel, hoje, sessoes, sala, calendario, disciplinas, notas, configuracoes
     entrar/           login e cadastro
     redefinir-senha/  nova senha pelo link do e-mail
   components/         interface (modais, gráficos, navegação)
   lib/
     calc.ts           regras de cálculo puras (testadas)
+    plan.ts           revisão espaçada, rotina e plano do dia (puras, testadas)
     legacy.ts         conversão da cópia da primeira versão (testada)
     store.tsx         dados do usuário, gravação otimista e sincronização
     room.tsx          sala de estudos
@@ -47,7 +49,7 @@ supabase/
 ### 1. Supabase (banco e login)
 
 1. Crie uma conta em [supabase.com](https://supabase.com) (pode entrar com o GitHub) e clique em **New project**. Região sugerida: *South America (São Paulo)*. Guarde a senha do banco.
-2. No projeto, abra **SQL Editor → New query**, cole todo o conteúdo de `supabase/migrations/20261010000000_inicial.sql` e clique em **Run**. Deve aparecer *Success*.
+2. No projeto, abra **SQL Editor → New query**, cole todo o conteúdo de `supabase/migrations/20261010000000_inicial.sql` e clique em **Run**. Deve aparecer *Success*. Repita, em ordem, para cada arquivo seguinte da pasta `supabase/migrations/` (cada um uma vez só).
 3. Em **Project Settings → API**, copie a **Project URL** e a chave **anon public**.
 4. Em **Authentication → Sign In / Providers → Email**, decida se quer exigir confirmação por e-mail. Com ela ligada, o envio gratuito do Supabase tem limite baixo de e-mails por hora; para uma turma pequena isso costuma bastar.
 

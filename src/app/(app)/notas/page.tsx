@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { activeSubjects, useStore } from "@/lib/store";
 import { gradeCalc, nf, parseNum } from "@/lib/calc";
-import type { Assessment, Scenario, Subject } from "@/lib/types";
+import type { Assessment, Recovery, Scenario, Subject } from "@/lib/types";
+import { RECOVERY } from "@/lib/constants";
 import { ConfirmButton, Dot, Empty, I, Icon, Tabs } from "@/components/ui";
 
 const SN: Record<Scenario, string> = { c: "conservador", e: "esperado", o: "otimista" };
@@ -22,7 +23,9 @@ function Cell({ value, onSave, label, wide, type = "text", placeholder, style }:
 
 function GradeCard({ s, sc }: { s: Subject; sc: Scenario }) {
   const st = useStore();
-  const items = st.assessments.filter((a) => a.subject_id === s.id).sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999") || a.name.localeCompare(b.name, "pt-BR"));
+  const items = st.assessments.filter((a) => a.subject_id === s.id)
+    .sort((a, b) => Number(a.kind === "sub") - Number(b.kind === "sub") || (a.date || "9999").localeCompare(b.date || "9999") || a.name.localeCompare(b.name, "pt-BR"));
+  const subItem = items.find((a) => a.kind === "sub");
   const r = gradeCalc(s, items, sc);
   const grade = (v: string): number | null | false => { const n = parseNum(v); if (n != null && (n < 0 || n > 10)) { st.toast("Use notas entre 0 e 10."); return false; } return n; };
   const setItem = async (a: Assessment, patch: Partial<Assessment>) => st.save("assessments", { ...a, ...patch });
@@ -30,9 +33,10 @@ function GradeCard({ s, sc }: { s: Subject; sc: Scenario }) {
 
   let verdict: React.ReactNode;
   if (!r.nItems) verdict = <span className="muted">Cadastre as avaliações e seus pesos.</span>;
+  else if (r.sub?.official && r.sub.final != null && r.sub.replaced) verdict = r.sub.final >= r.min ? <span style={{ color: "var(--ok)" }}>Média final com a SUB {nf(r.sub.final)}: aprovado.</span> : <span style={{ color: "var(--bad)" }}>Média final com a SUB {nf(r.sub.final)}: abaixo de {nf(r.min)}.</span>;
   else if (r.final != null) verdict = r.final >= r.min ? <span style={{ color: "var(--ok)" }}>Média final {nf(r.final)}: aprovado pela média.</span> : <span style={{ color: "var(--bad)" }}>Média final {nf(r.final)}: abaixo de {nf(r.min)}.</span>;
   else if ((r.needed ?? 0) <= 0) verdict = <span style={{ color: "var(--ok)" }}>Média mínima já garantida, mesmo tirando zero no restante.</span>;
-  else if ((r.needed ?? 0) > r.max) verdict = <span style={{ color: "var(--bad)" }}>Seria preciso {nf(r.needed)} de média nas restantes, acima de 10.{s.exam_enabled ? " Confira a simulação de exame." : ""}</span>;
+  else if ((r.needed ?? 0) > r.max) verdict = <span style={{ color: "var(--bad)" }}>Seria preciso {nf(r.needed)} de média nas restantes, acima de 10.{s.recovery === "exame" ? " Confira a simulação de exame." : s.recovery === "sub" ? " Confira a simulação da SUB." : ""}</span>;
   else verdict = <>Precisa de <b className="num">{nf(r.needed)}</b> de média nas avaliações restantes (peso {nf(r.Wr, 0)} de {nf(r.W, 0)}).</>;
   const explain = r.nItems ? `Você já somou ${nf(r.Sk)} pontos ponderados. Para média ${nf(r.min)} são necessários ${nf(r.min * r.W)} (= ${nf(r.min)} × ${nf(r.W, 0)}).${r.Wr > 0 ? ` Faltam ${nf(Math.max(0, r.min * r.W - r.Sk))} pontos em peso ${nf(r.Wr, 0)}, ou seja ${nf(Math.max(0, r.needed ?? 0))} por ponto de peso.` : ""}` : "";
   const ex = r.exam;
@@ -40,10 +44,23 @@ function GradeCard({ s, sc }: { s: Subject; sc: Scenario }) {
     ? <>Média {nf(ex.base)} fica abaixo de {nf(ex.minTake)}, o mínimo configurado para fazer exame.</>
     : <>Com média {nf(ex.base)}{r.final == null ? ` (cenário ${SN[sc]})` : ""}, o exame precisaria de <b className="num">{nf(Math.max(0, ex.need))}</b> para final {nf(ex.mf)} (final = ({nf(ex.wa, 0)}×média + {nf(ex.we, 0)}×exame) ÷ {nf(ex.wa + ex.we, 0)}).{ex.need > 10 ? " Acima de 10: não alcançável." : ""}</>) : null;
 
+  const sb = r.sub;
+  const subTxt = !sb ? null : !sb.target
+    ? <>A SUB substitui a menor nota entre as <b>provas</b> (trabalhos e apresentações não entram). Lance as notas das provas para ver qual seria substituída.</>
+    : sb.base == null
+      ? <>Preencha as notas que faltam (ou a simulação do cenário {SN[sc]}) para calcular quanto a SUB precisaria.</>
+      : <>
+        Sem a SUB, a média {r.final == null ? `projetada (cenário ${SN[sc]})` : "final"} é {nf(sb.base)}. A menor prova é <b>{sb.target.name}</b> ({nf(sb.target.value)}, peso {nf(sb.target.weight, 0)}).{" "}
+        {sb.need == null ? "A média mínima já é atingida sem a SUB." : sb.need > 10 ? `Mesmo com 10 na SUB, a média não chega a ${nf(r.min)}.` : <>Para chegar a {nf(r.min)}, a SUB precisa de <b className="num">{nf(Math.max(0, sb.need))}</b> (substituindo {sb.target.name}).</>}
+        {sb.value != null && sb.final != null && <> Com {nf(sb.value)} na SUB{sb.official ? "" : " (simulada)"}: {sb.replaced ? `substitui ${sb.target.name}` : "não substitui, porque a nota não é maior que a da prova"}; média {sb.official ? "final" : "projetada"} {nf(sb.final)}{sb.final >= r.min ? ", acima da mínima." : `, abaixo de ${nf(r.min)}.`}</>}
+      </>;
+  const setRecovery = (v: Recovery) => setSub({ recovery: v, exam_enabled: v === "exame" });
+  const addSub = () => st.save("assessments", { id: crypto.randomUUID(), subject_id: s.id, name: "SUB", kind: "sub", date: null, time: null, weight: 1, grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "" });
+
   const addItem = () => st.save("assessments", { id: crypto.randomUUID(), subject_id: s.id, name: `Avaliação ${items.length + 1}`, kind: "prova", date: null, time: null, weight: 1, grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "" });
   const fillNeeded = () => {
     const v = Math.round((r.needed ?? 0) * 10) / 10;
-    st.saveMany("assessments", items.filter((i) => i.grade == null).map((i) => ({ ...i, [simKey(sc)]: v })));
+    st.saveMany("assessments", items.filter((i) => i.grade == null && i.kind !== "sub").map((i) => ({ ...i, [simKey(sc)]: v })));
   };
 
   return (
@@ -61,7 +78,7 @@ function GradeCard({ s, sc }: { s: Subject; sc: Scenario }) {
             <tr key={a.id}>
               <td><Cell wide value={a.name} label="Nome da avaliação" onSave={(v) => (v.trim() ? setItem(a, { name: v.trim() }) : false)} /></td>
               <td><Cell type="date" value={a.date || ""} label="Data" style={{ maxWidth: 150, textAlign: "left" }} onSave={(v) => setItem(a, { date: v || null })} /></td>
-              <td className="n"><Cell value={show(a.weight)} label="Peso" style={{ maxWidth: 62 }} onSave={(v) => { const n = parseNum(v); if (n == null || n <= 0) { st.toast("O peso precisa ser maior que zero."); return false; } return setItem(a, { weight: n }); }} /></td>
+              <td className="n">{a.kind === "sub" ? <span className="muted small" title="A SUB não tem peso: substitui a menor nota de prova">substitui</span> : <Cell value={show(a.weight)} label="Peso" style={{ maxWidth: 62 }} onSave={(v) => { const n = parseNum(v); if (n == null || n <= 0) { st.toast("O peso precisa ser maior que zero."); return false; } return setItem(a, { weight: n }); }} />}</td>
               <td className="n"><Cell value={show(a.predicted)} label="Previsão" placeholder="–" onSave={(v) => { const g = grade(v); return g === false ? false : setItem(a, { predicted: g }); }} /></td>
               <td className="n"><Cell value={show(a.grade)} label="Nota oficial" placeholder="–" style={{ fontWeight: 600 }} onSave={(v) => { const g = grade(v); return g === false ? false : setItem(a, { grade: g, status: g != null ? "concluido" : "pendente" }); }} /></td>
               <td className="n">{a.grade != null ? <span className="muted small">lançada</span> : <Cell value={show(a[simKey(sc)])} label={`Nota simulada (${SN[sc]})`} placeholder="–" onSave={(v) => { const g = grade(v); return g === false ? false : setItem(a, { [simKey(sc)]: g }); }} />}</td>
@@ -87,17 +104,29 @@ function GradeCard({ s, sc }: { s: Subject; sc: Scenario }) {
           <div className="stack" style={{ marginTop: 14, gap: 6 }}><div>{verdict}</div><div className="small muted">{explain}</div></div>
         </>
       )}
-      <details style={{ marginTop: 12 }} open={s.exam_enabled}>
-        <summary className="small">Exame final ou recuperação</summary>
+      <details style={{ marginTop: 12 }} open={s.recovery !== "nenhuma"}>
+        <summary className="small">Recuperação: {RECOVERY[s.recovery].toLowerCase()}</summary>
         <div className="row" style={{ marginTop: 10, gap: 14 }}>
-          <label className="check"><input type="checkbox" checked={s.exam_enabled} onChange={(e) => setSub({ exam_enabled: e.target.checked })} />Esta disciplina tem exame</label>
+          <label className="row small" style={{ gap: 6 }}>Esta disciplina tem
+            <select value={s.recovery} onChange={(e) => setRecovery(e.target.value as Recovery)} style={{ width: "auto" }}>{Object.entries(RECOVERY).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
+        </div>
+        {s.recovery === "sub" && (
+          <div className="stack" style={{ marginTop: 10, gap: 8 }}>
+            <label className="check"><input type="checkbox" checked={s.sub_replace_lower} onChange={(e) => setSub({ sub_replace_lower: e.target.checked })} />A SUB substitui a nota mesmo se for menor (depende do professor)</label>
+            {!subItem && <div><button className="btn sm" onClick={addSub}><Icon d={I.plus} s={14} />Adicionar a SUB na tabela</button></div>}
+            {subTxt && <div className="callout">{subTxt}</div>}
+          </div>
+        )}
+        {s.recovery === "exame" && (<>
+        <div className="row" style={{ marginTop: 10, gap: 14 }}>
           <label className="row small" style={{ gap: 6 }}>Peso da média <Cell value={show(s.exam_w_avg)} label="Peso da média" style={{ width: 60 }} onSave={(v) => { const n = parseNum(v); if (!n || n <= 0) return false; return setSub({ exam_w_avg: n }); }} /></label>
           <label className="row small" style={{ gap: 6 }}>Peso do exame <Cell value={show(s.exam_w_exam)} label="Peso do exame" style={{ width: 60 }} onSave={(v) => { const n = parseNum(v); if (!n || n <= 0) return false; return setSub({ exam_w_exam: n }); }} /></label>
           <label className="row small" style={{ gap: 6 }}>Final mínima <Cell value={show(s.exam_min_final)} label="Final mínima" style={{ width: 60 }} onSave={(v) => { const g = grade(v); if (g === false || g == null) return false; return setSub({ exam_min_final: g }); }} /></label>
           <label className="row small" style={{ gap: 6 }}>Média mínima para fazer exame <Cell value={show(s.exam_min_take)} label="Média mínima para fazer exame" placeholder="–" style={{ width: 60 }} onSave={(v) => { const g = grade(v); return g === false ? false : setSub({ exam_min_take: g }); }} /></label>
         </div>
-        <p className="small muted" style={{ margin: "8px 0 0" }}>Confira as regras no regimento do seu curso; cada universidade usa pesos diferentes.</p>
         {exTxt && <div className="callout" style={{ marginTop: 10 }}>{exTxt}</div>}
+        </>)}
+        <p className="small muted" style={{ margin: "8px 0 0" }}>Confira as regras no regimento do curso e com o professor; cada universidade e cada disciplina pode ter uma regra diferente.</p>
       </details>
     </section>
   );
@@ -112,7 +141,7 @@ export default function Notas() {
     .map((a) => ({ a, s: list.find((s) => s.id === a.subject_id)!, d: Number(a.grade) - Number(a.predicted) }));
   return (
     <>
-      <div className="callout info"><b>Como a média é calculada:</b> média ponderada, Σ(peso × nota) ÷ Σ(pesos), na escala de 0 a 10. Cada disciplina tem sua própria média mínima e regra de exame, editáveis no cartão. A coluna <b>Previsão</b> é a nota que você acha que vai tirar, registrada antes da prova; ela serve para comparar com a nota real.</div>
+      <div className="callout info"><b>Como a média é calculada:</b> média ponderada, Σ(peso × nota) ÷ Σ(pesos), na escala de 0 a 10. Cada disciplina tem sua própria média mínima e regra de recuperação (SUB ou exame), editáveis no cartão. A SUB não entra nos pesos: ela substitui a menor nota de prova. A coluna <b>Previsão</b> é a nota que você acha que vai tirar, registrada antes da prova; ela serve para comparar com a nota real.</div>
       <div className="row between"><span className="lbl">Cenário em edição na coluna Simulação</span><Tabs value={sc} onChange={setSc} label="Cenário de simulação" options={[["c", "Conservador"], ["e", "Esperado"], ["o", "Otimista"]]} /></div>
       {list.map((s) => <GradeCard key={s.id} s={s} sc={sc} />)}
       <section className="panel">
