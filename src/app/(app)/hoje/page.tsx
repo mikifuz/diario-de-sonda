@@ -12,6 +12,7 @@ import type { Activity, MistakeCategory, ReviewItem, StudyPref } from "@/lib/typ
 import { Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
 import { BlockModal, MistakeModal, ReviewItemModal, ReviewModal } from "@/components/planning";
 import { ImportSigaModal } from "@/components/importSiga";
+import { DayPrint } from "@/components/dayPrint";
 import { StartModal, type StartArgs } from "@/components/studyStart";
 
 type Tab = "plano" | "provas" | "revisoes" | "erros" | "rotina";
@@ -94,6 +95,9 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
     logs: st.reviewLogs, cfg: masteryCfg(st.profile?.mastery_cfg), extra: todayTasks(plans, today),
   };
   const plan = planDay(input);
+  const [print, setPrint] = useState<"hoje" | "amanha" | null>(null);
+  const tomorrow = addDays(today, 1);
+  const printInput: PlanInput = print === "amanha" ? { ...input, today: tomorrow, nowMin: 0, extra: todayTasks(plans, tomorrow) } : input;
   const subOf = (id: string) => st.subjects.find((s) => s.id === id);
   const openItems = st.reviews.filter((i) => subOf(i.subject_id) && !subOf(i.subject_id)!.archived && itemState(i, st.assessments, today).open);
   const due = openItems.filter((i) => i.due <= today);
@@ -153,6 +157,13 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
           <span><button className="btn sm pri" onClick={() => reactivate(o)}>Reativar até a SUB</button></span>
         </div>
       ))}
+
+      <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
+        <span className="small muted">Folha para imprimir ou salvar em PDF:</span>
+        <button className="btn sm" onClick={() => setPrint("hoje")}>Plano de hoje</button>
+        <button className="btn sm" onClick={() => setPrint("amanha")}>Plano de amanhã</button>
+      </div>
+      {print && <DayPrint input={printInput} onDone={() => setPrint(null)} />}
 
       {plan.hasStudyBlocks && (
         <section className="panel">
