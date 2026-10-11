@@ -4,7 +4,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { activeSubjects, topicName, useStore } from "@/lib/store";
 import { addDays, daysBetween, fmtMin, gradeCalc, keyDate, nf, todayKey, qt } from "@/lib/calc";
-import { cleanSteps, dm, firstDue, fromMin, itemState, parseSteps, planDay, weekCapacity, type PlanInput, type Task } from "@/lib/plan";
+import { cleanSteps, dm, firstDue, fromMin, itemState, parseSteps, planDay, toMin, weekCapacity, type PlanInput, type Task } from "@/lib/plan";
 import { BLOCK, MISTAKE, PREF, WD_S, WEEKDAYS } from "@/lib/constants";
 import { BAND, masteryCfg } from "@/lib/mastery";
 import { FINAL_MIN, RESERVE, TARGET, reversePlan, todayTasks } from "@/lib/reverse";
@@ -335,7 +335,9 @@ function RoutineTab({ open }: { open: Open }) {
   const [stepsTxt, setStepsTxt] = useState(cleanSteps(p.review_steps).join(", "));
   const cap = weekCapacity(st.blocks);
   const total = cap.reduce((a, b) => a + b, 0);
-  const color = (k: string, sid: string | null) => (k === "aula" ? st.subjects.find((s) => s.id === sid)?.color || "var(--muted)" : k === "estudo" ? "var(--accent)" : "var(--line)");
+  const color = (k: string, sid: string | null) => (k === "aula" ? st.subjects.find((s) => s.id === sid)?.color || "var(--muted)" : k === "estudo" ? "var(--accent)" : k === "exercicio" ? "var(--ok)" : "var(--line)");
+  const workout = st.blocks.filter((b) => b.kind === "exercicio").reduce((a, b) => a + Math.max(0, toMin(b.end_time) - toMin(b.start_time)), 0);
+  const workoutDays = new Set(st.blocks.filter((b) => b.kind === "exercicio").map((b) => b.weekday)).size;
   const noClasses = activeSubjects(st.subjects).filter((s) => s.schedule && !st.blocks.some((b) => b.kind === "aula" && b.subject_id === s.id));
   const saveSteps = async () => {
     const r = parseSteps(stepsTxt);
@@ -370,6 +372,7 @@ function RoutineTab({ open }: { open: Open }) {
         <p className="small" style={{ margin: "12px 0 0" }}>
           {total ? <>Sua rotina tem <b>{fmtMin(total)}</b> de estudo por semana{p.weekly_goal_h ? <> (meta: {nf(p.weekly_goal_h, 0)}h{total / 60 < p.weekly_goal_h ? `; faltam ${fmtMin(p.weekly_goal_h * 60 - total)} na rotina para chegar à meta` : ""})</> : ""}.</> : <span className="muted">Ainda não há blocos de estudo.</span>}
         </p>
+        <p className="small" style={{ margin: "6px 0 0" }}>{workout ? <>Exercício físico: <b>{fmtMin(workout)}</b> por semana, em {qt(workoutDays, "dia", "dias")}.</> : <span className="muted">Nenhum bloco de exercício físico na rotina ainda.</span>}</p>
         {noClasses.length > 0 && <p className="small muted" style={{ margin: "6px 0 0" }}>Com horário anotado, mas sem aula na rotina: {noClasses.map((s) => `${s.name} (${s.schedule})`).join("; ")}.</p>}
       </section>
       <section className="panel">

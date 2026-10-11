@@ -7,8 +7,9 @@ import { dkey, fmtMin, gradeCalc, keyDate, nf, pct, signal, stats, todayKey, qt 
 import { dm, itemState } from "@/lib/plan";
 import { BAND, mastery, masteryCfg, topicFamily } from "@/lib/mastery";
 import { MISTAKE, WD_S } from "@/lib/constants";
-import type { Topic } from "@/lib/types";
-import { Dot, Empty, I, Icon } from "@/components/ui";
+import type { Effort, Subject, Topic } from "@/lib/types";
+import { Dot, Empty, I, Icon, Seg } from "@/components/ui";
+import { EFFORT, MIN_PACE, effortOf } from "@/lib/effort";
 import { SessionModal, SubjectModal, TopicModal, TopicOptions } from "@/components/modals";
 import { SessionRow } from "@/components/SessionRow";
 import { MistakeModal, ReviewItemModal } from "@/components/planning";
@@ -102,6 +103,7 @@ export default function Disciplina() {
               ? <span className="small muted">Aulas na rotina: {classes.map((b) => `${WD_S[b.weekday]} ${b.start_time}–${b.end_time}`).join(", ")}</span>
               : s.schedule && <span className="small muted">Aulas: {s.schedule} · <Link href="/hoje?aba=rotina">colocar na rotina</Link></span>}
             {s.notes && <span className="small" style={{ maxWidth: "65ch", whiteSpace: "pre-wrap" }}>{s.notes}</span>}
+            <EffortControl s={s} />
             {traitList.length > 0 && <div className="row" style={{ gap: 6, marginTop: 6 }}>{traitList.map((x) => <span key={x} className="chip">{x}</span>)}</div>}
           </div>
           <button className="btn pri" onClick={() => router.push(`/sala?disciplina=${s.id}`)}><Icon d={I.play} s={15} />Estudar agora</button>
@@ -160,5 +162,20 @@ export default function Disciplina() {
       {modal?.k === "topic" && <TopicModal id={modal.id} onClose={() => setModal(null)} />}
       {modal?.k === "session" && <SessionModal id={modal.id} onClose={() => setModal(null)} />}
     </>
+  );
+}
+
+/** "Para você, esta matéria é…": muda o tempo que o plano reserva; sem marcação, mostra a estimativa pelos registros */
+function EffortControl({ s }: { s: Subject }) {
+  const st = useStore();
+  const e = effortOf(s, st.sessions);
+  const set = (v: Effort | null) => st.save("subjects", { ...s, traits: { ...s.traits, esforco: v ?? undefined } });
+  const pace = e.pace.mine != null && e.pace.n >= MIN_PACE ? `Seus registros: ${nf(e.pace.mine, 0)} min por questão aqui${e.pace.others != null && e.pace.nOthers >= MIN_PACE ? `, ${nf(e.pace.others, 0)} nas outras matérias` : ""}.` : "";
+  return (
+    <div className="stack" style={{ gap: 4, marginTop: 6 }}>
+      <span className="small">Para você, esta matéria é:</span>
+      <Seg value={e.level} onChange={(v) => set(v)} options={(Object.keys(EFFORT) as Effort[]).map((k) => [k, EFFORT[k].name] as [Effort, string])} />
+      {(e.why || pace) && <span className="small muted" style={{ maxWidth: "65ch" }}>{e.why || pace}{e.why && pace && e.source === "marcado" ? ` ${pace}` : ""}</span>}
+    </div>
   );
 }

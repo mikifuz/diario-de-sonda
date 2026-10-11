@@ -8,7 +8,7 @@ export type Status = "pendente" | "concluido" | "cancelado";
 export type AssessmentKind = "prova" | "trabalho" | "apresentacao" | "entrega" | "sub";
 export type StudyPref = "antes" | "depois" | "ambos";
 export type Recovery = "nenhuma" | "sub" | "exame";
-export type BlockKind = "aula" | "estudo" | "trabalho" | "deslocamento" | "pessoal" | "descanso";
+export type BlockKind = "aula" | "estudo" | "exercicio" | "trabalho" | "deslocamento" | "pessoal" | "descanso";
 export type MistakeCategory = "conceitual" | "algebrico" | "aritmetico" | "interpretacao" | "unidade" | "sinal" | "formula" | "metodo" | "atencao" | "tempo";
 export type EventType = AssessmentKind | "aula" | "atividade" | "simulado" | "estudo" | "revisao" | "pessoal" | "indisponivel";
 export type Scenario = "c" | "e" | "o";
@@ -55,7 +55,10 @@ export interface Traits {
   algarismos?: boolean;
   metodos?: string;
   nivel?: string;
+  /** quanto a matéria custa para o aluno (não é a do professor): muda o tempo planejado */
+  esforco?: Effort;
 }
+export type Effort = "facil" | "media" | "dificil" | "muito";
 
 export interface Subject {
   id: string;
@@ -282,3 +285,7 @@ export interface Course {
   subject_id: string | null;
   position: number;
 }
+
+/* ============ Hábitos do dia ============ */
+export interface Habit { id: string; name: string; position: number; active: boolean }
+export interface HabitCheck { id: string; habit_id: string; day: string }

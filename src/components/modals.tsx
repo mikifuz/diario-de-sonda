@@ -5,7 +5,8 @@ import { Modal, Seg, ConfirmButton, Icon, I } from "./ui";
 import { ACT, AUTO, COLORS, COMP, CONF, DIFF, EVT, GRADED, PREF, PRIO, RES, STATUS } from "@/lib/constants";
 import { dkey, fmtMin, pad, parseNum, todayKey, qt } from "@/lib/calc";
 import { activeSubjects, useStore } from "@/lib/store";
-import type { Activity, Assessment, AssessmentKind, Autonomy, CalEvent, Comprehension, EventType, Priority, Result, Session, Status, StudyPref, Subject, Topic, Traits } from "@/lib/types";
+import { EFFORT } from "@/lib/effort";
+import type { Activity, Assessment, AssessmentKind, Autonomy, CalEvent, Comprehension, EventType, Priority, Result, Session, Status, StudyPref, Subject, Topic, Traits, Effort } from "@/lib/types";
 import { MistakeModal } from "./planning";
 import { pushLessons } from "@/lib/plan";
 
@@ -156,7 +157,7 @@ export function SubjectModal({ id, onClose }: { id: string | null; onClose: () =
     name: orig?.name || "", code: orig?.code || "", professor: orig?.professor || "", semester: orig?.semester ?? p?.current_semester ?? "",
     min_avg: String(orig?.min_avg ?? p?.default_min_avg ?? 7).replace(".", ","), credits: orig?.credits != null ? String(orig.credits) : "", hours: orig?.hours != null ? String(orig.hours) : "",
     schedule: orig?.schedule || "", notes: orig?.notes || "", color: orig?.color || COLORS[st.subjects.length % COLORS.length], traits: { ...(orig?.traits || {}) } as Traits,
-    study_pref: (orig?.study_pref || "") as StudyPref | "",
+    study_pref: (orig?.study_pref || "") as StudyPref | "", esforco: (orig?.traits?.esforco || "") as Effort | "",
   }));
   const up = (x: Partial<typeof f>) => setF({ ...f, ...x });
   const nSes = orig ? st.sessions.filter((x) => x.subject_id === orig.id).length : 0;
@@ -167,7 +168,7 @@ export function SubjectModal({ id, onClose }: { id: string | null; onClose: () =
     if (min == null || min < 0 || min > 10) { st.toast("A média mínima deve estar entre 0 e 10."); return; }
     const row: Subject = {
       id: orig?.id || crypto.randomUUID(), name: f.name.trim(), code: f.code.trim(), professor: f.professor.trim(), semester: f.semester.trim(),
-      credits: parseNum(f.credits), hours: parseNum(f.hours), color: f.color, min_avg: min, schedule: f.schedule.trim(), notes: f.notes.trim(), traits: f.traits,
+      credits: parseNum(f.credits), hours: parseNum(f.hours), color: f.color, min_avg: min, schedule: f.schedule.trim(), notes: f.notes.trim(), traits: { ...f.traits, esforco: f.esforco || undefined },
       exam_enabled: orig?.exam_enabled ?? false, exam_w_avg: orig?.exam_w_avg ?? 1, exam_w_exam: orig?.exam_w_exam ?? 1, exam_min_final: orig?.exam_min_final ?? 5,
       exam_min_take: orig?.exam_min_take ?? null, archived: orig?.archived ?? false,
       study_pref: f.study_pref || null, recovery: orig?.recovery ?? "nenhuma", sub_replace_lower: orig?.sub_replace_lower ?? false,
@@ -192,10 +193,13 @@ export function SubjectModal({ id, onClose }: { id: string | null; onClose: () =
             <span className="small">Para o plano do dia usar as aulas, cadastre-as em Hoje → Rotina.</span></label>
           <label className="f full"><span>Como prefere estudar esta disciplina</span><select value={f.study_pref} onChange={(e) => up({ study_pref: e.target.value as StudyPref | "" })}>
             <option value="">Segue o padrão ({PREF[st.profile?.study_pref || "depois"].toLowerCase()})</option>{Object.entries(PREF).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
+          <label className="f full"><span>Para você, esta matéria é</span><select value={f.esforco} onChange={(e) => up({ esforco: e.target.value as Effort | "" })}>
+            <option value="">Não marquei (o app estima pelos seus registros)</option>{(Object.keys(EFFORT) as Effort[]).map((k) => <option key={k} value={k}>{EFFORT[k].name}{EFFORT[k].factor !== 1 ? ` (${EFFORT[k].factor > 1 ? "+" : "−"}${Math.round(Math.abs(EFFORT[k].factor - 1) * 100)}% de tempo no plano)` : ""}</option>)}</select>
+            <span className="small">É sobre você, não sobre o professor: matéria difícil ganha mais tempo no plano do dia e no plano das provas.</span></label>
           <div className="f full"><span>Cor</span><div className="swatches">{COLORS.map((c) => <button key={c} type="button" style={{ ["--c" as string]: c }} aria-pressed={f.color === c} aria-label={`Cor ${c}`} onClick={() => up({ color: c })} />)}</div></div>
           <label className="f full"><span>Critérios de avaliação e observações</span><textarea value={f.notes} onChange={(e) => up({ notes: e.target.value })} /></label>
         </div>
-        <details open={Object.values(f.traits).some(Boolean)}>
+        <details open={Object.entries(f.traits).some(([k, v]) => k !== "esforco" && Boolean(v))}>
           <summary>Como o professor avalia (opcional)</summary>
           <div className="stack" style={{ marginTop: 10, gap: 8 }}>
             {TRAITS.map(([k, n]) => <label key={k} className="check"><input type="checkbox" checked={!!f.traits[k]} onChange={(e) => up({ traits: { ...f.traits, [k]: e.target.checked } })} />{n}</label>)}

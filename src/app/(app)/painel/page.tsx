@@ -9,6 +9,7 @@ import { ChartCalib, ChartDays, ChartLine, Gauge, type DayBar } from "@/componen
 import { Dot, Empty, I, Icon, Tabs } from "@/components/ui";
 import { EventModal, SubjectModal } from "@/components/modals";
 import { AlertsPanel, TodoPanel } from "@/components/dashboard";
+import { HabitsPanel } from "@/components/habits";
 import { GettingStarted } from "@/components/onboarding";
 
 export default function Painel() {
@@ -74,12 +75,12 @@ export default function Painel() {
         <div className="kpi"><span className="lbl">Esta semana</span><span className="v">{fmtMin(mWeek)}</span>
           <span className="s">{goal ? `${pct(Math.min(1, mWeek / 60 / goal))} da meta de ${nf(goal, 0)}h` : <>{nWeek} sessões · <Link href="/configuracoes">definir meta</Link></>}</span>
           {goal > 0 && <div className="bar" style={{ marginTop: 4 }}><i style={{ width: `${Math.min(100, (mWeek / 60 / goal) * 100)}%`, background: "var(--accent)" }} /></div>}</div>
-        <div className="kpi"><span className="lbl">Este mês</span><span className="v">{fmtMin(mMonth)}</span><span className="s">{all.filter((s) => inRange(s, periodRange("mes"))).length} sessões</span></div>
+        <div className="kpi"><span className="lbl">Este mês</span><span className="v">{fmtMin(mMonth)}</span><span className="s">{qt(all.filter((s) => inRange(s, periodRange("mes"))).length, "sessão", "sessões")}</span></div>
         <div className="kpi"><span className="lbl">Média parcial</span><span className="v">{avg == null ? "–" : nf(avg)}</span><span className="s">{avg == null ? "sem notas lançadas" : avgs.length === 1 ? "média da disciplina com notas" : `média das ${avgs.length} disciplinas com notas`}</span></div>
       </section>
       <section className="grid g3">
         <div className="span2"><AlertsPanel /></div>
-        <TodoPanel />
+        <div className="stack"><TodoPanel /><HabitsPanel /></div>
       </section>
       <section className="grid g3">
         <div className="panel span2">
