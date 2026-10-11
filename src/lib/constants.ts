@@ -27,6 +27,13 @@ export const MISTAKE_D: Record<MistakeCategory, string> = {
   tempo: "Não deu tempo de terminar",
 };
 export const DEFAULT_STEPS = [1, 3, 7, 14, 30];
+/** Horários de aula pré-definidos (padrão informado pelo dono; editáveis no bloco) */
+export const CLASS_SLOTS = [
+  { n: "1º horário", start: "08:20", end: "10:10" },
+  { n: "2º horário", start: "10:20", end: "12:00" },
+  { n: "3º horário", start: "13:30", end: "15:10" },
+  { n: "4º horário", start: "15:20", end: "17:00" },
+];
 
 export const COLORS = ["#4f86f7", "#e0864a", "#3fae7a", "#c75b9b", "#d4b13f", "#5bb8c7", "#9a7be0", "#d0584f"];
 

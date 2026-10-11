@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { anchorFor, examLoads, firstDue, freeStudy, itemState, nextReview, parseSteps, planDay, type PlanInput } from "./plan";
+import { slotRanges, anchorFor, examLoads, firstDue, freeStudy, itemState, nextReview, parseSteps, planDay, type PlanInput } from "./plan";
 import type { Assessment, CalEvent, ReviewItem, RoutineBlock, Session, Subject, Topic } from "./types";
 
 const STEPS = [1, 3, 7, 14, 30];
@@ -135,4 +135,11 @@ test("carga até a prova avisa quando não cabe", () => {
   assert.equal(l.need, 120);
   assert.equal(l.capacity, 90);
   assert.equal(l.tight, true);
+});
+
+test("horários de aula seguidos viram um bloco só", () => {
+  const S4 = [{ start: "08:20", end: "10:10" }, { start: "10:20", end: "12:00" }, { start: "13:30", end: "15:10" }, { start: "15:20", end: "17:00" }];
+  assert.deepEqual(slotRanges([1, 0], S4), [{ start: "08:20", end: "12:00" }]);
+  assert.deepEqual(slotRanges([0, 2, 3], S4), [{ start: "08:20", end: "10:10" }, { start: "13:30", end: "17:00" }]);
+  assert.deepEqual(slotRanges([], S4), []);
 });
