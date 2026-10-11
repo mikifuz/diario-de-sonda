@@ -358,3 +358,9 @@ ul.plain{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:co
 .ps-hab th,.ps-hab td{border:1px solid #bbb;padding:2px 5px;text-align:center;font-size:8pt}
 .ps-hab td:first-child,.ps-hab th:first-child{text-align:left}
 .ps-hab .box{margin:0}
+
+/* mesinha da sala */
+.desk{display:block;flex:none;overflow:visible}
+.desk.off{filter:grayscale(1);opacity:.5}
+.desk .desk-halo{animation:deskGlow 2.8s ease-in-out infinite;transform-origin:60px 36px}
+@keyframes deskGlow{50%{opacity:.05}}

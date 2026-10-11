@@ -178,8 +178,8 @@ export function buildDemo(today = todayKey()): { data: DemoData; room: DemoRoom 
   const members = [
     mk(DEMO_UID, "Você (demo)", { friend_code: "DEMO1234" }),
     mk("demo-bia", "Bia", { studying: true, since: new Date(Date.now() - 34 * 60000).toISOString(), subject: "Física II" }),
-    mk("demo-leo", "Leo", { paused: true, accum_ms: 18 * 60000, subject: "" }),
-    mk("demo-ana", "Ana"),
+    mk("demo-leo", "Leo", { paused: true, accum_ms: 18 * 60000, subject: "", updated_at: new Date(Date.now() - 20 * 60000).toISOString() }),
+    mk("demo-ana", "Ana", { updated_at: new Date(Date.now() - 3 * 3600_000).toISOString() }),
   ];
   const totals: DailyTotal[] = [];
   for (let d = -20; d <= 0; d++) {
