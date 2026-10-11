@@ -21,7 +21,7 @@ export function DayPrint({ input, onDone }: { input: PlanInput; onDone: () => vo
 
   useEffect(() => {
     const title = document.title;
-    document.title = `Plano ${dm(day).replace("/", "-")} - Diário de Sonda`;
+    document.title = `Plano ${dm(day).replace("/", "-")} - Fundo do Poço`;
     document.body.classList.add("printing");
     const done = () => { document.body.classList.remove("printing"); document.title = title; onDone(); };
     window.addEventListener("afterprint", done, { once: true });
@@ -58,7 +58,7 @@ export function DayPrint({ input, onDone }: { input: PlanInput; onDone: () => vo
   return createPortal(
     <div id="print-root" className="ps" aria-hidden="true">
       <header className="ps-h">
-        <div><div className="ps-k">Diário de Sonda · plano do dia</div><h1>{dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}</h1></div>
+        <div><div className="ps-k">Fundo do Poço · plano do dia</div><h1>{dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}</h1></div>
         <div className="ps-k" style={{ textAlign: "right" }}>Estudo livre: {fmtMin(plan.capacity)}<br />Tarefas pedem: {fmtMin(plan.need)}</div>
       </header>
 

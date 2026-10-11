@@ -113,7 +113,7 @@ export function ImportSyllabusModal({ s, onClose }: { s: Subject; onClose: () =>
     <Modal title="Importar cronograma" sub={s.name} onClose={onClose}>
       {!entries ? (
         <div className="stack" style={{ gap: 12 }}>
-          <p style={{ margin: 0 }}>Escolha o cronograma que o professor mandou. O diário procura as datas e os conteúdos de cada aula, as provas e os dias sem aula, e mostra tudo para você conferir antes de salvar.</p>
+          <p style={{ margin: 0 }}>Escolha o cronograma que o professor mandou. O app procura as datas e os conteúdos de cada aula, as provas e os dias sem aula, e mostra tudo para você conferir antes de salvar.</p>
           <p className="small muted" style={{ margin: 0 }}>Funciona com Excel (.xlsx), Word (.docx) e PDF com texto. O arquivo é lido aqui no seu aparelho e não é enviado para lugar nenhum.</p>
           {err && <div className="callout">{err}</div>}
           {!paste ? (

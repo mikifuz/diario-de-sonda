@@ -34,7 +34,7 @@ export function WeekPrint({ start, onDone }: { start: string; onDone: () => void
 
   useEffect(() => {
     const title = document.title;
-    document.title = `Semana ${dm(days[0]).replace("/", "-")} a ${dm(days[6]).replace("/", "-")} - Diário de Sonda`;
+    document.title = `Semana ${dm(days[0]).replace("/", "-")} a ${dm(days[6]).replace("/", "-")} - Fundo do Poço`;
     document.body.classList.add("printing");
     const done = () => { document.body.classList.remove("printing"); document.title = title; onDone(); };
     window.addEventListener("afterprint", done, { once: true });
@@ -46,7 +46,7 @@ export function WeekPrint({ start, onDone }: { start: string; onDone: () => void
   return createPortal(
     <div id="print-root" className="ps ps-week" aria-hidden="true">
       <header className="ps-h">
-        <div><div className="ps-k">Diário de Sonda · plano da semana</div><h1>{dm(days[0])} a {dm(days[6])}</h1></div>
+        <div><div className="ps-k">Fundo do Poço · plano da semana</div><h1>{dm(days[0])} a {dm(days[6])}</h1></div>
         <div className="ps-k" style={{ textAlign: "right" }}>Gerado em {now.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
       </header>
 

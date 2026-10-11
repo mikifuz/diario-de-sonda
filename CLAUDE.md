@@ -1,4 +1,4 @@
-# Diário de Sonda — contexto para quem continuar o projeto
+# Fundo do Poço (antigo Diário de Sonda) — contexto para quem continuar o projeto
 
 Aplicativo de acompanhamento de estudos de um aluno de Engenharia de Petróleo (UDESC), com colegas usando a sala de estudos. Toda a interface e as mensagens são em **português do Brasil**. O dono do projeto não é programador: explique em linguagem simples e diga claramente quando ele precisa agir (ex.: rodar SQL no Supabase).
 
@@ -6,6 +6,7 @@ Aplicativo de acompanhamento de estudos de um aluno de Engenharia de Petróleo (
 1. Começou como uma página publicada no Claude (artifact) com os mesmos recursos.
 2. Migrado para Next.js 15 + Supabase para funcionar fora do Claude. Deploy: GitHub → Vercel (automático a cada push em `main`).
 3. A cópia JSON exportada da primeira versão (`version: 1`) é importada por `src/lib/legacy.ts`.
+4. Renomeado para **Fundo do Poço** (pedido do dono). Ícone: capacete de obra rosa, estilo adesivo retrô (`src/app/icon.svg`, `favicon.ico`, `apple-icon.png` gerados do SVG); no menu (`Brand.tsx`) o capacete segue a cor do tema. Nos textos, chamar de "o app". O identificador interno das cópias de segurança continua `diario-de-sonda` (cópias antigas seguem abrindo).
 
 ## Regras do produto (não negociáveis)
 - **Confiança, acerto conferido e autonomia são métricas separadas.** Confiança alta nunca conta como acerto. "Ainda não conferi" não entra em médias de acerto.
@@ -72,6 +73,7 @@ Aplicativo de acompanhamento de estudos de um aluno de Engenharia de Petróleo (
 - O plano do dia considera a rotina pessoal (blocos semanais de aula, estudo, trabalho etc.), compromissos do calendário e a preferência de estudo (adiantar antes da aula / revisar depois / os dois; padrão no perfil, opcional por disciplina). Só blocos de **estudo** recebem tarefas. O que não cabe aparece, não é escondido. Sem IA nesta parte: regras fixas e explicadas.
 
 ## Próximas etapas (ordem combinada)
+0. **Rosa no app** (pedido do dono, para depois): incluir o rosa do ícone (#f2679c / #c9407a) nos temas — talvez um tema novo, vintage e colorido.
 1. **Análise de desempenho** — feito: banco de erros, revisão espaçada, plano do dia, rotina, SUB por prova, planejamento reverso, notificações com relatório semanal, amigos, modo demonstração. Falta: uma rodada de testes reais com o dono.
 1b. **Pedidos do dono**: feito — Notas dentro de Disciplinas (`components/grades.tsx`; `/notas` redireciona), painel com alertas e lista de tarefas (`tasks`, `components/dashboard.tsx`), índice de domínio.
 2. **IA** (chave só no servidor, via route handlers): simulados com gabarito/resolução/critérios em PDF, correção assistida de resoluções por foto (sinalizar trechos ilegíveis), assistente que responde com base nos dados e distingue fato de estimativa.

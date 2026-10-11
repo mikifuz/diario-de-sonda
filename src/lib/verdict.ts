@@ -11,7 +11,7 @@ const LINES: Record<VerdictKind, string[]> = {
     "Eita, meu filho… pra que você usa esse sistema?",
     "Tudo bem que você quer ser engenheiro de petróleo, mas já chegar no fundo do poço antes de se formar?",
     "Sonda parada há dias. Nem a Petrobras deixa equipamento tanto tempo sem uso.",
-    "Alô? Tem alguém aí? O diário sente sua falta.",
+    "Alô? Tem alguém aí? O app sente sua falta.",
     "Esse poço tá seco: nenhum estudo registrado faz tempo.",
     "Depois não vai chorar na prova, hein?",
     "O caderno tá pegando poeira e o cronômetro esqueceu seu nome.",
@@ -59,7 +59,7 @@ const LINES: Record<VerdictKind, string[]> = {
   voando: [
     "Tá voando, hein? Continua assim.",
     "Que fase! Estudando bem e acertando.",
-    "Assim dá gosto de ver o diário.",
+    "Assim dá gosto de ver o app.",
     "Jorrando conhecimento. Poço produtivo!",
     "Isso aqui é campo do pré-sal: produção alta e de qualidade.",
   ],
