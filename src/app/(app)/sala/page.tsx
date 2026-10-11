@@ -4,8 +4,8 @@ import { Suspense, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { activeSubjects, timerMs, topicName, useStore } from "@/lib/store";
 import { liveMs, NUDGES, todayMin, useRoom, weekMin, type NudgeKey } from "@/lib/room";
-import { daysBetween, dkey, fmtClock, fmtMin, inRange, keyDate, nf, pct, periodRange, stats, streak, todayKey, type Period, qt } from "@/lib/calc";
-import { dm, lastTaught, topicExams } from "@/lib/plan";
+import { dkey, fmtClock, fmtMin, inRange, keyDate, nf, pct, periodRange, stats, streak, todayKey, type Period, qt } from "@/lib/calc";
+import { lastTaught, studyHint, topicExams } from "@/lib/plan";
 import { ACT } from "@/lib/constants";
 import type { Activity, Session, Social } from "@/lib/types";
 import { ConfirmButton, Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
@@ -104,12 +104,8 @@ function TopicHint({ topicId, today }: { topicId: string; today: string }) {
   // prova marcada, a dos subconteúdos ou a primeira depois da aula; num assunto com várias, a próxima
   const ex = topicExams(t, st.topics, st.assessments).sort((x, y) => (x.date || "").localeCompare(y.date || ""));
   const a = ex.find((x) => x.date && x.date >= today) ?? ex[ex.length - 1] ?? null;
-  const d = a?.date ? daysBetween(today, a.date) : null;
-  const parts = [
-    t.taught_on ? (t.taught_on <= today ? `aula de ${dm(t.taught_on)}` : `aula prevista para ${dm(t.taught_on)}`) : "",
-    a ? `cai na ${a.name}${d != null && d >= 0 ? (d === 0 ? " (hoje)" : d === 1 ? " (amanhã)" : ` (em ${d} dias)`) : ""}` : "",
-  ].filter(Boolean);
-  return parts.length ? <p className="small muted" style={{ margin: "8px 0 0" }}>Estudando para: {parts.join(" · ")}.</p> : null;
+  const txt = studyHint(t.taught_on, a, today);
+  return txt ? <p className="small muted" style={{ margin: "8px 0 0" }}>{txt}</p> : null;
 }
 
 /* ============ Grupos ============ */

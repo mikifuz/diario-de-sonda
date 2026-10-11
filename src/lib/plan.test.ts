@@ -1,7 +1,7 @@
 import { holidayOf, easter } from "./holidays";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { slotRanges, anchorFor, examLoads, firstDue, freeStudy, itemState, noClass, nextReview, parseSteps, planDay, type PlanInput } from "./plan";
+import { slotRanges, anchorFor, examLoads, firstDue, freeStudy, itemState, noClass, nextReview, studyHint, parseSteps, planDay, type PlanInput } from "./plan";
 import type { Assessment, CalEvent, ReviewItem, RoutineBlock, Session, Subject, Topic } from "./types";
 
 const STEPS = [1, 3, 7, 14, 30];
@@ -206,4 +206,14 @@ test("'Sem aula / feriado' no calendário: de todas as disciplinas ou só de uma
   assert.deepEqual(f.blocks.map((b) => b.start_time), ["08:20"]);
   assert.match(f.notes[0], /Professor em congresso/);
   assert.equal(noClass(TODAY, [soCalculo]).all, null);
+});
+
+test("Sala: 'estudando para quê' respeita passado, hoje e futuro", () => {
+  const p2 = { name: "P2", date: "2026-10-14" };
+  // conteúdo de setembro estudado em 11/10 para a prova do dia 14
+  assert.equal(studyHint("2026-09-16", p2, "2026-10-11"), "Estudando para a P2 (em 3 dias) · conteúdo dado na aula de 16/09.");
+  assert.equal(studyHint("2026-10-11", p2, "2026-10-11"), "Estudando para a P2 (em 3 dias) · conteúdo da aula de hoje.");
+  assert.equal(studyHint("2026-10-13", null, "2026-10-11"), "Adiantando a aula de 13/10.");
+  assert.equal(studyHint("2026-09-16", { name: "P1", date: "2026-09-30" }, "2026-10-11"), "Conteúdo dado na aula de 16/09.");
+  assert.equal(studyHint(null, null, "2026-10-11"), "");
 });

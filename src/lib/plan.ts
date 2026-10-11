@@ -420,3 +420,13 @@ export function pushLessons(topics: Topic[], id: string, newDate: string, classW
   const wds = classWeekdays.length ? classWeekdays : [...new Set(same.map((x) => keyDate(x.taught_on!).getDay()))];
   return [...moved, ...same.filter((x) => x.taught_on! > old).map((x) => ({ ...x, taught_on: nextClassDay(x.taught_on!, wds) }))];
 }
+
+/** Frase "estudando para quê" da Sala, respeitando passado, hoje e futuro:
+ *  "Estudando para a P2 (em 3 dias) · conteúdo dado na aula de 16/09." */
+export function studyHint(taughtOn: string | null, exam: { name: string; date: string | null } | null, today: string): string {
+  const d = exam?.date ? daysBetween(today, exam.date) : null;
+  const examPart = exam && d != null && d >= 0 ? `Estudando para a ${exam.name} (${d === 0 ? "hoje" : d === 1 ? "amanhã" : `em ${d} dias`})` : "";
+  const classPart = !taughtOn ? "" : taughtOn < today ? `conteúdo dado na aula de ${dm(taughtOn)}` : taughtOn === today ? "conteúdo da aula de hoje" : `adiantando a aula de ${dm(taughtOn)}`;
+  const txt = [examPart, classPart].filter(Boolean).join(" · ");
+  return txt ? txt.charAt(0).toUpperCase() + txt.slice(1) + "." : "";
+}
