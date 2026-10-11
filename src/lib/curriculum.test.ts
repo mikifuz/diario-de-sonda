@@ -100,7 +100,8 @@ function check(cs: Course[], f: Forecast) {
   cs.forEach((c) => { if (c.status === "aprovada" || c.status === "dispensada" || c.status === "cursando") when.set(c.id, -1); });
   f.terms.forEach((t, i) => t.items.forEach((it) => when.set(it.id, i)));
   for (const [i, t] of f.terms.entries()) {
-    assert.ok(t.credits <= f.cap, `${t.term}: ${t.credits} créditos`);
+    const soEstagio = t.items.every((x) => { const k = cs.find((c) => c.id === x.id)?.kind; return k === "estagio" || k === "tcc"; });
+    assert.ok(soEstagio || t.credits <= f.cap, `${t.term}: ${t.credits} créditos`);
     for (const it of t.items) {
       const c = cs.find((x) => x.id === it.id)!;
       if (c.kind === "vaga") continue;
@@ -121,7 +122,7 @@ test("semestres letivos", () => {
   assert.equal(nextTerm("2027/1"), "2027/2");
 });
 
-test("previsão conservadora e otimista no caso do dono (3ª fase, Geologia Geral e Química Orgânica II pendentes)", () => {
+test("previsão conservadora, equilibrada e otimista no caso do dono (3ª fase, Geologia Geral e Química Orgânica II pendentes)", () => {
   const cs = grade();
   assert.equal(studentPhase(cs), 3);
   const con = forecast(cs, OUT, "conservadora"), oti = forecast(cs, OUT, "otimista");
@@ -129,11 +130,18 @@ test("previsão conservadora e otimista no caso do dono (3ª fase, Geologia Gera
   check(cs, oti);
   assert.equal(con.stuck.length, 0);
   assert.equal(oti.stuck.length, 0);
-  assert.ok(con.heavy.every((t) => t.credits > 28));
-  // otimista: um semestre antes (adianta e faz estágio junto com Projeto Integrado III), sem passar de 30 créditos
-  assert.equal(con.finish, "2030/2");
+  // conservadora: até 20 créditos (só o semestre do estágio passa disso)
+  assert.equal(con.heavy.length, 0);
+  assert.ok(con.terms.every((t) => t.credits <= 20 || t.items.every((x) => /Estágio|Conclusão/.test(x.name))));
+  assert.equal(con.finish, "2031/2");
+  // equilibrada: adianta sem semestre puxado (24 ou mais)
+  const eq = forecast(cs, OUT, "equilibrada");
+  check(cs, eq);
+  assert.equal(eq.heavy.length, 0);
+  assert.ok(eq.terms.length < con.terms.length && eq.terms.length >= oti.terms.length);
+  // otimista: a data mais cedo (adianta e faz estágio junto com Projeto Integrado III), com semestres puxados
   assert.equal(oti.finish, "2030/1");
-  assert.equal(oti.cap, 30);
+  assert.ok(oti.heavy.length > 0);
   assert.ok(oti.together);
   assert.equal(con.terms[0].term, "2027/1");
   // pendências da 3ª fase entram logo no próximo semestre

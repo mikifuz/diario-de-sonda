@@ -36,7 +36,7 @@ export default function Curso() {
         <div className="kpi"><span className="lbl">Créditos cursados</span><span className="v">{pct(s.pct)}</span><span className="s">{s.done} de {s.total}</span><div className="bar" style={{ marginTop: 4 }}><i style={{ width: `${s.pct * 100}%`, background: "var(--ok)" }} /></div></div>
         <div className="kpi"><span className="lbl">Pode cursar</span><span className="v">{s.available.length}</span><span className="s">obrigatórias liberadas</span></div>
         <div className="kpi"><span className="lbl">Optativas</span><span className="v">{s.optDone}<small>/{s.optNeed}</small></span><span className="s">créditos</span></div>
-        <div className="kpi"><span className="lbl">Formatura prevista</span><span className="v">{fc.con.finish ?? "–"}</span><span className="s">{fc.oti.finish && fc.oti.finish !== fc.con.finish ? `otimista: ${fc.oti.finish} · ` : ""}<a href="#previsao">ver previsão</a></span></div>
+        <div className="kpi"><span className="lbl">Formatura prevista</span><span className="v">{fc.con.finish ?? "–"}</span><span className="s">{fc.oti.finish && fc.oti.finish !== fc.con.finish ? `conservadora · otimista: ${fc.oti.finish} · ` : "conservadora · "}<a href="#previsao">ver previsão</a></span></div>
       </section>
       <div id="previsao"><ForecastPanel /></div>
 
