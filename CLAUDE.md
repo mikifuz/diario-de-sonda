@@ -23,6 +23,7 @@ Aplicativo de acompanhamento de estudos de um aluno de Engenharia de Petróleo (
 - `src/lib/room.tsx`: sala de estudos (presença sincronizada com o cronômetro, grupos com código de 6 caracteres, placar).
 - Página `/sala` junta cronômetro, grupos ao vivo, placar e histórico de sessões (a antiga `/sessoes` redireciona para cá). Ao começar, `StartModal` (`components/studyStart.tsx`) pergunta: entrar na sala com a matéria, sem a matéria ou estudar sozinho (`profiles.timer.social`).
 - `src/components/`: modais (sessão, autoavaliação, disciplina, conteúdo, item do calendário), gráficos SVG, navegação; `planning.tsx` tem os modais de erro, revisão e bloco da rotina.
+- Notas ficam dentro de cada disciplina (`GradesPanel`, `#notas`); a lista de Disciplinas é a visão geral (uma linha por disciplina).
 - Página `/hoje` (abas Plano do dia, Revisões, Banco de erros, Rotina; `?aba=` abre uma aba).
 - Tela logada em `src/app/(app)/*` (client components). Login em `/entrar`.
 - Estilo: `src/app/globals.css` com tokens; temas pelo atributo `data-skin` no `<html>` (sonda, caderno, blueprint, terminal; "moderno" = sem atributo, segue claro/escuro).
@@ -43,7 +44,7 @@ Aplicativo de acompanhamento de estudos de um aluno de Engenharia de Petróleo (
 
 ## Próximas etapas (ordem combinada)
 1. **Análise de desempenho** — feito: banco de erros, revisão espaçada, plano do dia, rotina, SUB. Falta: índice de domínio por conteúdo com metodologia transparente e configurável, planejamento reverso completo a partir da data da prova (distribuir conteúdo novo, não só revisões), relatórios, e recolocar o modo demonstração (dados só em memória).
-1b. **Pedidos do dono (em andamento)**: Notas dentro de Disciplinas, com visão geral enxuta (uma linha por disciplina: média atual, quanto precisa, próxima prova; dentro, uma linha por avaliação, simulação visível); painel com alertas acionáveis (prova chegando + conteúdo fraco ou pouca confiança → "faça exercícios de X") e lista de tarefas (to-do, tabela nova). O índice de domínio ainda precisa ser explicado melhor ao dono antes de ser feito.
+1b. **Pedidos do dono**: feito — Notas dentro de Disciplinas (`components/grades.tsx`; `/notas` redireciona). Falta: painel com alertas acionáveis (prova chegando + conteúdo fraco ou pouca confiança → "faça exercícios de X") e lista de tarefas (to-do, tabela nova). O índice de domínio ainda precisa ser explicado melhor ao dono antes de ser feito.
 2. **IA** (chave só no servidor, via route handlers): simulados com gabarito/resolução/critérios em PDF, correção assistida de resoluções por foto (sinalizar trechos ilegíveis), assistente que responde com base nos dados e distingue fato de estimativa.
 3. **Engenharia de Petróleo**: fórmulas com variáveis, unidades e hipóteses (KaTeX), conversor SI ↔ unidades de campo (bbl, scf, psi, ft, mD, cP, °API), verificação dimensional, histórico da graduação (matriz curricular informada pelo aluno, não presumida).
 4. Biblioteca de materiais por disciplina (Supabase Storage, privada).

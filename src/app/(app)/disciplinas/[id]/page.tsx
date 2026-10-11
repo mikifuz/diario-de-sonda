@@ -11,6 +11,7 @@ import { Dot, Empty, I, Icon } from "@/components/ui";
 import { SessionModal, SubjectModal, TopicModal, TopicOptions } from "@/components/modals";
 import { SessionRow } from "@/components/SessionRow";
 import { MistakeModal, ReviewItemModal } from "@/components/planning";
+import { GradesPanel } from "@/components/grades";
 
 export default function Disciplina() {
   const { id } = useParams<{ id: string }>();
@@ -92,9 +93,10 @@ export default function Disciplina() {
         <div className="kpi"><span className="lbl">Horas totais</span><span className="v">{fmtMin(sp.min)}</span><span className="s">{sp.n} sessões</span></div>
         <div className="kpi"><span className="lbl">Confiança média</span><span className="v">{sp.conf == null ? "–" : nf(sp.conf)}<small>/5</small></span><span className="s">{sp.confN} autoavaliação(ões)</span></div>
         <div className="kpi"><span className="lbl">Acerto conferido</span><span className="v">{pct(sp.acc)}</span><span className="s">{sp.accN} registro(s)</span></div>
-        <div className="kpi"><span className="lbl">Média parcial</span><span className="v" style={{ color: gc.partial == null ? "inherit" : gc.partial >= gc.min ? "var(--ok)" : "var(--bad)" }}>{gc.partial == null ? "–" : nf(gc.partial)}</span>
-          <span className="s">{gc.needed != null ? `precisa de ${nf(Math.max(0, gc.needed))} nas restantes` : `mínima ${nf(gc.min)}`} · <Link href="/notas">notas</Link></span></div>
+        <div className="kpi"><span className="lbl">Média atual</span><span className="v" style={{ color: gc.partial == null ? "inherit" : gc.partial >= gc.min ? "var(--ok)" : "var(--bad)" }}>{gc.partial == null ? "–" : nf(gc.partial)}</span>
+          <span className="s">{gc.needed != null ? `precisa de ${nf(Math.max(0, gc.needed))} nas restantes` : `mínima ${nf(gc.min)}`} · <a href="#notas">notas</a></span></div>
       </section>
+      <GradesPanel s={s} />
       <section className="grid g2">
         <div className="panel">
           <div className="panel-h"><h2>Conteúdos</h2><span className="lbl">{ts.length} itens</span></div>

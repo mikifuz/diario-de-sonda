@@ -130,7 +130,7 @@ function PlanTab({ open, goRoutine }: { open: Open; goRoutine: () => void }) {
       {subOffers.map((o) => (
         <div key={o.s.id} className="callout info stack" style={{ gap: 8 }}>
           <span><b>SUB de {o.s.name} em {dm(o.sub.date!)}.</b> Ela substituiria {o.r.target!.name} (nota {nf(o.r.target!.value)}).
-            {o.r.base == null ? " Lance as notas em Notas para ver quanto a SUB precisa."
+            {o.r.base == null ? " Lance as notas na disciplina para ver quanto a SUB precisa."
               : o.r.need != null ? (o.r.need > 10 ? " Mesmo com 10 na SUB, a média não chega à mínima." : ` Para chegar à média mínima, a SUB precisa de ${nf(Math.max(0, o.r.need))}.`)
                 : ` Sua média (${nf(o.r.base)}) já atinge a mínima; a SUB só serviria para melhorar a nota.`}
             {" "}{o.closed.length === 1 ? `A revisão de ${o.r.target!.name} foi encerrada` : `As ${o.closed.length} revisões de ${o.r.target!.name} foram encerradas`} com a prova. Reativar até a SUB?</span>

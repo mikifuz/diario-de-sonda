@@ -8,9 +8,8 @@ Acompanhamento de estudos universitários, pensado para Engenharia de Petróleo.
 |---|---|
 | Hoje | Plano do dia que encaixa revisões e aulas (consolidar a de hoje ou adiantar a de amanhã) nos seus blocos de estudo, com o motivo de cada tarefa e o que não coube; banco de erros com 10 categorias; revisão espaçada ancorada na prova (encerra depois dela, pode ser reativada até a SUB); rotina semanal em blocos; aviso quando as revisões não cabem antes de uma prova |
 | Painel | Horas do dia, semana e mês; meta semanal; horas por dia por disciplina; medidores de acerto, confiança e autonomia; gráfico de calibração; alertas quando confiança e resultado divergem; próximas avaliações |
-| Disciplinas | Cadastro completo, conteúdos em árvore, perfil de avaliação do professor, leitura transparente de cada conteúdo, arquivar/excluir |
+| Disciplinas | Visão geral com uma linha por disciplina (média atual, situação, próxima prova, horas, acerto); dentro de cada uma: notas enxutas (uma linha por avaliação, simulação em 3 cenários, SUB ou exame configuráveis), conteúdos em árvore, perfil de avaliação do professor, erros e sessões; previsão × nota real |
 | Calendário | Visão mensal, itens por dia, próximos 30 dias; provas que "contam na média" vão direto para as notas |
-| Notas | Média ponderada explicada, nota necessária nas restantes, cenários conservador/esperado/otimista, recuperação configurável por disciplina (SUB que substitui a menor prova, ou exame), previsão × nota real |
 | Sala de estudos | Cronômetro com pausa que continua entre aparelhos e, ao começar, a escolha de entrar na sala (com ou sem a matéria) ou estudar sozinho; registro manual; autoavaliação rápida; histórico de sessões. Sala só por grupos (código de convite): quem está estudando agora, placar do dia e da semana, sequência de dias |
 | Conta | Login por e-mail e senha, recuperação de senha, 5 temas visuais, exportar e importar dados (inclusive da primeira versão) |
 
@@ -28,7 +27,7 @@ Todos os dados acadêmicos ficam protegidos por **Row Level Security** no Postgr
 ```
 src/
   app/
-    (app)/            telas logadas: painel, hoje, sala (cronômetro + grupos), calendario, disciplinas, notas, configuracoes
+    (app)/            telas logadas: painel, hoje, sala (cronômetro + grupos), calendario, disciplinas (com notas), configuracoes
     entrar/           login e cadastro
     redefinir-senha/  nova senha pelo link do e-mail
   components/         interface (modais, gráficos, navegação)

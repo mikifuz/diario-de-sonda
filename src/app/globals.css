@@ -150,6 +150,8 @@ table{border-collapse:collapse;width:100%;font-size:.92em}
 th{text-align:left;font-family:var(--f-mono);font-weight:500;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
 td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
 td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+table.grades td{padding:3px 6px}
+table.grades td input{padding:4px 6px}
 td input{padding:5px 7px;max-width:92px;text-align:right;font-family:var(--f-mono)}
 td input.wide{max-width:none;text-align:left;font-family:var(--f-body)}
 .bar{height:8px;background:var(--panel2);border-radius:999px;overflow:hidden}
