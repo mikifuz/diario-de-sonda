@@ -230,6 +230,15 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a
 insert into public.tasks (title, subject_id, due) values ('Lista 4 de Cálculo', '10000000-0000-0000-0000-000000000001', current_date + 2);
 insert into public.tasks (title) values ('Comprar calculadora');
 update public.profiles set mastery_cfg = '{"w_acc":60}';
+-- tema rosa aceito; tema inexistente não
+update public.profiles set skin = 'rosa';
+do $$ begin
+  begin
+    update public.profiles set skin = 'inventado';
+    raise exception 'FALHOU: tema inexistente aceito';
+  exception when check_violation then null; end;
+  update public.profiles set skin = 'sonda';
+end $$;
 do $$ begin
   begin
     insert into public.tasks (title) values ('   ');

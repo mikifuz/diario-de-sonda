@@ -42,6 +42,7 @@ export const SKINS: { id: Skin; nm: string; d: string; c: string[] }[] = [
   { id: "caderno", nm: "Caderno de Campo", d: "Papel pautado e tinta azul", c: ["#ebe3cf", "#f7f1e1", "#24466e", "#2b2419"] },
   { id: "blueprint", nm: "Blueprint", d: "Planta técnica em cianotipia", c: ["#163d70", "#215495", "#ffe08a", "#eef5ff"] },
   { id: "terminal", nm: "Terminal", d: "Fósforo verde, tela antiga", c: ["#090c08", "#142013", "#7dff5f", "#b9f5a8"] },
+  { id: "rosa", nm: "Rosa", d: "Fofo, arredondado e cheio de bolinhas", c: ["#fff0f6", "#ffd6e7", "#e0428a", "#5a2a45"] },
   { id: "moderno", nm: "Moderno", d: "Limpo, segue o claro/escuro do sistema", c: ["#f4f6f8", "#ffffff", "#2556c4", "#18202b"] },
 ];
 
