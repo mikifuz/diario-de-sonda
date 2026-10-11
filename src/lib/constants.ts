@@ -29,7 +29,7 @@ export const MISTAKE_D: Record<MistakeCategory, string> = {
 export const DEFAULT_STEPS = [1, 3, 7, 14, 30];
 /** Horários de aula pré-definidos (padrão informado pelo dono; editáveis no bloco) */
 export const CLASS_SLOTS = [
-  { n: "1º horário", start: "08:20", end: "10:10" },
+  { n: "1º horário", start: "08:20", end: "10:00" },
   { n: "2º horário", start: "10:20", end: "12:00" },
   { n: "3º horário", start: "13:30", end: "15:10" },
   { n: "4º horário", start: "15:20", end: "17:00" },
