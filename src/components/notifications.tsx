@@ -9,6 +9,7 @@ import { fmtMin, nf, pct, todayKey, qt } from "@/lib/calc";
 import { buildReport, reportWeek, type ReportData } from "@/lib/report";
 import type { AppNotification } from "@/lib/types";
 import { ConfirmButton, Empty, I, Icon } from "./ui";
+import { WeekPrint } from "./weekPrint";
 
 /** Cria o relatório da semana quando ele estiver liberado e ainda não existir (um por semana) */
 export function useWeeklyReport() {
@@ -63,6 +64,7 @@ export function NotificationsList() {
     if (unread.length) sb().from("notifications").update({ read_at: new Date().toISOString() }).in("id", unread.map((n) => n.id)).then(() => st.reload("notifications"));
   }, [st.notes]); // eslint-disable-line react-hooks/exhaustive-deps
   const [open, setOpen] = useState<string | null>(null);
+  const [week, setWeek] = useState(false);
   const read = st.notes.filter((n) => n.read_at && !fresh.has(n.id));
   if (!st.notes.length) return <Empty title="Nenhuma notificação">O relatório da semana chega todo domingo de manhã. Pedidos de amizade e chamados para estudar também aparecem aqui.</Empty>;
   return (
@@ -77,8 +79,8 @@ export function NotificationsList() {
                 <div className="t">{n.title}</div>
                 <div className="m">{when(n.created_at)}</div>
                 {n.body && <div className="small" style={{ marginTop: 4 }}>{n.body}</div>}
-                {n.kind === "relatorio" && (open === n.id ? <><Report d={n.data as unknown as ReportData} /><button className="btn sm ghost" onClick={() => setOpen(null)}>Fechar</button></>
-                  : <button className="btn sm ghost" style={{ paddingLeft: 0 }} onClick={() => setOpen(n.id)}>Ver relatório completo</button>)}
+                {n.kind === "relatorio" && (open === n.id ? <><Report d={n.data as unknown as ReportData} /><span className="row" style={{ gap: 6 }}><button className="btn sm" onClick={() => setWeek(true)}>Imprimir: esta semana + a próxima</button><button className="btn sm ghost" onClick={() => setOpen(null)}>Fechar</button></span></>
+                  : <span className="row" style={{ gap: 6 }}><button className="btn sm ghost" style={{ paddingLeft: 0 }} onClick={() => setOpen(n.id)}>Ver relatório completo</button><button className="btn sm ghost" onClick={() => setWeek(true)}>Imprimir com a próxima semana</button></span>)}
                 {req && <div className="row" style={{ marginTop: 6 }}><button className="btn sm pri" onClick={() => room.acceptFriend(req.id)}>Aceitar</button><button className="btn sm ghost" onClick={() => room.removeFriend(req.id)}>Recusar</button></div>}
                 {n.kind === "chamado" && <div style={{ marginTop: 6 }}><Link className="btn sm" href="/sala"><Icon d={I.play} s={13} />Ir para a sala</Link></div>}
               </div>
@@ -88,6 +90,7 @@ export function NotificationsList() {
         })}</div>
         {read.length > 0 && <div style={{ marginTop: 10 }}><ConfirmButton small label="Apagar as lidas" question={`Apagar ${qt(read.length, "notificação lida", "notificações lidas")}?`} confirmLabel="Apagar" onConfirm={async () => { for (const n of read) await st.remove("notifications", n.id); }} /></div>}
       </section>
+      {week && <WeekPrint start={todayKey()} onDone={() => setWeek(false)} />}
       <p className="small muted" style={{ margin: 0 }}>O relatório chega todo domingo a partir das 7h, sobre a semana de domingo a sábado. Por enquanto as notificações aparecem dentro do app; avisos no celular com o app fechado ficam para uma próxima etapa.</p>
     </>
   );

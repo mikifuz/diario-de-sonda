@@ -1,7 +1,7 @@
 import { holidayOf, easter } from "./holidays";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { slotRanges, anchorFor, examLoads, firstDue, freeStudy, itemState, noClass, nextReview, studyHint, parseSteps, planDay, type PlanInput } from "./plan";
+import { slotRanges, anchorFor, examLoads, firstDue, freeStudy, itemState, noClass, nextReview, studyHint, parseSteps, planDay, planWeek, type PlanInput } from "./plan";
 import type { Assessment, CalEvent, ReviewItem, RoutineBlock, Session, Subject, Topic } from "./types";
 
 const STEPS = [1, 3, 7, 14, 30];
@@ -216,4 +216,13 @@ test("Sala: 'estudando para quê' respeita passado, hoje e futuro", () => {
   assert.equal(studyHint("2026-10-13", null, "2026-10-11"), "Adiantando a aula de 13/10.");
   assert.equal(studyHint("2026-09-16", { name: "P1", date: "2026-09-30" }, "2026-10-11"), "Conteúdo dado na aula de 16/09.");
   assert.equal(studyHint(null, null, "2026-10-11"), "");
+});
+
+test("plano da semana: revisão atrasada entra uma vez só; cada dia com as aulas dele", () => {
+  const days = ["2026-10-19", "2026-10-20", "2026-10-21"];
+  const blocks = [0, 1, 2, 3, 4, 5, 6].map((w) => B({ weekday: w, start_time: "19:00", end_time: "20:00" }));
+  const items = [R({ id: "r1", title: "Sinal do jacobiano", due: "2026-10-15", est_min: 20 }), R({ id: "r2", title: "Limites", due: "2026-10-21", est_min: 20 })];
+  const w = planWeek(input({ blocks, items }), days, () => []);
+  const titles = w.map((d) => d.plan.slots.flatMap((s) => s.placed.map((p) => p.task.title)));
+  assert.deepEqual(titles, [["Sinal do jacobiano"], [], ["Limites"]]);
 });

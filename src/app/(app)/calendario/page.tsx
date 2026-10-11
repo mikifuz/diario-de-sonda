@@ -2,7 +2,7 @@
 import { holidayOf } from "@/lib/holidays";
 import { useState } from "react";
 import { agenda, useStore, type AgendaItem } from "@/lib/store";
-import { addDays, daysBetween, dkey, keyDate, nf, todayKey, qt } from "@/lib/calc";
+import { addDays, daysBetween, dkey, fmtMin, keyDate, nf, todayKey, qt } from "@/lib/calc";
 import { EVT, GRADED } from "@/lib/constants";
 import { Dot, I, Icon } from "@/components/ui";
 import { EventModal } from "@/components/modals";
@@ -37,6 +37,13 @@ export default function Calendario() {
   const done = (e: AgendaItem) => e.status === "concluido" || e.status === "cancelado";
   const up = ag.filter((e) => e.date >= t && e.date <= addDays(t, 30) && e.status === "pendente");
   const dayEv = byDay[sel] || [];
+  // tempo estudado (sessões registradas) por dia
+  const studied: Record<string, number> = {};
+  for (const x of st.sessions) studied[dkey(x.started_at)] = (studied[dkey(x.started_at)] || 0) + x.duration_min;
+  const short = (mn: number) => (mn >= 60 ? `${Math.floor(mn / 60)}h${mn % 60 ? String(mn % 60).padStart(2, "0") : ""}` : `${mn}min`);
+  const selSes = st.sessions.filter((x) => dkey(x.started_at) === sel);
+  const selBySub = Object.entries(selSes.reduce<Record<string, { min: number; n: number }>>((a, x) => { const o = (a[x.subject_id] ||= { min: 0, n: 0 }); o.min += x.duration_min; o.n++; return a; }, {}))
+    .sort((a, b) => b[1].min - a[1].min);
 
   const Row = ({ e }: { e: AgendaItem }) => {
     const s = st.subjects.find((x) => x.id === e.subject_id);
@@ -70,8 +77,10 @@ export default function Calendario() {
             {cells.map((k) => {
               const evs = byDay[k] || [];
               return (
-                <button key={k} className={["day", k.slice(0, 7) !== month && "out", k === t && "today", k === sel && "sel"].filter(Boolean).join(" ")} onClick={() => pick(k)} aria-label={`${fmtDL(k)}, ${evs.length} item(ns)`}>
-                  <span className="dn">{keyDate(k).getDate()}</span>
+                <button key={k} className={["day", k.slice(0, 7) !== month && "out", k === t && "today", k === sel && "sel"].filter(Boolean).join(" ")} onClick={() => pick(k)}
+                  aria-label={`${fmtDL(k)}, ${qt(evs.length, "item", "itens")}${studied[k] ? `, estudou ${fmtMin(studied[k])}` : ""}`}
+                  style={studied[k] && k !== sel ? { background: `color-mix(in srgb,var(--ok) ${Math.round(6 + Math.min(1, studied[k] / 240) * 22)}%,transparent)` } : undefined}>
+                  <span className="row" style={{ justifyContent: "space-between", gap: 2, flexWrap: "nowrap" }}><span className="dn">{keyDate(k).getDate()}</span>{studied[k] ? <span className="cstudy" title={`Estudou ${fmtMin(studied[k])}`}>{short(studied[k])}</span> : null}</span>
                   {holidayOf(k) && <span className="ev" style={{ ["--c" as string]: "var(--muted)" }} title="Feriado nacional: sem aula">{holidayOf(k)}</span>}
                   {evs.slice(0, 3).map((e) => <span key={e.id} className="ev" style={{ ["--c" as string]: color(e) }}>{GRADED.includes(e.type) ? "● " : ""}{e.title}</span>)}
                   {evs.length > 3 && <span className="small muted">+{evs.length - 3}</span>}
@@ -84,6 +93,13 @@ export default function Calendario() {
         <div className="stack" style={{ gap: 16 }}>
           <div className="panel">
             <div className="panel-h"><h3>{fmtDL(sel)}</h3><button className="btn sm" onClick={() => setModal({ id: null, date: sel })}><Icon d={I.plus} s={14} />Adicionar</button></div>
+            {studied[sel] ? (
+              <div style={{ margin: "0 0 10px" }}>
+                <p className="small" style={{ margin: "0 0 4px" }}>Você estudou <b>{fmtMin(studied[sel])}</b> neste dia ({qt(selSes.length, "sessão", "sessões")}):</p>
+                <div className="stack small" style={{ gap: 2 }}>{selBySub.map(([sid, v]) => { const s = st.subjects.find((x) => x.id === sid); return (
+                  <span key={sid} className="row" style={{ gap: 6, flexWrap: "nowrap" }}><Dot c={s?.color || "var(--muted)"} /><span className="grow">{s?.name || "Disciplina apagada"}</span><span className="num">{fmtMin(v.min)}</span></span>); })}</div>
+              </div>
+            ) : sel <= t ? <p className="small muted" style={{ margin: "0 0 8px" }}>Nenhum estudo registrado neste dia.</p> : null}
             {holidayOf(sel) && <p className="small" style={{ margin: "0 0 8px" }}>Feriado nacional: <b>{holidayOf(sel)}</b>. Sem aula; no plano, os horários de aula viram tempo de estudo.</p>}
             {dayEv.length ? <div className="list">{dayEv.map((e) => <Row key={e.id} e={e} />)}</div> : <p className="muted small" style={{ margin: 0 }}>Nada marcado neste dia.</p>}
           </div>

@@ -339,3 +339,22 @@ ul.plain{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:co
 .ps-notes{height:90px;background:repeating-linear-gradient(#fff 0 21px,#ccc 21px 22px)}
 .ps-f{margin-top:10px;font-size:8.5pt;color:#555;border-top:1px solid #999;padding-top:4px}
 .ps tr,.ps li{break-inside:avoid}
+.cal .day .cstudy{font-family:var(--f-mono);font-size:.68rem;color:var(--ok);white-space:nowrap}
+/* Folha da semana: A4 deitada */
+@page semana{size:A4 landscape;margin:0}
+.ps-week{page:semana;font-size:8.5pt}
+.ps-week h1{font-size:14pt}
+.ps-box{border:1px solid #999;border-radius:3px;padding:5px 7px;margin:8px 0;line-height:1.35}
+.ps-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:6px}
+.ps-day{border:1px solid #bbb;border-radius:3px;padding:4px 5px;min-height:300px;display:flex;flex-direction:column;gap:3px;break-inside:avoid}
+.ps-dh{font-weight:700;border-bottom:1px solid #111;padding-bottom:2px;margin-bottom:2px}
+.ps-tag{font-size:7.5pt;background:#eee;padding:1px 3px;border-radius:2px}
+.ps-exam{font-weight:700;border:1.3px solid #111;padding:1px 3px;border-radius:2px}
+.ps-cl{color:#444}
+.ps-t1{line-height:1.25}
+.ps-week .box{width:9px;height:9px;margin-right:4px}
+.ps-foot2{display:flex;gap:14px;margin-top:8px;align-items:flex-start}
+.ps-hab{border-collapse:collapse;width:60%;flex:none}
+.ps-hab th,.ps-hab td{border:1px solid #bbb;padding:2px 5px;text-align:center;font-size:8pt}
+.ps-hab td:first-child,.ps-hab th:first-child{text-align:left}
+.ps-hab .box{margin:0}
