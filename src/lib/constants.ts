@@ -48,7 +48,6 @@ export const SKINS: { id: Skin; nm: string; d: string; c: string[] }[] = [
 export const PAGES = [
   { href: "/painel", nm: "Painel", full: "Painel", t: "Painel do semestre", ic: "M3 13h4v8H3zM10 3h4v18h-4zM17 9h4v12h-4z" },
   { href: "/hoje", nm: "Hoje", full: "Hoje", t: "Plano do dia", ic: "M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9" },
-  { href: "/sessoes", nm: "Sessões", full: "Sessões", t: "Sessões de estudo", ic: "M12 8v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 1h6" },
   { href: "/sala", nm: "Sala", full: "Sala de estudos", t: "Sala de estudos", ic: "M16 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 20v-1a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" },
   { href: "/calendario", nm: "Agenda", full: "Calendário", t: "Calendário acadêmico", ic: "M3 6h18v15H3zM3 10h18M8 3v5M16 3v5" },
   { href: "/disciplinas", nm: "Disciplinas", full: "Disciplinas", t: "Minhas disciplinas", ic: "M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3zM18 20V7M8 8h6M8 12h6" },

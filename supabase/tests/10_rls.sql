@@ -22,15 +22,15 @@ insert into public.study_sessions (subject_id, topic_id, activity, started_at, d
 insert into public.assessments (subject_id, name, weight, grade) values ('10000000-0000-0000-0000-000000000001', 'Prova 1', 3, 6.5);
 insert into public.room_members (nick) values ('Ana');
 
--- Bruno não vê nada de Ana, exceto a sala
+-- Bruno não vê nada de Ana (nem na sala: eles ainda não dividem um grupo)
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
 do $$ begin
   if (select count(*) from public.subjects) <> 0 then raise exception 'Bruno vê disciplinas de Ana'; end if;
   if (select count(*) from public.study_sessions) <> 0 then raise exception 'Bruno vê sessões de Ana'; end if;
   if (select count(*) from public.assessments) <> 0 then raise exception 'Bruno vê notas de Ana'; end if;
   if (select count(*) from public.profiles) <> 1 then raise exception 'Bruno vê perfil alheio'; end if;
-  if (select count(*) from public.room_members) <> 1 then raise exception 'Bruno não vê a sala'; end if;
-  if (select minutes from public.room_daily_totals(35, 'America/Sao_Paulo') limit 1) <> 50 then raise exception 'totais da sala incorretos'; end if;
+  if (select count(*) from public.room_members) <> 0 then raise exception 'Bruno vê Ana na sala sem dividir grupo'; end if;
+  if (select count(*) from public.room_daily_totals(35, 'America/Sao_Paulo')) <> 0 then raise exception 'Bruno vê os minutos de Ana sem dividir grupo'; end if;
 end $$;
 
 -- Bruno não consegue alterar a presença de Ana
@@ -58,10 +58,57 @@ do $$ begin
   end;
 end $$;
 
--- Grupos
+-- Grupos: só quem divide um grupo se vê
 insert into public.room_members (nick) values ('Bruno');
 insert into public.study_groups (code, name) values ('PETRO7', 'Turma 2024.1');
 insert into public.group_members (code) values ('PETRO7');
+do $$ begin
+  if (select count(*) from public.study_groups) <> 1 then raise exception 'criador não vê o próprio grupo'; end if;
+  if (select count(*) from public.room_members) <> 1 then raise exception 'Bruno deveria ver só a si mesmo'; end if;
+end $$;
+
+-- Ana não vê o grupo nem os membros antes de entrar; entra sabendo o código
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+do $$ begin
+  if (select count(*) from public.study_groups) <> 0 then raise exception 'códigos de grupos alheios visíveis'; end if;
+  if (select count(*) from public.group_members) <> 0 then raise exception 'membros de grupos alheios visíveis'; end if;
+  if (select count(*) from public.room_members) <> 1 then raise exception 'Ana vê alguém sem dividir grupo'; end if;
+  if (select nick from public.room_members) <> 'Ana' then raise exception 'Bruno alterou a presença de Ana'; end if;
+end $$;
+insert into public.group_members (code) values ('PETRO7');
+do $$ begin
+  if (select count(*) from public.study_groups) <> 1 then raise exception 'Ana não vê o grupo em que entrou'; end if;
+  if (select count(*) from public.group_members) <> 2 then raise exception 'Ana não vê os membros do grupo'; end if;
+  if (select count(*) from public.room_members) <> 2 then raise exception 'Ana não vê Bruno no grupo'; end if;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+do $$ begin
+  if (select count(*) from public.room_members) <> 2 then raise exception 'Bruno não vê Ana no grupo'; end if;
+  if (select minutes from public.room_daily_totals(35, 'America/Sao_Paulo') where user_id = '00000000-0000-0000-0000-00000000000a') <> 50 then raise exception 'totais do grupo incorretos'; end if;
+end $$;
+
+-- Carla, fora do grupo, não vê ninguém e não entra com código errado
+reset role;
+insert into auth.users (id, raw_user_meta_data) values ('00000000-0000-0000-0000-00000000000c', '{"name":"Carla"}');
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false);
+insert into public.room_members (nick) values ('Carla');
+do $$ begin
+  if (select count(*) from public.room_members) <> 1 then raise exception 'Carla vê pessoas de fora do grupo'; end if;
+  if (select count(*) from public.study_groups) + (select count(*) from public.group_members) <> 0 then raise exception 'Carla vê grupos alheios'; end if;
+  if (select count(*) from public.room_daily_totals(35, 'America/Sao_Paulo')) <> 0 then raise exception 'Carla vê minutos de quem não é do grupo'; end if;
+  begin
+    insert into public.group_members (code) values ('ZZZZZZ');
+    raise exception 'FALHOU: entrou em grupo inexistente';
+  exception when foreign_key_violation then null;
+  end;
+  begin
+    insert into public.group_members (code, user_id) values ('PETRO7', '00000000-0000-0000-0000-00000000000a');
+    raise exception 'FALHOU: colocou outra pessoa num grupo';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
 
 -- Validações
 do $$ begin

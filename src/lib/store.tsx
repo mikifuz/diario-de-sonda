@@ -3,7 +3,7 @@
 // grava de forma otimista e escuta mudanças feitas em outros aparelhos.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { sb, friendlyError } from "./supabase";
-import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Subject, Timer, Topic } from "./types";
+import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Social, Subject, Timer, Topic } from "./types";
 
 export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs";
 type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "mistakes" | "reviews" | "reviewLogs";
@@ -35,7 +35,8 @@ export interface Store extends Data {
   toast: (msg: string) => void;
   evalId: string | null;
   setEvalId: (id: string | null) => void;
-  startTimer: (subject_id: string, topic_id: string | null, activity: Timer["activity"]) => void;
+  startTimer: (subject_id: string, topic_id: string | null, activity: Timer["activity"], social: Social) => void;
+  setSocial: (social: Social) => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
   stopTimer: () => Promise<void>;
@@ -169,11 +170,15 @@ export function DataProvider({ uid, email, children, onToast }: { uid: string; e
   }, [uid, reload, toast]);
 
   // cronômetro (guardado no perfil para continuar entre aparelhos)
-  const startTimer = useCallback((subject_id: string, topic_id: string | null, activity: Timer["activity"]) => {
+  const startTimer = useCallback((subject_id: string, topic_id: string | null, activity: Timer["activity"], social: Social) => {
     if (dataRef.current.profile?.timer) { toast("Já existe uma sessão em andamento."); return; }
     const now = Date.now();
-    updateProfile({ timer: { subject_id, topic_id, activity, since: now, started: now, accum: 0, running: true } });
+    updateProfile({ timer: { subject_id, topic_id, activity, since: now, started: now, accum: 0, running: true, social } });
   }, [toast, updateProfile]);
+  const setSocial = useCallback((social: Social) => {
+    const t = dataRef.current.profile?.timer; if (!t) return;
+    updateProfile({ timer: { ...t, social } });
+  }, [updateProfile]);
   const pauseTimer = useCallback(() => {
     const t = dataRef.current.profile?.timer; if (!t || !t.running) return;
     updateProfile({ timer: { ...t, accum: timerMs(t), running: false } });
@@ -199,8 +204,8 @@ export function DataProvider({ uid, email, children, onToast }: { uid: string; e
 
   const value = useMemo<Store>(() => ({
     ...data, uid, email, ready, save, saveMany, remove, updateProfile, reload, toast, evalId, setEvalId,
-    startTimer, pauseTimer, resumeTimer, stopTimer, discardTimer,
-  }), [data, uid, email, ready, save, saveMany, remove, updateProfile, reload, toast, evalId, startTimer, pauseTimer, resumeTimer, stopTimer, discardTimer]);
+    startTimer, setSocial, pauseTimer, resumeTimer, stopTimer, discardTimer,
+  }), [data, uid, email, ready, save, saveMany, remove, updateProfile, reload, toast, evalId, startTimer, setSocial, pauseTimer, resumeTimer, stopTimer, discardTimer]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

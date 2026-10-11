@@ -85,7 +85,7 @@ export default function Disciplina() {
             {s.notes && <span className="small" style={{ maxWidth: "65ch", whiteSpace: "pre-wrap" }}>{s.notes}</span>}
             {traitList.length > 0 && <div className="row" style={{ gap: 6, marginTop: 6 }}>{traitList.map((x) => <span key={x} className="chip">{x}</span>)}</div>}
           </div>
-          <button className="btn pri" onClick={() => router.push(`/sessoes?disciplina=${s.id}`)}><Icon d={I.play} s={15} />Estudar agora</button>
+          <button className="btn pri" onClick={() => router.push(`/sala?disciplina=${s.id}`)}><Icon d={I.play} s={15} />Estudar agora</button>
         </div>
       </section>
       <section className="kpis">

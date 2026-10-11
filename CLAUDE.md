@@ -13,7 +13,7 @@ Aplicativo de acompanhamento de estudos de um aluno de Engenharia de Petróleo (
 - Toda leitura/estimativa mostra o motivo (ex.: `signal()` em `calc.ts` devolve `why`). Sem dados suficientes, dizer isso.
 - Notas estimadas (simulação, futura correção por IA) sempre separadas da nota oficial.
 - Regras de média variam por disciplina (média mínima e exame configuráveis); não assumir regra da universidade.
-- Privacidade: dados acadêmicos são só do dono (RLS). A sala expõe apenas apelido, presença e minutos por dia (`room_daily_totals`).
+- Privacidade: dados acadêmicos são só do dono (RLS). A sala expõe apenas apelido, presença e minutos por dia (`room_daily_totals`), e **só para quem divide um grupo** (não existe sala geral; códigos de grupo não são listáveis).
 - Não criar botões que parecem funcionar mas não fazem nada; recursos futuros aparecem só como "próximas etapas".
 
 ## Arquitetura
@@ -21,6 +21,7 @@ Aplicativo de acompanhamento de estudos de um aluno de Engenharia de Petróleo (
 - `src/lib/plan.ts`: revisão espaçada ancorada na prova (`nextReview`, `itemState`, `anchorFor`), plano do dia (`planDay`: encaixa revisões e aulas nos blocos de estudo da rotina) e carga até as provas (`examLoads`). Tudo devolve `why`. Testes em `plan.test.ts`.
 - `src/lib/store.tsx`: carrega as tabelas do usuário, grava de forma otimista (`save`, `saveMany`, `remove`), escuta realtime dos próprios dados; cronômetro fica em `profiles.timer` para seguir entre aparelhos.
 - `src/lib/room.tsx`: sala de estudos (presença sincronizada com o cronômetro, grupos com código de 6 caracteres, placar).
+- Página `/sala` junta cronômetro, grupos ao vivo, placar e histórico de sessões (a antiga `/sessoes` redireciona para cá). Ao começar, `StartModal` (`components/studyStart.tsx`) pergunta: entrar na sala com a matéria, sem a matéria ou estudar sozinho (`profiles.timer.social`).
 - `src/components/`: modais (sessão, autoavaliação, disciplina, conteúdo, item do calendário), gráficos SVG, navegação; `planning.tsx` tem os modais de erro, revisão e bloco da rotina.
 - Página `/hoje` (abas Plano do dia, Revisões, Banco de erros, Rotina; `?aba=` abre uma aba).
 - Tela logada em `src/app/(app)/*` (client components). Login em `/entrar`.
@@ -37,10 +38,12 @@ Aplicativo de acompanhamento de estudos de um aluno de Engenharia de Petróleo (
 - A próxima data depende só de resultado conferido + autonomia; confiança é registrada mas não muda a data.
 - Horários de aula pré-definidos (`CLASS_SLOTS` em `constants.ts`): 1º 08:20–10:00, 2º 10:20–12:00, 3º 13:30–15:10, 4º 15:20–17:00 (informados pelo dono; o fim do 1º foi corrigido para 10:00 conforme o comprovante do SIGA, que divide em aulas de 50 min: 08:20–09:10, 09:10–10:00). São atalhos no bloco da rotina; "Outro horário" permite qualquer horário. Horários seguidos viram um bloco só. O bloco de aula pode criar uma disciplina nova na hora.
 - **Importar do SIGA**: `src/lib/siga.ts` lê o "Comprovante de matrícula" do SIGA (UDESC) pelo texto e posições do PDF (pdf.js, no navegador; o arquivo não sai do aparelho). Sem IA. Mostra uma prévia e só grava depois da confirmação. O exemplo de teste (`src/lib/fixtures/siga-comprovante.json`) não tem nome, matrícula nem código de autenticidade; nunca versionar o PDF original.
+- **Sala só por grupos** (decisão do dono): migration `20261012000000_sala_por_grupos.sql` (`shares_group`, `is_group_member`). Entrar num grupo exige o código. "Estudar sozinho" esconde a presença ao vivo, mas os minutos salvos continuam no placar do grupo.
 - O plano do dia considera a rotina pessoal (blocos semanais de aula, estudo, trabalho etc.), compromissos do calendário e a preferência de estudo (adiantar antes da aula / revisar depois / os dois; padrão no perfil, opcional por disciplina). Só blocos de **estudo** recebem tarefas. O que não cabe aparece, não é escondido. Sem IA nesta parte: regras fixas e explicadas.
 
 ## Próximas etapas (ordem combinada)
 1. **Análise de desempenho** — feito: banco de erros, revisão espaçada, plano do dia, rotina, SUB. Falta: índice de domínio por conteúdo com metodologia transparente e configurável, planejamento reverso completo a partir da data da prova (distribuir conteúdo novo, não só revisões), relatórios, e recolocar o modo demonstração (dados só em memória).
+1b. **Pedidos do dono (em andamento)**: Notas dentro de Disciplinas, com visão geral enxuta (uma linha por disciplina: média atual, quanto precisa, próxima prova; dentro, uma linha por avaliação, simulação visível); painel com alertas acionáveis (prova chegando + conteúdo fraco ou pouca confiança → "faça exercícios de X") e lista de tarefas (to-do, tabela nova). O índice de domínio ainda precisa ser explicado melhor ao dono antes de ser feito.
 2. **IA** (chave só no servidor, via route handlers): simulados com gabarito/resolução/critérios em PDF, correção assistida de resoluções por foto (sinalizar trechos ilegíveis), assistente que responde com base nos dados e distingue fato de estimativa.
 3. **Engenharia de Petróleo**: fórmulas com variáveis, unidades e hipóteses (KaTeX), conversor SI ↔ unidades de campo (bbl, scf, psi, ft, mD, cP, °API), verificação dimensional, histórico da graduação (matriz curricular informada pelo aluno, não presumida).
 4. Biblioteca de materiais por disciplina (Supabase Storage, privada).

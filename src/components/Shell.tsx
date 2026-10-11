@@ -17,7 +17,7 @@ function TimerPill() {
   if (!t) return null;
   const s = st.subjects.find((x) => x.id === t.subject_id);
   return (
-    <Link href="/sessoes" className={"timer-pill" + (t.running ? "" : " paused")} aria-label="Cronômetro em andamento">
+    <Link href="/sala" className={"timer-pill" + (t.running ? "" : " paused")} aria-label="Cronômetro em andamento">
       <i className="dot" /><span>{fmtClock(timerMs(t, now))}</span><span className="hide-m small" style={{ color: "var(--muted)" }}>{s?.name}</span>
     </Link>
   );
