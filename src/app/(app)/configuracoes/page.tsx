@@ -155,6 +155,7 @@ export default function Configuracoes() {
             ? <button className="btn" onClick={() => { try { sessionStorage.removeItem(DEMO_FLAG); } catch { /* sem armazenamento */ } window.location.href = "/entrar"; }}><Icon d={I.logout} s={15} />Sair da demonstração</button>
             : <button className="btn" onClick={async () => { const { error } = await sb().auth.signOut(); if (error) st.toast(friendlyError(error)); }}><Icon d={I.logout} s={15} />Sair</button>}
         </div>
+        {!st.demo && <DeleteAccount />}
       </section>
       <section className="panel">
         <div className="panel-h"><h2>Próximas etapas</h2><span className="lbl">ainda não disponíveis</span></div>
@@ -166,6 +167,39 @@ export default function Configuracoes() {
         </div>
       </section>
     </>
+  );
+}
+
+/** Exclui a conta e tudo o que é dela (função delete_my_account no banco). Pede para digitar EXCLUIR. */
+function DeleteAccount() {
+  const st = useStore();
+  const [open, setOpen] = useState(false);
+  const [word, setWord] = useState("");
+  const [busy, setBusy] = useState(false);
+  const run = async (e: FormEvent) => {
+    e.preventDefault();
+    if (word.trim().toUpperCase() !== "EXCLUIR") { st.toast("Digite EXCLUIR para confirmar."); return; }
+    setBusy(true);
+    const { error } = await sb().rpc("delete_my_account");
+    if (error) { st.toast(friendlyError(error)); setBusy(false); return; }
+    // a conta já não existe: só limpa a sessão deste aparelho
+    await sb().auth.signOut({ scope: "local" }).catch(() => undefined);
+    window.location.href = "/entrar?conta=excluida";
+  };
+  if (!open) return (
+    <div className="row" style={{ borderTop: "1px solid var(--line)", paddingTop: 12, marginTop: 12 }}>
+      <button className="btn danger sm" onClick={() => setOpen(true)}>Excluir minha conta</button>
+    </div>
+  );
+  return (
+    <form className="stack" style={{ gap: 8, borderTop: "1px solid var(--line)", paddingTop: 12, marginTop: 12 }} onSubmit={run}>
+      <p className="small" style={{ margin: 0 }}><b>Isto não tem volta.</b> A conta ({st.email}) e tudo o que é dela são apagados para sempre: disciplinas, sessões, notas, calendário, rotina, erros, revisões, tarefas, hábitos, grade do curso, notificações, amizades e a presença na sala. Os grupos que você criou continuam para os colegas, sem você. Se quiser guardar seus dados, use “Exportar cópia” antes.</p>
+      <label className="f"><span>Para confirmar, digite EXCLUIR</span><input type="text" value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" /></label>
+      <div className="row">
+        <button className="btn danger" disabled={busy || word.trim().toUpperCase() !== "EXCLUIR"}>{busy ? "Excluindo…" : "Excluir minha conta para sempre"}</button>
+        <button type="button" className="btn ghost" onClick={() => { setOpen(false); setWord(""); }}>Cancelar</button>
+      </div>
+    </form>
   );
 }
 

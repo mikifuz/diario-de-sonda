@@ -21,6 +21,7 @@ export default function Entrar() {
   useEffect(() => {
     // entrar de verdade sai do modo demonstração
     try { sessionStorage.removeItem(DEMO_FLAG); } catch { /* sem armazenamento */ }
+    if (new URLSearchParams(window.location.search).get("conta") === "excluida") setMsg({ ok: true, t: "Sua conta e todos os seus dados foram excluídos." });
     if (!configured) return;
     sb().auth.getSession().then(({ data }) => { if (data.session) router.replace("/painel"); });
   }, [router]);
@@ -37,7 +38,7 @@ export default function Entrar() {
         if (error) throw error;
         router.replace("/painel");
       } else if (mode === "criar") {
-        if (password.length < 6) { setMsg({ ok: false, t: "A senha precisa ter pelo menos 6 caracteres." }); return; }
+        if (password.length < 8) { setMsg({ ok: false, t: "A senha precisa ter pelo menos 8 caracteres." }); return; }
         const { data, error } = await auth.signUp({ email: email.trim(), password, options: { data: { name: name.trim() }, emailRedirectTo: `${location.origin}/painel` } });
         if (error) throw error;
         if (data.session) router.replace("/painel");
@@ -66,7 +67,7 @@ export default function Entrar() {
         <form className="stack" style={{ gap: 12 }} onSubmit={submit}>
           {mode === "criar" && <label className="f"><span>Seu nome</span><input type="text" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></label>}
           <label className="f"><span>E-mail</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></label>
-          {mode !== "esqueci" && <label className="f"><span>Senha</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete={mode === "criar" ? "new-password" : "current-password"} /></label>}
+          {mode !== "esqueci" && <label className="f"><span>Senha</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={mode === "criar" ? 8 : 6} autoComplete={mode === "criar" ? "new-password" : "current-password"} /></label>}
           {msg && <div className={"callout" + (msg.ok ? " info" : "")} role="status">{msg.t}</div>}
           <button className="btn pri" disabled={busy} style={{ justifyContent: "center" }}>{busy ? "Aguarde…" : mode === "criar" ? "Criar conta" : mode === "esqueci" ? "Enviar link" : "Entrar"}</button>
         </form>

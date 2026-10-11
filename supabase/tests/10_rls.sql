@@ -60,9 +60,20 @@ end $$;
 
 -- Grupos: só quem divide um grupo se vê
 insert into public.room_members (nick) values ('Bruno');
-insert into public.study_groups (code, name) values ('PETRO7', 'Turma 2024.1');
-insert into public.group_members (code) values ('PETRO7');
+-- o código nasce no banco; para o teste, o grupo de Bruno passa a se chamar PETRO7
+select public.create_group('Turma 2024.1');
+reset role;
+insert into public.study_groups (code, name, created_by) select 'PETRO7', name, created_by from public.study_groups;
+update public.group_members set code = 'PETRO7';
+delete from public.study_groups where code <> 'PETRO7';
+set role authenticated;
 do $$ begin
+  begin
+    insert into public.study_groups (code, name, created_by) values ('ABCDEF', 'Escolhido', '00000000-0000-0000-0000-00000000000b');
+    raise exception 'FALHOU: grupo criado direto na tabela (com código escolhido)';
+  exception when insufficient_privilege then null;
+  end;
+  if (select count(*) from public.group_members where user_id = auth.uid()) <> 1 then raise exception 'criador não entrou no próprio grupo'; end if;
   if (select count(*) from public.study_groups) <> 1 then raise exception 'criador não vê o próprio grupo'; end if;
   if (select count(*) from public.room_members) <> 1 then raise exception 'Bruno deveria ver só a si mesmo'; end if;
 end $$;
@@ -74,8 +85,14 @@ do $$ begin
   if (select count(*) from public.group_members) <> 0 then raise exception 'membros de grupos alheios visíveis'; end if;
   if (select count(*) from public.room_members) <> 1 then raise exception 'Ana vê alguém sem dividir grupo'; end if;
   if (select nick from public.room_members) <> 'Ana' then raise exception 'Bruno alterou a presença de Ana'; end if;
+  begin
+    insert into public.group_members (code) values ('PETRO7');
+    raise exception 'FALHOU: entrou em grupo direto na tabela';
+  exception when insufficient_privilege then null;
+  end;
+  if public.join_group(' petro7 ') <> 'ok' then raise exception 'Ana não entrou com o código certo'; end if;
+  if public.join_group('PETRO7') <> 'ja_membro' then raise exception 'entrar duas vezes'; end if;
 end $$;
-insert into public.group_members (code) values ('PETRO7');
 do $$ begin
   if (select count(*) from public.study_groups) <> 1 then raise exception 'Ana não vê o grupo em que entrou'; end if;
   if (select count(*) from public.group_members) <> 2 then raise exception 'Ana não vê os membros do grupo'; end if;
@@ -98,15 +115,23 @@ do $$ begin
   if (select count(*) from public.study_groups) + (select count(*) from public.group_members) <> 0 then raise exception 'Carla vê grupos alheios'; end if;
   if (select count(*) from public.room_daily_totals(35, 'America/Sao_Paulo')) <> 0 then raise exception 'Carla vê minutos de quem não é do grupo'; end if;
   begin
-    insert into public.group_members (code) values ('ZZZZZZ');
-    raise exception 'FALHOU: entrou em grupo inexistente';
-  exception when foreign_key_violation then null;
-  end;
-  begin
     insert into public.group_members (code, user_id) values ('PETRO7', '00000000-0000-0000-0000-00000000000a');
     raise exception 'FALHOU: colocou outra pessoa num grupo';
   exception when insufficient_privilege then null;
   end;
+end $$;
+-- Carla chuta códigos: 10 erros e o banco para de responder por uma hora (nem o certo passa)
+do $$ begin
+  for i in 1..10 loop
+    if public.join_group('ZZZZZ' || i) <> 'nao_encontrado' then raise exception 'código inexistente aceito'; end if;
+  end loop;
+  begin
+    perform public.join_group('PETRO7');
+    raise exception 'FALHOU: chutes de código sem limite';
+  exception when raise_exception then if sqlerrm like 'FALHOU%' then raise; end if;
+  end;
+  if (select count(*) from public.group_join_log) <> 0 then raise exception 'registro de tentativas visível'; end if;
+  if (select count(*) from public.group_members) <> 0 then raise exception 'Carla entrou no grupo'; end if;
 end $$;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
 
@@ -256,7 +281,7 @@ do $$ begin
   end;
 end $$;
 reset role;
-update public.room_members set friend_code = 'ANACODE1' where user_id = '00000000-0000-0000-0000-00000000000a';
+update public.room_members set friend_code = 'ABCDEF01' where user_id = '00000000-0000-0000-0000-00000000000a';
 set role authenticated;
 
 -- Carla (fora do grupo de Ana) não vê Ana, não chama Ana e não escreve nas notificações dela
@@ -284,8 +309,8 @@ do $$ begin
     raise exception 'FALHOU: amizade aceita sem o outro lado';
   exception when insufficient_privilege then null;
   end;
-  if public.send_friend_request('anacode1') <> 'enviado' then raise exception 'pedido de amizade não enviado'; end if;
-  if public.send_friend_request('ANACODE1') <> 'ja_pedido' then raise exception 'pedido duplicado'; end if;
+  if public.send_friend_request('abcdef01') <> 'enviado' then raise exception 'pedido de amizade não enviado'; end if;
+  if public.send_friend_request('ABCDEF01') <> 'ja_pedido' then raise exception 'pedido duplicado'; end if;
   begin
     perform public.accept_friend((select id from public.friendships limit 1));
     raise exception 'FALHOU: aceitou o próprio pedido';
@@ -336,6 +361,83 @@ do $$ begin
   if (select count(*) from public.room_members) <> 1 then raise exception 'amizade desfeita continua visível'; end if;
 end $$;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+
+-- Spam de pedidos: desfazer e pedir de novo não gera outro aviso na mesma semana
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false);
+do $$ begin
+  begin
+    perform public.send_friend_request('ABCDEF01');
+    raise exception 'FALHOU: pedido repetido logo depois de desfazer a amizade';
+  exception when raise_exception then if sqlerrm like 'FALHOU%' then raise; end if;
+  end;
+  if (select count(*) from public.friend_request_log) <> 0 then raise exception 'registro de pedidos visível'; end if;
+end $$;
+-- Bruno pede, Ana bloqueia: o pedido some e Bruno não consegue pedir de novo
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+do $$ begin
+  if public.send_friend_request('ABCDEF01') <> 'enviado' then raise exception 'pedido de Bruno não enviado'; end if;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+do $$ begin
+  perform public.block_friend((select id from public.my_friendships() where nick = 'Bruno'));
+  if exists (select 1 from public.my_friendships() where nick = 'Bruno') then raise exception 'pedido bloqueado continuou'; end if;
+  if exists (select 1 from public.notifications where kind = 'amizade' and from_user = '00000000-0000-0000-0000-00000000000b') then raise exception 'aviso do pedido bloqueado continuou'; end if;
+  if (select nick from public.my_blocks()) <> 'Bruno' then raise exception 'bloqueio não listado'; end if;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+do $$ begin
+  if (select count(*) from public.friend_blocks) <> 0 then raise exception 'Bruno vê quem o bloqueou'; end if;
+  begin
+    perform public.send_friend_request('ABCDEF01');
+    raise exception 'FALHOU: pedido de quem foi bloqueado';
+  exception when raise_exception then if sqlerrm like 'FALHOU%' then raise; end if;
+  end;
+  begin
+    perform public.block_friend(gen_random_uuid());
+    raise exception 'FALHOU: bloqueio de pedido inexistente';
+  exception when raise_exception then if sqlerrm like 'FALHOU%' then raise; end if;
+  end;
+  -- chutar códigos de amigo: 10 erros e para por uma hora
+  for i in 1..10 loop
+    if public.send_friend_request('0000000' || i) <> 'nao_encontrado' then raise exception 'código de amigo inexistente aceito'; end if;
+  end loop;
+  begin
+    perform public.send_friend_request('00000011');
+    raise exception 'FALHOU: chutes de código de amigo sem limite';
+  exception when raise_exception then if sqlerrm like 'FALHOU%' then raise; end if;
+  end;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+delete from public.friend_blocks;
+do $$ begin
+  if (select count(*) from public.my_blocks()) <> 0 then raise exception 'desbloquear falhou'; end if;
+end $$;
+
+-- Limites de tamanho e de quantidade (ninguém enche o banco sozinho)
+do $$ begin
+  begin
+    update public.profiles set name = repeat('x', 5000) where id = auth.uid();
+    raise exception 'FALHOU: nome gigante aceito';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into public.subjects (name, notes) values ('Y', repeat('x', 20000));
+    raise exception 'FALHOU: anotação gigante aceita';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.room_members set friend_code = 'QUALQUER COISA' where user_id = auth.uid();
+    raise exception 'FALHOU: código de amigo inventado';
+  exception when check_violation then null;
+  end;
+  insert into public.habits (name) select 'h' || g from generate_series(1, 200) g;
+  begin
+    insert into public.habits (name) values ('um a mais');
+    raise exception 'FALHOU: sem limite de registros';
+  exception when raise_exception then if sqlerrm like 'FALHOU%' then raise; end if;
+  end;
+  delete from public.habits;
+end $$;
 
 -- Ana: apagar conteúdo mantém a sessão como "geral"
 delete from public.topics where id = '20000000-0000-0000-0000-000000000001';
@@ -438,5 +540,34 @@ do $$ begin
   if (select count(*) from public.curriculum where subject_id is null) <> 2 then raise exception 'matriz deveria continuar, só sem a ligação com a disciplina apagada'; end if;
 end $$;
 
+-- Carla exclui a conta: some tudo dela, o grupo de Bruno e os dados de Ana continuam
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false);
+insert into public.subjects (name) values ('Física');
+select public.delete_my_account();
+reset role;
+do $$ begin
+  if exists (select 1 from auth.users where id = '00000000-0000-0000-0000-00000000000c') then raise exception 'conta não excluída'; end if;
+  if exists (select 1 from public.profiles where id = '00000000-0000-0000-0000-00000000000c')
+    or exists (select 1 from public.subjects where user_id = '00000000-0000-0000-0000-00000000000c')
+    or exists (select 1 from public.room_members where user_id = '00000000-0000-0000-0000-00000000000c')
+    or exists (select 1 from public.notifications where '00000000-0000-0000-0000-00000000000c' in (user_id, from_user))
+    or exists (select 1 from public.friend_request_log where from_user = '00000000-0000-0000-0000-00000000000c')
+    or exists (select 1 from public.group_join_log where user_id = '00000000-0000-0000-0000-00000000000c') then
+    raise exception 'dados da conta excluída continuaram';
+  end if;
+  if not exists (select 1 from auth.users where id = '00000000-0000-0000-0000-00000000000a') or not exists (select 1 from public.study_groups where code = 'PETRO7') then
+    raise exception 'excluir uma conta afetou outras pessoas';
+  end if;
+end $$;
+-- sem login, ninguém exclui nada
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+do $$ begin
+  begin
+    perform public.delete_my_account();
+    raise exception 'FALHOU: exclusão sem login';
+  exception when insufficient_privilege or raise_exception then if sqlerrm like 'FALHOU%' then raise; end if;
+  end;
+end $$;
 reset role;
 select 'RLS OK' as resultado;

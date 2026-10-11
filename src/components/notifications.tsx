@@ -81,7 +81,7 @@ export function NotificationsList() {
                 {n.body && <div className="small" style={{ marginTop: 4 }}>{n.body}</div>}
                 {n.kind === "relatorio" && (open === n.id ? <><Report d={n.data as unknown as ReportData} /><span className="row" style={{ gap: 6 }}><button className="btn sm" onClick={() => setWeek(true)}>Imprimir: esta semana + a próxima</button><button className="btn sm ghost" onClick={() => setOpen(null)}>Fechar</button></span></>
                   : <span className="row" style={{ gap: 6 }}><button className="btn sm ghost" style={{ paddingLeft: 0 }} onClick={() => setOpen(n.id)}>Ver relatório completo</button><button className="btn sm ghost" onClick={() => setWeek(true)}>Imprimir com a próxima semana</button></span>)}
-                {req && <div className="row" style={{ marginTop: 6 }}><button className="btn sm pri" onClick={() => room.acceptFriend(req.id)}>Aceitar</button><button className="btn sm ghost" onClick={() => room.removeFriend(req.id)}>Recusar</button></div>}
+                {req && <div className="row" style={{ marginTop: 6 }}><button className="btn sm pri" onClick={() => room.acceptFriend(req.id)}>Aceitar</button><button className="btn sm ghost" onClick={() => room.removeFriend(req.id)}>Recusar</button><button className="btn sm ghost" onClick={() => room.blockFriend(req.id)}>Recusar e bloquear</button></div>}
                 {n.kind === "chamado" && <div style={{ marginTop: 6 }}><Link className="btn sm" href="/sala"><Icon d={I.play} s={13} />Ir para a sala</Link></div>}
               </div>
               <button className="btn icon ghost" aria-label="Apagar notificação" onClick={() => st.remove("notifications", n.id)}><Icon d={I.trash} s={15} /></button>
