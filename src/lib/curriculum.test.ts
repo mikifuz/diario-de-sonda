@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { courseState, creditsUpTo, fillSlots, fromTemplate, requiresAll, summary, unlocksAll } from "./curriculum";
+import { courseState, creditsUpTo, fillSlots, forecast, fromTemplate, nextTerm, requiresAll, studentPhase, summary, termOf, unlocksAll, type Forecast } from "./curriculum";
 import type { Course, Subject } from "./types";
 
 const sub = (id: string, name: string): Subject => ({
@@ -88,4 +88,70 @@ test("resumo: créditos, liberadas, gargalos e semestres que faltam, com o motiv
   const fim = summary(cs.map((c) => ({ ...c, status: "aprovada" as const })));
   assert.equal(fim.minTerms, 0);
   assert.equal(fim.pct, 1);
+});
+
+/* ============ Previsão de formatura ============ */
+
+const OUT = new Date(2026, 9, 11); // 2026/2
+
+/** confere uma previsão: limite de créditos, pré-requisitos antes (correquisito pode junto) e regra dos 70% */
+function check(cs: Course[], f: Forecast) {
+  const when = new Map<string, number>();
+  cs.forEach((c) => { if (c.status === "aprovada" || c.status === "dispensada" || c.status === "cursando") when.set(c.id, -1); });
+  f.terms.forEach((t, i) => t.items.forEach((it) => when.set(it.id, i)));
+  for (const [i, t] of f.terms.entries()) {
+    assert.ok(t.credits <= f.cap, `${t.term}: ${t.credits} créditos`);
+    for (const it of t.items) {
+      const c = cs.find((x) => x.id === it.id)!;
+      if (c.kind === "vaga") continue;
+      for (const p of c.prereqs) {
+        const w = when.get(p.id);
+        assert.ok(w != null && (p.co ? w <= i : w < i), `${c.name} em ${t.term} antes de ${cs.find((x) => x.id === p.id)?.name}`);
+      }
+    }
+  }
+  const all = cs.filter((c) => c.kind !== "optativa" && c.kind !== "complementar" && !(c.kind === "extensao" && c.phase == null));
+  for (const c of all) assert.ok(when.has(c.id) || (c.kind === "vaga"), `${c.name} ficou de fora`);
+}
+
+test("semestres letivos", () => {
+  assert.equal(termOf(OUT), "2026/2");
+  assert.equal(termOf(new Date(2027, 2, 1)), "2027/1");
+  assert.equal(nextTerm("2026/2"), "2027/1");
+  assert.equal(nextTerm("2027/1"), "2027/2");
+});
+
+test("previsão conservadora e otimista no caso do dono (3ª fase, Geologia Geral e Química Orgânica II pendentes)", () => {
+  const cs = grade();
+  assert.equal(studentPhase(cs), 3);
+  const con = forecast(cs, OUT, "conservadora"), oti = forecast(cs, OUT, "otimista");
+  check(cs, con);
+  check(cs, oti);
+  assert.equal(con.stuck.length, 0);
+  assert.equal(oti.stuck.length, 0);
+  assert.ok(con.heavy.every((t) => t.credits > 28));
+  // otimista: um semestre antes (adianta e faz estágio junto com Projeto Integrado III), sem passar de 30 créditos
+  assert.equal(con.finish, "2030/2");
+  assert.equal(oti.finish, "2030/1");
+  assert.equal(oti.cap, 30);
+  assert.ok(oti.together);
+  assert.equal(con.terms[0].term, "2027/1");
+  // pendências da 3ª fase entram logo no próximo semestre
+  const first = con.terms[0].items.map((x) => x.name);
+  assert.ok(first.includes("Geologia Geral") && first.includes("Química Orgânica II"));
+  // estágio e TCC no último semestre
+  assert.deepEqual(con.terms[con.terms.length - 1].items.map((x) => x.name).sort(), ["Estágio Curricular Supervisionado", "Projeto de Conclusão de Curso"]);
+  assert.match(con.why, /não reprova/);
+  assert.ok(con.notes.some((n) => /atividades complementares/.test(n)));
+});
+
+test("previsão: tudo feito forma neste semestre; optativa aprovada ocupa a vaga", () => {
+  const cs = grade().map((c) => ({ ...c, status: c.kind === "optativa" ? c.status : ("aprovada" as const) }));
+  const f = forecast(cs, OUT, "conservadora");
+  assert.equal(f.terms.length, 0);
+  assert.equal(f.finish, "2026/2");
+  const quase = grade().map((c) => (c.name === "Geoestatística" ? { ...c, status: "aprovada" as const } : c));
+  const g = forecast(quase, OUT, "otimista");
+  const optativas = g.terms.flatMap((t) => t.items).filter((x) => /Optativa/.test(x.name));
+  assert.equal(optativas.length, 3);
 });
