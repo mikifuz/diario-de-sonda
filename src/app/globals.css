@@ -19,6 +19,15 @@ img{max-width:100%}
   --bg:#10141a; --panel:#171c24; --panel2:#1e2530; --fg:#e6ebf2; --muted:#95a2b4; --line:#2a3340;
   --accent:#6d9bff; --accent-fg:#0b1220; --ok:#4cc38a; --warn:#e0a640; --bad:#f0715c; --shadow:none; color-scheme:dark}
 
+/* Tema rosa: fofo, cantos bem redondos, bolinhas no fundo */
+:root[data-skin="rosa"]{
+  --bg:#fff0f6; --panel:#fffafc; --panel2:#ffe3ef; --fg:#4a2338; --muted:#8e5f77; --line:#f5c8dc;
+  --accent:#d6337f; --accent-fg:#ffffff; --ok:#2e9a6b; --warn:#b8720f; --bad:#d23c4b;
+  --f-display:"Fredoka","Nunito",system-ui,sans-serif; --f-body:"Nunito",system-ui,sans-serif; --f-mono:"Nunito",system-ui,sans-serif;
+  --display-case:none; --display-track:0; --display-scale:1.08;
+  --radius:16px; --fs:15px; --shadow:0 2px 0 #f7cfe0,0 6px 18px rgba(214,51,127,.08); color-scheme:light;
+  --texture:radial-gradient(rgba(214,51,127,.13) 2.2px,transparent 2.7px) 0 0/24px 24px,radial-gradient(rgba(214,51,127,.08) 2.2px,transparent 2.7px) 12px 12px/24px 24px}
+
 /* Temas próprios (visual fixo, independente do claro/escuro do sistema) */
 :root[data-skin="sonda"]{
   --bg:#1f221b; --panel:#292d23; --panel2:#33382b; --fg:#ece4cb; --muted:#a6a189; --line:#474c3b;
@@ -367,3 +376,7 @@ ul.plain{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:co
 .desk.off{filter:grayscale(1);opacity:.5}
 .desk .desk-halo{animation:deskGlow 2.8s ease-in-out infinite;transform-origin:60px 36px}
 @keyframes deskGlow{50%{opacity:.05}}
+
+/* Tema rosa: barras e etiquetas redondas (depois das regras gerais de tema) */
+:root[data-skin="rosa"] .bar{border-radius:999px}
+:root[data-skin="rosa"] .chip{border-radius:999px}
