@@ -138,6 +138,9 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
 .li .grow{flex:1;min-width:0}
 .li .t{font-weight:500;overflow-wrap:anywhere}
 .li .m{font-size:.84em;color:var(--muted)}
+/* botão que aparece ao passar o mouse na linha (ex.: "+ Amigo" na Sala); sem mouse (celular), fica sempre visível */
+@media (hover:hover){.hover-row .reveal{opacity:0;transition:opacity .15s}.hover-row:hover .reveal,.hover-row:focus-within .reveal{opacity:1}}
+.reveal-wrap:empty{display:none}
 .clickable{cursor:pointer}
 .clickable:hover .t{color:var(--accent)}
 .empty{padding:26px 18px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:var(--radius);display:flex;flex-direction:column;gap:10px;align-items:center}

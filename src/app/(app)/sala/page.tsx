@@ -7,7 +7,7 @@ import { liveMs, memberDesk, NUDGES, todayMin, useRoom, weekMin, type NudgeKey }
 import { dkey, fmtClock, fmtMin, inRange, keyDate, nf, pct, periodRange, stats, streak, todayKey, type Period, qt } from "@/lib/calc";
 import { lastTaught, studyHint, topicExams } from "@/lib/plan";
 import { ACT } from "@/lib/constants";
-import type { Activity, Session, Social } from "@/lib/types";
+import type { Activity, RoomMember, Session, Social } from "@/lib/types";
 import { ConfirmButton, Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
 import { SessionModal, SubjectModal, TopicOptions } from "@/components/modals";
 import { SessionRow } from "@/components/SessionRow";
@@ -113,6 +113,25 @@ function TopicHint({ topicId, today }: { topicId: string; today: string }) {
 }
 
 /* ============ Grupos ============ */
+/** Pedido de amizade direto para quem divide um grupo com você (sem pedir o código).
+ * Aparece ao passar o mouse; no celular (sem mouse) fica sempre visível. */
+function FriendAdd({ m }: { m: RoomMember }) {
+  const st = useStore();
+  const room = useRoom();
+  const [busy, setBusy] = useState(false);
+  if (m.user_id === st.uid || !m.friend_code) return null;
+  const f = room.friends.find((x) => x.other === m.user_id);
+  if (f?.status === "aceito") return null;
+  if (f && !f.incoming) return <span className="small muted reveal" title={`Você já mandou um pedido para ${m.nick}`}>pedido enviado</span>;
+  if (f) return <button className="btn sm pri" onClick={() => room.acceptFriend(f.id)} title={`${m.nick} quer ser seu amigo`}>Aceitar amizade</button>;
+  const send = async () => { setBusy(true); await room.sendFriend(m.friend_code!); setBusy(false); };
+  return (
+    <button className="btn sm ghost reveal" disabled={busy} onClick={send} title={`Mandar um pedido de amizade para ${m.nick}`} aria-label={`Adicionar ${m.nick} como amigo`}>
+      <Icon d={I.plus} s={12} />Amigo
+    </button>
+  );
+}
+
 function GroupsArea() {
   const st = useStore();
   const room = useRoom();
@@ -167,12 +186,13 @@ function GroupsArea() {
             {now.length ? (
               <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 10 }}>
                 {now.map((m) => (
-                  <div key={m.user_id} className="panel" style={{ padding: 14, background: "var(--panel2)", outline: isMe(m.user_id) ? "1px solid var(--accent)" : undefined }}>
+                  <div key={m.user_id} className="panel hover-row" style={{ padding: 14, background: "var(--panel2)", outline: isMe(m.user_id) ? "1px solid var(--accent)" : undefined }}>
                     <div style={{ display: "grid", placeItems: "center", marginBottom: 8 }}><Desk state={desk(m)!} size={130} label={`${m.nick}: ${m.studying ? "estudando, abajur aceso" : "parou há pouco, abajur apagado"}`} /></div>
                     <div className="row between" style={{ flexWrap: "nowrap" }}>
                       <b className="t" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.nick}{isMe(m.user_id) ? " (você)" : ""}</b>
                       <i className="dot" style={{ background: m.studying ? "var(--ok)" : "var(--muted)", animation: m.studying ? "blink 1.6s infinite" : undefined }} />
                     </div>
+                    <div className="reveal-wrap" style={{ marginTop: 6 }}><FriendAdd m={m} /></div>
                     {m.studying || m.paused
                       ? <div className="num" style={{ fontSize: "1.6rem", marginTop: 6 }}>{fmtClock(liveMs(m))}</div>
                       : <div className="num" style={{ fontSize: "1.6rem", marginTop: 6, color: "var(--muted)" }}>{fmtMin(todayMin(m, room.totals[m.user_id]))}</div>}
@@ -185,12 +205,13 @@ function GroupsArea() {
             <div className="list">{rank.map((m, i) => {
               const v = val(m), sk = streak(room.totals[m.user_id] || {}, m.studying);
               return (
-                <div key={m.user_id} className="li" style={isMe(m.user_id) ? { background: "color-mix(in srgb,var(--accent) 8%,transparent)" } : undefined}>
+                <div key={m.user_id} className="li hover-row" style={isMe(m.user_id) ? { background: "color-mix(in srgb,var(--accent) 8%,transparent)" } : undefined}>
                   <span className="num" style={{ width: "2ch", textAlign: "right", color: i < 3 && v > 0 ? "var(--accent)" : "var(--muted)" }}>{i + 1}</span>
                   <div className="grow">
                     <div className="row between" style={{ flexWrap: "nowrap" }}><span className="t">{m.nick}{isMe(m.user_id) ? " (você)" : ""}</span><span className="num">{fmtMin(v)}</span></div>
                     <div className="bar" style={{ marginTop: 5 }}><i style={{ width: `${(v / top) * 100}%`, background: isMe(m.user_id) ? "var(--accent)" : "var(--muted)" }} /></div>
                   </div>
+                  <FriendAdd m={m} />
                   <span className={"chip " + (sk >= 3 ? "warn" : "")} title="Dias seguidos com estudo">{sk} dia{sk === 1 ? "" : "s"}</span>
                 </div>
               );
@@ -248,7 +269,7 @@ function FriendsPanel() {
       {outgoing.map((f) => (
         <div key={f.id} className="li small"><div className="grow muted">Pedido enviado para {f.nick}</div><button className="btn sm ghost" onClick={() => room.removeFriend(f.id)}>Cancelar</button></div>
       ))}
-      {!room.friends.length && <p className="small muted" style={{ margin: "0 0 8px" }}>Passe seu código para um colega, ou digite o código dele. Amigos veem um ao outro na sala (como num grupo) e podem se chamar para estudar.</p>}
+      {!room.friends.length && <p className="small muted" style={{ margin: "0 0 8px" }}>Passe seu código para um colega, ou digite o código dele. Quem já está num grupo com você dá para adicionar direto: passe o mouse no nome dele e toque em "+ Amigo". Amigos veem um ao outro na sala (como num grupo) e podem se chamar para estudar.</p>}
       <form className="row" style={{ marginTop: 8, flexWrap: "nowrap" }} onSubmit={add}><input type="text" maxLength={8} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Código de amigo" aria-label="Código de amigo" style={{ fontFamily: "var(--f-mono)" }} /><button className="btn sm">Adicionar</button></form>
       {room.blocks.length > 0 && <details className="small" style={{ marginTop: 10 }}><summary>{qt(room.blocks.length, "pessoa bloqueada", "pessoas bloqueadas")}</summary>
         {room.blocks.map((b) => <div key={b.blocked} className="li small"><div className="grow muted">{b.nick}</div><button className="btn sm ghost" onClick={() => room.unblock(b.blocked)}>Desbloquear</button></div>)}
