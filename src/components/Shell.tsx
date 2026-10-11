@@ -10,6 +10,7 @@ import { Brand } from "./Brand";
 import { Icon, useNow } from "./ui";
 import { EvalModal } from "./modals";
 import { useWeeklyReport } from "./notifications";
+import { DEMO_FLAG } from "@/lib/demo";
 
 function TimerPill() {
   const st = useStore();
@@ -59,7 +60,7 @@ export function Shell({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <div className="foot">
-          <div className="store-badge"><i className="dot" style={{ background: st.ready ? "var(--ok)" : "var(--muted)" }} />{st.ready ? "Sincronizado" : "Carregando…"}</div>
+          <div className="store-badge"><i className="dot" style={{ background: st.demo ? "var(--warn)" : st.ready ? "var(--ok)" : "var(--muted)" }} />{st.demo ? "Nada é salvo" : st.ready ? "Sincronizado" : "Carregando…"}</div>
           <div className="small muted" style={{ overflowWrap: "anywhere" }}>{st.email}</div>
         </div>
       </aside>
@@ -69,6 +70,16 @@ export function Shell({ children }: { children: ReactNode }) {
           <TimerPill />
           <Link className="btn icon ghost show-m" href="/configuracoes" aria-label="Configurações"><Icon d={PAGES[PAGES.length - 1].ic} s={20} /></Link>
         </header>
+        {st.demo && (
+          <div className="banner" role="note" style={{ margin: "12px 16px 0" }}>
+            <b>Modo demonstração</b>
+            <span>Dados de exemplo, só nesta aba: nada é salvo e tudo some ao sair. Pode mexer à vontade.</span>
+            <span className="row" style={{ marginLeft: "auto", gap: 6 }}>
+              <button className="btn sm pri" onClick={() => { try { sessionStorage.removeItem(DEMO_FLAG); } catch { /* sem armazenamento */ } window.location.href = "/entrar"; }}>Criar minha conta</button>
+              <button className="btn sm ghost" onClick={() => { try { sessionStorage.removeItem(DEMO_FLAG); } catch { /* sem armazenamento */ } window.location.href = "/entrar"; }}>Sair da demonstração</button>
+            </span>
+          </div>
+        )}
         <main>{st.ready ? children : <div className="empty"><b>Abrindo o diário…</b><span>Carregando seus registros.</span></div>}</main>
       </div>
       <nav className="mobile-nav" aria-label="Navegação">

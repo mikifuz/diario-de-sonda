@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { configured, friendlyError, sb } from "@/lib/supabase";
 import { Brand, NotConfigured } from "@/components/Brand";
 import { Tabs } from "@/components/ui";
+import Link from "next/link";
+import { DEMO_FLAG } from "@/lib/demo";
 
 type Mode = "entrar" | "criar" | "esqueci";
 
@@ -17,6 +19,8 @@ export default function Entrar() {
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
 
   useEffect(() => {
+    // entrar de verdade sai do modo demonstração
+    try { sessionStorage.removeItem(DEMO_FLAG); } catch { /* sem armazenamento */ }
     if (!configured) return;
     sb().auth.getSession().then(({ data }) => { if (data.session) router.replace("/painel"); });
   }, [router]);
@@ -70,6 +74,7 @@ export default function Entrar() {
           {mode === "esqueci"
             ? <button type="button" className="btn ghost sm" onClick={() => { setMode("entrar"); setMsg(null); }}>Voltar para entrar</button>
             : <button type="button" className="btn ghost sm" onClick={() => { setMode("esqueci"); setMsg(null); }}>Esqueci minha senha</button>}
+          <Link className="btn ghost sm" href="/demo">Ver demonstração sem conta</Link>
         </div>
       </div>
     </div>

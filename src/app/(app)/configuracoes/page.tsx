@@ -9,6 +9,7 @@ import { convertLegacy, isLegacyExport } from "@/lib/legacy";
 import type { Profile, Skin } from "@/lib/types";
 import { ConfirmButton, I, Icon } from "@/components/ui";
 import { DEFAULT_MASTERY, masteryCfg, type MasteryCfg } from "@/lib/mastery";
+import { DEMO_FLAG } from "@/lib/demo";
 
 // ordem das chaves estrangeiras: conteúdos apontam para provas, erros para sessões, revisões para erros
 const ORDER: Table[] = ["subjects", "assessments", "topics", "study_sessions", "events", "routine_blocks", "mistakes", "review_items", "review_logs", "tasks"];
@@ -135,27 +136,30 @@ export default function Configuracoes() {
           <p className="small" style={{ margin: 0 }}>Seus registros acadêmicos são privados: nenhuma outra conta consegue lê-los. Na sala de estudos aparecem só o apelido, a presença e os minutos por dia.</p>
           <div className="row">
             <button className="btn" onClick={exportData} disabled={!!busy}>Exportar cópia (JSON)</button>
-            <button className="btn" onClick={() => fileRef.current?.click()} disabled={!!busy}>Importar cópia</button>
+            <button className="btn" onClick={() => fileRef.current?.click()} disabled={!!busy || st.demo} title={st.demo ? "Indisponível na demonstração" : undefined}>Importar cópia</button>
             <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => { const file = e.target.files?.[0]; if (file) importFile(file); }} />
             {busy && <span className="small muted">{busy}</span>}
           </div>
           <p className="small muted" style={{ margin: 0 }}>A importação aceita a cópia exportada desta versão e a da primeira versão (a página publicada no Claude, em Configurações → Exportar cópia). Importar duas vezes a cópia antiga duplica os registros.</p>
-          <div className="row" style={{ borderTop: "1px solid var(--line)", paddingTop: 12, marginTop: 4 }}>
+          {st.demo && <p className="small" style={{ margin: 0 }}>Na demonstração, importar e apagar ficam desligados: os dados são de exemplo e já somem ao sair.</p>}
+          {!st.demo && <div className="row" style={{ borderTop: "1px solid var(--line)", paddingTop: 12, marginTop: 4 }}>
             <ConfirmButton small label="Apagar todos os meus dados" question="Isto apaga disciplinas, sessões, notas, eventos, rotina, erros, revisões e tarefas. Exporte uma cópia antes se quiser guardar." confirmLabel="Apagar tudo" onConfirm={wipe} />
-          </div>
+          </div>}
         </div>
       </section>
       <section className="panel">
         <div className="panel-h"><h2>Conta</h2></div>
         <div className="row between">
           <span className="small">Conectado como <b>{st.email}</b></span>
-          <button className="btn" onClick={async () => { const { error } = await sb().auth.signOut(); if (error) st.toast(friendlyError(error)); }}><Icon d={I.logout} s={15} />Sair</button>
+          {st.demo
+            ? <button className="btn" onClick={() => { try { sessionStorage.removeItem(DEMO_FLAG); } catch { /* sem armazenamento */ } window.location.href = "/entrar"; }}><Icon d={I.logout} s={15} />Sair da demonstração</button>
+            : <button className="btn" onClick={async () => { const { error } = await sb().auth.signOut(); if (error) st.toast(friendlyError(error)); }}><Icon d={I.logout} s={15} />Sair</button>}
         </div>
       </section>
       <section className="panel">
         <div className="panel-h"><h2>Próximas etapas</h2><span className="lbl">ainda não disponíveis</span></div>
         <div className="grid g2 small">
-          <div><b>Análise de desempenho</b><p className="muted" style={{ margin: ".3em 0 0" }}>Relatórios e modo demonstração. O banco de erros, a revisão espaçada, o plano do dia, o planejamento reverso das provas, o índice de domínio e os alertas já estão disponíveis.</p></div>
+          <div><b>Análise de desempenho</b><p className="muted" style={{ margin: ".3em 0 0" }}>Relatórios mais completos. O banco de erros, a revisão espaçada, o plano do dia, o planejamento reverso das provas, o índice de domínio e os alertas já estão disponíveis.</p></div>
           <div><b>Inteligência artificial</b><p className="muted" style={{ margin: ".3em 0 0" }}>Gerador de simulados com gabarito e resolução, correção assistida de resoluções enviadas por foto e assistente que consulta seus dados.</p></div>
           <div><b>Engenharia de Petróleo</b><p className="muted" style={{ margin: ".3em 0 0" }}>Biblioteca de fórmulas com unidades, conversor SI ↔ unidades de campo (bbl, psi, ft, mD, cP, °API), verificação dimensional e histórico da graduação.</p></div>
           <div><b>Biblioteca de materiais</b><p className="muted" style={{ margin: ".3em 0 0" }}>Planos de ensino, listas e provas antigas por disciplina, que depois servirão de base para os simulados.</p></div>

@@ -15,7 +15,7 @@ export function useWeeklyReport() {
   const st = useStore();
   const tried = useRef("");
   useEffect(() => {
-    if (!st.ready) return;
+    if (!st.ready || st.demo) return; // a demonstração já vem com o relatório
     const { week } = reportWeek(todayKey(), new Date().getHours());
     if (tried.current === week || st.notes.some((n) => n.kind === "relatorio" && n.data.week === week)) return;
     tried.current = week;
@@ -59,6 +59,7 @@ export function NotificationsList() {
   useEffect(() => {
     const unread = st.notes.filter((n) => !n.read_at);
     // update (não upsert): notificações de amigos não podem ser "recriadas" pela própria pessoa
+    if (unread.length && st.demo) { st.saveMany("notifications", unread.map((n) => ({ ...n, read_at: new Date().toISOString() }))); return; }
     if (unread.length) sb().from("notifications").update({ read_at: new Date().toISOString() }).in("id", unread.map((n) => n.id)).then(() => st.reload("notifications"));
   }, [st.notes]); // eslint-disable-line react-hooks/exhaustive-deps
   const [open, setOpen] = useState<string | null>(null);

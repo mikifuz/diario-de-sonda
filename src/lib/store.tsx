@@ -3,6 +3,7 @@
 // grava de forma otimista e escuta mudanças feitas em outros aparelhos.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { sb, friendlyError } from "./supabase";
+import type { DemoData } from "./demo";
 import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic, AppNotification } from "./types";
 
 export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs" | "tasks" | "notifications";
@@ -25,6 +26,8 @@ const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], ass
 
 export interface Store extends Data {
   uid: string;
+  /** modo demonstração: dados só na memória, nada vai para o banco */
+  demo: boolean;
   email: string;
   ready: boolean;
   save: <T extends Table>(table: T, row: RowOf[T]) => Promise<boolean>;
@@ -68,9 +71,10 @@ const COLS: Record<Table, string> = {
   notifications: "id,kind,title,body,data,from_user,created_at,read_at",
 };
 
-export function DataProvider({ uid, email, children, onToast }: { uid: string; email: string; children: ReactNode; onToast: (m: string) => void }) {
-  const [data, setData] = useState<Data>(EMPTY);
-  const [ready, setReady] = useState(false);
+export function DataProvider({ uid, email, children, onToast, demo }: { uid: string; email: string; children: ReactNode; onToast: (m: string) => void; demo?: DemoData }) {
+  const [data, setData] = useState<Data>(() => (demo ? { ...EMPTY, ...demo } : EMPTY));
+  const [ready, setReady] = useState(!!demo);
+  const isDemo = !!demo;
   const [evalId, setEvalId] = useState<string | null>(null);
   const dataRef = useRef(data);
   dataRef.current = data;
@@ -103,16 +107,18 @@ export function DataProvider({ uid, email, children, onToast }: { uid: string; e
   }, [uid]);
 
   const reload = useCallback(async (t?: Table | "profiles") => {
+    if (isDemo) return;
     const all: (Table | "profiles")[] = t ? [t] : ["profiles", ...TABLES];
     try {
       await Promise.all(all.map(fetchTable));
     } catch (e) {
       toast(friendlyError(e as { message?: string }));
     }
-  }, [fetchTable, toast]);
+  }, [fetchTable, toast, isDemo]);
 
   // carga inicial + tempo real para os próprios dados (outros aparelhos)
   useEffect(() => {
+    if (isDemo) return;
     let alive = true;
     reload().then(() => alive && setReady(true));
     const timers: Record<string, ReturnType<typeof setTimeout>> = {};
@@ -125,7 +131,7 @@ export function DataProvider({ uid, email, children, onToast }: { uid: string; e
     const onVis = () => { if (document.visibilityState === "visible") reload(); };
     document.addEventListener("visibilitychange", onVis);
     return () => { alive = false; sb().removeChannel(ch); document.removeEventListener("visibilitychange", onVis); Object.values(timers).forEach(clearTimeout); };
-  }, [uid, reload]);
+  }, [uid, reload, isDemo]);
 
   const localPut = <T extends Table>(t: T, rows: RowOf[T][]) =>
     setData((d) => {
@@ -141,15 +147,17 @@ export function DataProvider({ uid, email, children, onToast }: { uid: string; e
   const saveMany = useCallback(async <T extends Table>(t: T, rows: RowOf[T][]) => {
     if (!rows.length) return true;
     localPut(t, rows);
+    if (isDemo) return true;
     const { error } = await sb().from(t).upsert(rows as never[]);
     if (error) { toast(friendlyError(error)); reload(t); return false; }
     return true;
-  }, [reload, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [reload, toast, isDemo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = useCallback(<T extends Table>(t: T, row: RowOf[T]) => saveMany(t, [row]), [saveMany]);
 
   const remove = useCallback(async (t: Table, id: string) => {
     setData((d) => ({ ...d, [KEY[t]]: (d[KEY[t]] as { id: string }[]).filter((x) => x.id !== id) }));
+    if (isDemo) { setData((d) => demoCascade(d, t, id)); return true; }
     const { error } = await sb().from(t).delete().eq("id", id);
     if (error) { toast(friendlyError(error)); reload(t); return false; }
     // cascatas do banco: atualiza tabelas dependentes
@@ -163,14 +171,15 @@ export function DataProvider({ uid, email, children, onToast }: { uid: string; e
     };
     deps[t]?.forEach((x) => reload(x));
     return true;
-  }, [reload, toast]);
+  }, [reload, toast, isDemo]);
 
   const updateProfile = useCallback(async (patch: Partial<Profile>) => {
     setData((d) => (d.profile ? { ...d, profile: { ...d.profile, ...patch } } : d));
+    if (isDemo) return true;
     const { error } = await sb().from("profiles").update(patch).eq("id", uid);
     if (error) { toast(friendlyError(error)); reload("profiles"); return false; }
     return true;
-  }, [uid, reload, toast]);
+  }, [uid, reload, toast, isDemo]);
 
   // cronômetro (guardado no perfil para continuar entre aparelhos)
   const startTimer = useCallback((subject_id: string, topic_id: string | null, activity: Timer["activity"], social: Social) => {
@@ -206,11 +215,29 @@ export function DataProvider({ uid, email, children, onToast }: { uid: string; e
   }, [save, toast, updateProfile]);
 
   const value = useMemo<Store>(() => ({
-    ...data, uid, email, ready, save, saveMany, remove, updateProfile, reload, toast, evalId, setEvalId,
+    ...data, uid, email, ready, demo: isDemo, save, saveMany, remove, updateProfile, reload, toast, evalId, setEvalId,
     startTimer, setSocial, pauseTimer, resumeTimer, stopTimer, discardTimer,
-  }), [data, uid, email, ready, save, saveMany, remove, updateProfile, reload, toast, evalId, startTimer, setSocial, pauseTimer, resumeTimer, stopTimer, discardTimer]);
+  }), [data, uid, email, ready, isDemo, save, saveMany, remove, updateProfile, reload, toast, evalId, startTimer, setSocial, pauseTimer, resumeTimer, stopTimer, discardTimer]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+/** Demonstração: imita as cascatas do banco ao apagar (só na memória) */
+function demoCascade(d: Data, t: Table, id: string): Data {
+  const x = { ...d };
+  if (t === "subjects") {
+    const keep = <R extends { subject_id?: string | null }>(rs: R[]) => rs.filter((r) => r.subject_id !== id);
+    Object.assign(x, { topics: keep(x.topics), sessions: keep(x.sessions), assessments: keep(x.assessments), events: keep(x.events), blocks: keep(x.blocks), mistakes: keep(x.mistakes), reviews: keep(x.reviews), todos: keep(x.todos) });
+  }
+  if (t === "topics") {
+    const un = <R extends { topic_id: string | null }>(rs: R[]) => rs.map((r) => (r.topic_id === id ? { ...r, topic_id: null } : r));
+    Object.assign(x, { sessions: un(x.sessions), mistakes: un(x.mistakes), reviews: un(x.reviews), topics: x.topics.map((tp) => (tp.parent_id === id ? { ...tp, parent_id: null } : tp)) });
+  }
+  if (t === "assessments") Object.assign(x, { topics: x.topics.map((tp) => (tp.assessment_id === id ? { ...tp, assessment_id: null } : tp)), reviews: x.reviews.map((r) => (r.assessment_id === id ? { ...r, assessment_id: null } : r)), assessments: x.assessments.map((a) => (a.sub_id === id ? { ...a, sub_id: null } : a)) });
+  if (t === "mistakes") x.reviews = x.reviews.filter((r) => r.mistake_id !== id);
+  const items = new Set(x.reviews.map((r) => r.id));
+  x.reviewLogs = x.reviewLogs.filter((l) => items.has(l.item_id));
+  return x;
 }
 
 /* ============ Seletores ============ */

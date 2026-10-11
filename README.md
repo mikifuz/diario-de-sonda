@@ -12,6 +12,7 @@ Acompanhamento de estudos universitários, pensado para Engenharia de Petróleo.
 | Calendário | Visão mensal, itens por dia, próximos 30 dias; provas que "contam na média" vão direto para as notas |
 | Sala de estudos | Cronômetro com pausa que continua entre aparelhos e, ao começar, a escolha de entrar na sala (com ou sem a matéria) ou estudar sozinho; registro manual; autoavaliação rápida; histórico de sessões. Sala só por grupos (código de convite) e amigos (código de amigo, "chamar para estudar" com mensagens prontas): quem está estudando agora, placar do dia e da semana, sequência de dias |
 | Notificações | Relatório da semana todo domingo de manhã (horas, acerto × confiança, erros, provas da semana seguinte), pedidos de amizade e chamados para estudar |
+| Demonstração | Em `/demo` (link "Ver demonstração sem conta" na tela de login): um semestre de exemplo com 4 disciplinas, sessões, erros, revisões, rotina, sala e notificações, tudo só na memória da aba e marcado com uma faixa; nada é salvo |
 | Conta | Login por e-mail e senha, recuperação de senha, 5 temas visuais, exportar e importar dados (inclusive da primeira versão) |
 
 ## Privacidade
@@ -94,7 +95,7 @@ Ao rodar localmente, adicione `http://localhost:3000/**` às Redirect URLs do Su
 
 ## Próximas etapas
 
-1. **Análise de desempenho**: índice de domínio por conteúdo com metodologia configurável, banco de erros, revisão espaçada, planejamento reverso, relatórios.
+1. **Análise de desempenho**: concluída (falta só a rodada de testes com o dono).
 2. **Inteligência artificial** (chave de API só no servidor): simulados com gabarito e resolução em PDF, correção assistida, assistente que consulta os dados.
 3. **Engenharia de Petróleo**: biblioteca de fórmulas com unidades, conversor SI ↔ unidades de campo, verificação dimensional, histórico da graduação.
 4. **Biblioteca** de materiais por disciplina (Supabase Storage).
