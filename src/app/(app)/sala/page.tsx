@@ -120,13 +120,13 @@ function GroupsArea() {
   if (!room.ready) return null;
 
   if (!me) {
-    const join = async (e: FormEvent) => { e.preventDefault(); if (!nick.trim()) { st.toast("Escolha um apelido."); return; } if (await room.join(nick, false)) st.toast("Pronto. Agora crie um grupo ou entre com um código."); };
+    const join = async (e: FormEvent) => { e.preventDefault(); if (!nick.trim()) { st.toast("Escolha um apelido."); return; } if (await room.join(nick, false)) st.toast("Pronto. Agora entre num grupo (com o código de um colega) ou crie o seu."); };
     return (
       <section className="grid g2">
         <div className="panel stack" style={{ gap: 14 }}>
           <span className="lbl">Estudar junto</span>
           <h2>Sala de estudos em grupo</h2>
-          <p style={{ margin: 0, maxWidth: "60ch" }}>Crie um grupo com seus colegas (ou entre com o código de um grupo) para ver quem está estudando agora e o placar do dia e da semana. Só quem está no mesmo grupo vê você.</p>
+          <p style={{ margin: 0, maxWidth: "60ch" }}>Escolha um apelido e depois entre no grupo de um colega (com o código dele) ou crie o seu, para ver quem está estudando agora e o placar do dia e da semana. Só quem está no mesmo grupo vê você.</p>
           <form className="row" style={{ flexWrap: "nowrap" }} onSubmit={join}>
             <input type="text" maxLength={30} required value={nick} onChange={(e) => setNick(e.target.value)} placeholder="Seu apelido, ex.: Mica" aria-label="Apelido" />
             <button className="btn pri">Entrar na sala</button>
@@ -187,7 +187,7 @@ function GroupsArea() {
             <p className="small muted" style={{ margin: "10px 0 0" }}>A semana começa na segunda-feira. O placar soma as sessões salvas (inclusive as feitas &quot;só para mim&quot;) e o cronômetro em andamento de quem está visível.</p>
           </>
         ) : (
-          <Empty title="Você ainda não está em nenhum grupo">Crie um grupo e passe o código para os colegas, ou entre com o código de um grupo. Ninguém te vê até vocês estarem no mesmo grupo.</Empty>
+          <Empty title="Você ainda não está em nenhum grupo">Use os botões "Entrar num grupo" (se um colega já te passou o código) ou "Criar um grupo" (se ninguém criou ainda). Ninguém te vê até vocês estarem no mesmo grupo.</Empty>
         )}
       </div>
       <div className="stack" style={{ gap: 16 }}>
@@ -249,8 +249,9 @@ function GroupsPanel({ onPick, cur }: { onPick: (c: string) => void; cur?: strin
   const room = useRoom();
   const [gName, setGName] = useState("");
   const [gCode, setGCode] = useState("");
-  const newGroup = async (e: FormEvent) => { e.preventDefault(); if (!gName.trim()) return; const code = await room.createGroup(gName); if (code) { setGName(""); onPick(code); st.toast(`Grupo criado. Código: ${code}`); } };
-  const joinGroup = async (e: FormEvent) => { e.preventDefault(); const c = gCode.trim().toUpperCase(); if (room.myGroups.some((x) => x.code === c)) { st.toast("Você já está nesse grupo."); return; } if (await room.joinGroup(c)) { setGCode(""); onPick(c); st.toast("Você entrou no grupo."); } };
+  const [mode, setMode] = useState<"entrar" | "criar" | null>(null);
+  const newGroup = async (e: FormEvent) => { e.preventDefault(); if (!gName.trim()) return; const code = await room.createGroup(gName); if (code) { setGName(""); setMode(null); onPick(code); st.toast(`Grupo criado. Passe o código ${code} para os colegas.`); } };
+  const joinGroup = async (e: FormEvent) => { e.preventDefault(); const c = gCode.trim().toUpperCase(); if (room.myGroups.some((x) => x.code === c)) { st.toast("Você já está nesse grupo."); return; } if (await room.joinGroup(c)) { setGCode(""); setMode(null); onPick(c); st.toast("Você entrou no grupo."); } };
   const copy = (code: string) => { try { navigator.clipboard.writeText(code).then(() => st.toast(`Código ${code} copiado.`), () => st.toast(`Código do grupo: ${code}`)); } catch { st.toast(`Código do grupo: ${code}`); } };
   return (
     <div className="panel">
@@ -264,8 +265,20 @@ function GroupsPanel({ onPick, cur }: { onPick: (c: string) => void; cur?: strin
           </div>
         ))}</div>
       )}
-      <form className="row" style={{ marginTop: 10, flexWrap: "nowrap" }} onSubmit={newGroup}><input type="text" maxLength={40} value={gName} onChange={(e) => setGName(e.target.value)} placeholder="Nome do novo grupo" aria-label="Nome do novo grupo" required /><button className="btn sm">Criar</button></form>
-      <form className="row" style={{ marginTop: 8, flexWrap: "nowrap" }} onSubmit={joinGroup}><input type="text" maxLength={6} value={gCode} onChange={(e) => setGCode(e.target.value.toUpperCase())} placeholder="Código, ex.: PETRO7" aria-label="Código do grupo" required style={{ fontFamily: "var(--f-mono)" }} /><button className="btn sm">Entrar</button></form>
+      {/* uma coisa de cada vez: entrar OU criar */}
+      <div className="grid g2" style={{ gap: 8, marginTop: room.myGroups.length ? 12 : 0 }}>
+        <button type="button" className={"btn" + (mode === "entrar" ? " pri" : "")} aria-pressed={mode === "entrar"} onClick={() => setMode(mode === "entrar" ? null : "entrar")}>Entrar num grupo</button>
+        <button type="button" className={"btn" + (mode === "criar" ? " pri" : "")} aria-pressed={mode === "criar"} onClick={() => setMode(mode === "criar" ? null : "criar")}>Criar um grupo</button>
+      </div>
+      {!mode && <p className="small muted" style={{ margin: "8px 0 0" }}>Escolha só um: se um colega já criou o grupo, <b>entre</b> com o código que ele passou. Se ninguém criou ainda, <b>crie</b> e passe o código para os colegas.</p>}
+      {mode === "entrar" && <form className="stack" style={{ gap: 6, marginTop: 10 }} onSubmit={joinGroup}>
+        <span className="small">Digite o código de 6 letras que seu colega passou:</span>
+        <div className="row" style={{ flexWrap: "nowrap" }}><input type="text" maxLength={6} value={gCode} onChange={(e) => setGCode(e.target.value.toUpperCase())} placeholder="Ex.: PETRO7" aria-label="Código do grupo" required autoFocus style={{ fontFamily: "var(--f-mono)" }} /><button className="btn pri sm">Entrar</button></div>
+      </form>}
+      {mode === "criar" && <form className="stack" style={{ gap: 6, marginTop: 10 }} onSubmit={newGroup}>
+        <span className="small">Dê um nome ao grupo. O app cria um código para você passar aos colegas:</span>
+        <div className="row" style={{ flexWrap: "nowrap" }}><input type="text" maxLength={40} value={gName} onChange={(e) => setGName(e.target.value)} placeholder="Ex.: Turma Petróleo 3ª fase" aria-label="Nome do novo grupo" required autoFocus /><button className="btn pri sm">Criar</button></div>
+      </form>}
       <p className="small muted" style={{ margin: "8px 0 0" }}>O código é a chave do grupo: passe só para quem você quer que veja seus horários de estudo.</p>
     </div>
   );

@@ -430,3 +430,17 @@ export function studyHint(taughtOn: string | null, exam: { name: string; date: s
   const txt = [examPart, classPart].filter(Boolean).join(" · ");
   return txt ? txt.charAt(0).toUpperCase() + txt.slice(1) + "." : "";
 }
+
+/** Plano de vários dias seguidos (folha da semana). Cada revisão entra só no primeiro dia em que couber;
+ *  `extraFor` dá os pedaços do planejamento reverso de cada dia. */
+export function planWeek(base: PlanInput, days: string[], extraFor: (day: string) => Task[]): { day: string; plan: DayPlan }[] {
+  let items = base.items;
+  const out: { day: string; plan: DayPlan }[] = [];
+  for (const day of days) {
+    const plan = planDay({ ...base, today: day, nowMin: day === base.today ? base.nowMin : 0, items, extra: extraFor(day) });
+    const placed = new Set(plan.slots.flatMap((s) => s.placed.map((p) => p.task.item_id)).filter(Boolean) as string[]);
+    items = items.filter((i) => !placed.has(i.id));
+    out.push({ day, plan });
+  }
+  return out;
+}
