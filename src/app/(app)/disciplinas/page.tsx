@@ -31,7 +31,8 @@ export default function Disciplinas() {
               const next = items.filter((a) => (a.kind === "prova" || a.kind === "sub") && a.grade == null && a.status !== "cancelado" && a.date && a.date >= today)
                 .sort((a, b) => a.date!.localeCompare(b.date!))[0];
               const dd = next ? daysBetween(today, next.date!) : null;
-              const sl = s.recovery === "sub" && r.sub?.need != null && r.final != null ? subLine(r) : null;
+              const subNeed = r.final != null ? r.subs.find((x) => x.need != null && x.value == null) : undefined;
+              const sl = subNeed ? subLine(r, undefined, subNeed) : null;
               const open = () => router.push(`/disciplinas/${s.id}#notas`);
               return (
                 <tr key={s.id} className="clickable" tabIndex={0} onClick={open} onKeyDown={(e) => { if (e.key === "Enter") open(); }}>

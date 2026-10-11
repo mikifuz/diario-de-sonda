@@ -3,7 +3,7 @@
 // conteúdos com a data da aula e a prova em que caem, e as provas em Notas. Prévia antes de gravar.
 import { useState } from "react";
 import { useStore } from "@/lib/store";
-import { buildPlan, classify, KIND_LABEL, norm, rowsFromText, type Entry, type EntryKind } from "@/lib/syllabus";
+import { buildPlan, classify, KIND_LABEL, norm, rowsFromText, subCoverage, type Entry, type EntryKind } from "@/lib/syllabus";
 import type { Assessment, Subject, Topic } from "@/lib/types";
 import { Modal } from "./ui";
 
@@ -49,10 +49,26 @@ export function ImportSyllabusModal({ s, onClose }: { s: Subject; onClose: () =>
         const ex = mine.find((a) => norm(a.name) === x.key || (a.date === x.date && a.kind === kind));
         if (ex) { examId.set(x.key, ex.id); if (!ex.date) newExams.push({ ...ex, date: x.date }); continue; }
         const row: Assessment = { id: crypto.randomUUID(), subject_id: s.id, name: x.name.slice(0, 120), kind, date: x.date, time: null, weight: x.weight ?? 1,
-          grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "" };
+          grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "", sub_id: null };
         newExams.push(row); examId.set(x.key, row.id);
       }
+      // "Tem SUB?": cada prova fica ligada à SUB que pode substituí-la (só se ainda não tiver)
+      const cov = subCoverage(plan.exams);
+      const rowOf = (key: string) => newExams.find((a) => a.id === examId.get(key)) ?? mine.find((a) => a.id === examId.get(key));
+      for (const [subKey, provaKeys] of cov) {
+        const subId = examId.get(subKey);
+        for (const k of provaKeys) {
+          const row = rowOf(k);
+          if (!row || row.sub_id || !subId) continue;
+          const upd = { ...row, sub_id: subId };
+          const i = newExams.findIndex((a) => a.id === row.id);
+          if (i >= 0) newExams[i] = upd; else newExams.push(upd);
+        }
+      }
+      // SUBs precisam existir antes das provas que apontam para elas
+      newExams.sort((a, b) => Number(b.kind === "sub") - Number(a.kind === "sub"));
       if (newExams.length && !(await st.saveMany("assessments", newExams))) return;
+      if (plan.exams.some((x) => x.kind === "sub") && s.recovery === "nenhuma") await st.save("subjects", { ...s, recovery: "sub", exam_enabled: false });
 
       const ts = st.topics.filter((t) => t.subject_id === s.id);
       let pos = ts.length;

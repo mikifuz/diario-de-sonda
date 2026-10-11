@@ -108,14 +108,15 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
   const subOffers = activeSubjects(st.subjects).flatMap((s) => {
     if (s.recovery !== "sub") return [];
     const items = st.assessments.filter((a) => a.subject_id === s.id);
-    const sub = items.find((a) => a.kind === "sub" && a.grade == null && a.date && a.date >= today);
-    // só depois da última prova: antes disso, reativar faria o conteúdo acumular
-    const provaPending = items.some((a) => a.kind === "prova" && a.grade == null && a.status !== "cancelado" && (!a.date || a.date >= today));
-    const r = gradeCalc(s, items).sub;
-    if (!sub || provaPending || !r?.target) return [];
-    const closed = st.reviews.filter((i) => i.assessment_id === r.target!.id && i.active && !itemState(i, st.assessments, today).open);
-    if (!closed.length) return [];
-    return [{ s, sub, r, closed }];
+    const calc = gradeCalc(s, items);
+    return items.filter((a) => a.kind === "sub" && a.grade == null && a.date && a.date >= today).flatMap((sub) => {
+      // só depois da última prova que esta SUB cobre: antes disso, reativar faria o conteúdo acumular
+      const provaPending = items.some((a) => a.kind === "prova" && a.sub_id === sub.id && a.grade == null && a.status !== "cancelado" && (!a.date || a.date >= today));
+      const r = calc.subs.find((x) => x.id === sub.id);
+      if (provaPending || !r?.target) return [];
+      const closed = st.reviews.filter((i) => i.assessment_id === r.target!.id && i.active && !itemState(i, st.assessments, today).open);
+      return closed.length ? [{ s, sub, r, closed }] : [];
+    });
   });
   const reactivate = async (o: (typeof subOffers)[number]) => {
     const rows: ReviewItem[] = o.closed.map((i) => ({ ...i, assessment_id: o.sub.id, step: 0, due: firstDue(steps, today, o.sub.date) }));
@@ -143,8 +144,8 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
         <div key={pl.exam.id} className="callout"><b>{pl.exam.name} de {pl.subject.name} em {pl.days} dia(s): não cabe tudo.</b> Faltam {pl.missing} min de estudo antes da prova. <button className="btn sm ghost" onClick={goExams}>Ver o plano da prova</button></div>
       ))}
       {subOffers.map((o) => (
-        <div key={o.s.id} className="callout info stack" style={{ gap: 8 }}>
-          <span><b>SUB de {o.s.name} em {dm(o.sub.date!)}.</b> Ela substituiria {o.r.target!.name} (nota {nf(o.r.target!.value)}).
+        <div key={o.sub.id} className="callout info stack" style={{ gap: 8 }}>
+          <span><b>{o.sub.name} de {o.s.name} em {dm(o.sub.date!)}.</b> Ela substituiria {o.r.target!.name} (nota {nf(o.r.target!.value)}).
             {o.r.base == null ? " Lance as notas na disciplina para ver quanto a SUB precisa."
               : o.r.need != null ? (o.r.need > 10 ? " Mesmo com 10 na SUB, a média não chega à mínima." : ` Para chegar à média mínima, a SUB precisa de ${nf(Math.max(0, o.r.need))}.`)
                 : ` Sua média (${nf(o.r.base)}) já atinge a mínima; a SUB só serviria para melhorar a nota.`}

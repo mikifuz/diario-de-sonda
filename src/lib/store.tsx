@@ -3,25 +3,25 @@
 // grava de forma otimista e escuta mudanças feitas em outros aparelhos.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { sb, friendlyError } from "./supabase";
-import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic } from "./types";
+import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic, AppNotification } from "./types";
 
-export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs" | "tasks";
-type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "mistakes" | "reviews" | "reviewLogs" | "todos";
+export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs" | "tasks" | "notifications";
+type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "mistakes" | "reviews" | "reviewLogs" | "todos" | "notes";
 const KEY: Record<Table, Key> = {
   subjects: "subjects", topics: "topics", study_sessions: "sessions", assessments: "assessments", events: "events",
-  routine_blocks: "blocks", mistakes: "mistakes", review_items: "reviews", review_logs: "reviewLogs", tasks: "todos",
+  routine_blocks: "blocks", mistakes: "mistakes", review_items: "reviews", review_logs: "reviewLogs", tasks: "todos", notifications: "notes",
 };
 type RowOf = {
   subjects: Subject; topics: Topic; study_sessions: Session; assessments: Assessment; events: CalEvent;
-  routine_blocks: RoutineBlock; mistakes: Mistake; review_items: ReviewItem; review_logs: ReviewLog; tasks: Todo;
+  routine_blocks: RoutineBlock; mistakes: Mistake; review_items: ReviewItem; review_logs: ReviewLog; tasks: Todo; notifications: AppNotification;
 };
 export const TABLES = Object.keys(KEY) as Table[];
 
 interface Data {
   profile: Profile | null; subjects: Subject[]; topics: Topic[]; sessions: Session[]; assessments: Assessment[]; events: CalEvent[];
-  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[]; todos: Todo[];
+  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[]; todos: Todo[]; notes: AppNotification[];
 }
-const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [], blocks: [], mistakes: [], reviews: [], reviewLogs: [], todos: [] };
+const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [], blocks: [], mistakes: [], reviews: [], reviewLogs: [], todos: [], notes: [] };
 
 export interface Store extends Data {
   uid: string;
@@ -58,13 +58,14 @@ const COLS: Record<Table, string> = {
   subjects: "id,name,code,professor,semester,credits,hours,color,min_avg,schedule,notes,traits,exam_enabled,exam_w_avg,exam_w_exam,exam_min_final,exam_min_take,archived,study_pref,recovery,sub_replace_lower",
   topics: "id,subject_id,parent_id,name,position,taught_on,assessment_id",
   study_sessions: "id,subject_id,topic_id,activity,started_at,duration_min,questions,correct,notes,confidence,result,autonomy,difficulty,comprehension",
-  assessments: "id,subject_id,name,kind,date,time,weight,grade,predicted,sim_c,sim_e,sim_o,priority,status,description",
+  assessments: "id,subject_id,name,kind,date,time,weight,grade,predicted,sim_c,sim_e,sim_o,priority,status,description,sub_id",
   events: "id,subject_id,title,type,date,time,priority,status,description",
   routine_blocks: "id,weekday,start_time,end_time,kind,subject_id,label",
   mistakes: "id,subject_id,topic_id,session_id,category,description,correction,source,occurred_on",
   review_items: "id,subject_id,topic_id,mistake_id,assessment_id,title,step,due,est_min,active,last_reviewed_at",
   review_logs: "id,item_id,reviewed_at,result,autonomy,confidence,prev_step,new_step,prev_due,new_due",
   tasks: "id,title,subject_id,due,done,done_at",
+  notifications: "id,kind,title,body,data,from_user,created_at,read_at",
 };
 
 export function DataProvider({ uid, email, children, onToast }: { uid: string; email: string; children: ReactNode; onToast: (m: string) => void }) {
@@ -92,6 +93,7 @@ export function DataProvider({ uid, email, children, onToast }: { uid: string; e
     let q = db.from(t).select(COLS[t]);
     if (t === "study_sessions") q = q.order("started_at", { ascending: false }).limit(10000);
     if (t === "review_logs") q = q.order("reviewed_at", { ascending: false }).limit(10000);
+    if (t === "notifications") q = q.order("created_at", { ascending: false }).limit(200);
     const { data: rows, error } = await q;
     if (error) throw error;
     let list = (rows || []) as unknown as RowOf[typeof t][];

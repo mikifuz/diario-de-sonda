@@ -295,7 +295,9 @@ export function EventModal({ id, src, date, onClose }: { id: string | null; src?
     if (counted && (w == null || w <= 0)) { st.toast("Informe um peso maior que zero."); return; }
     const time = f.time || null;
     if (counted) {
-      const base: Assessment = item ? { ...item } : { id: crypto.randomUUID(), subject_id: f.subject_id, name: "", kind: "prova", date: null, time: null, weight: 1, grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "" };
+      const base: Assessment = item ? { ...item } : { id: crypto.randomUUID(), subject_id: f.subject_id, name: "", kind: "prova", date: null, time: null, weight: 1, grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "",
+        // prova nova: se a disciplina tem uma única SUB, ela vale para esta prova
+        sub_id: (() => { const subs = st.assessments.filter((a) => a.subject_id === f.subject_id && a.kind === "sub"); return f.type === "prova" && subs.length === 1 ? subs[0].id : null; })() };
       const row: Assessment = { ...base, id: item && item.subject_id === f.subject_id ? item.id : crypto.randomUUID(), subject_id: f.subject_id, name: f.title.trim(), kind: f.type as AssessmentKind, date: f.date, time, weight: w!, priority: f.priority, status: f.status, description: f.description.trim() };
       if (!(await st.save("assessments", row))) return;
       if (item && item.id !== row.id) await st.remove("assessments", item.id);

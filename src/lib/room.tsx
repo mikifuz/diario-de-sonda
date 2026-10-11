@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { sb, friendlyError } from "./supabase";
 import { useStore, timerMs } from "./store";
 import { addDays, todayKey, weekStartKey } from "./calc";
-import type { DailyTotal, GroupMember, RoomMember, StudyGroup } from "./types";
+import type { DailyTotal, Friend, GroupMember, RoomMember, StudyGroup } from "./types";
 
 const CODE_CH = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export const newCode = () => Array.from({ length: 6 }, () => CODE_CH[Math.floor(Math.random() * CODE_CH.length)]).join("");
@@ -25,7 +25,16 @@ interface Room {
   createGroup: (name: string) => Promise<string | null>;
   joinGroup: (code: string) => Promise<boolean>;
   leaveGroup: (code: string) => Promise<void>;
+  friends: Friend[];
+  sendFriend: (code: string) => Promise<boolean>;
+  acceptFriend: (id: string) => Promise<void>;
+  removeFriend: (id: string) => Promise<void>;
+  nudge: (to: string, msg: NudgeKey) => Promise<boolean>;
+  setAcceptNudges: (v: boolean) => Promise<void>;
 }
+export type NudgeKey = "bora" | "sala" | "revisao" | "prova";
+/** Mensagens prontas (o banco só aceita estas) */
+export const NUDGES: Record<NudgeKey, string> = { bora: "Bora estudar?", sala: "Tô na sala, vem estudar comigo!", revisao: "Bora revisar junto hoje?", prova: "Prova chegando: bora estudar?" };
 const Ctx = createContext<Room | null>(null);
 export const useRoom = () => {
   const r = useContext(Ctx);
@@ -52,12 +61,13 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const [groups, setGroups] = useState<StudyGroup[]>([]);
   const [memberships, setMemberships] = useState<GroupMember[]>([]);
   const [totalsRaw, setTotalsRaw] = useState<DailyTotal[]>([]);
+  const [friends, setFriends] = useState<Friend[]>([]);
 
-  const load = useCallback(async (what: "members" | "groups" | "totals" | "all" = "all") => {
+  const load = useCallback(async (what: "members" | "groups" | "totals" | "friends" | "all" = "all") => {
     const db = sb();
     try {
       if (what === "members" || what === "all") {
-        const { data, error } = await db.from("room_members").select("user_id,nick,share_subject,studying,paused,since,accum_ms,subject,updated_at");
+        const { data, error } = await db.from("room_members").select("user_id,nick,share_subject,studying,paused,since,accum_ms,subject,updated_at,friend_code,accept_nudges");
         if (error) throw error;
         setMembers((data || []) as RoomMember[]);
       }
@@ -67,6 +77,11 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         if (gm.error) throw gm.error;
         setGroups((g.data || []) as StudyGroup[]);
         setMemberships((gm.data || []) as GroupMember[]);
+      }
+      if (what === "friends" || what === "all") {
+        const { data, error } = await db.rpc("my_friendships");
+        if (error) throw error;
+        setFriends((data || []) as Friend[]);
       }
       if (what === "totals" || what === "all") {
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo";
@@ -86,6 +101,8 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "room_members" }, () => load("members"))
       .on("postgres_changes", { event: "*", schema: "public", table: "group_members" }, () => load("groups"))
       .on("postgres_changes", { event: "*", schema: "public", table: "study_groups" }, () => load("groups"))
+      // amizade nova ou desfeita muda quem aparece na sala
+      .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, () => load("all"))
       .subscribe();
     const iv = setInterval(() => load("totals"), 60000);
     return () => { alive = false; sb().removeChannel(ch); clearInterval(iv); };
@@ -177,6 +194,37 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     await load("all");
   }, [uid, load, toast]);
 
+  const rpcError = (e: { message?: string }) => toast(e.message && !/fetch|network/i.test(e.message) ? e.message : friendlyError(e));
+  const sendFriend = useCallback(async (code: string) => {
+    const { data, error } = await sb().rpc("send_friend_request", { p_code: code.trim().toUpperCase() });
+    if (error) { rpcError(error); return false; }
+    toast(data === "enviado" ? "Pedido de amizade enviado." : data === "aceito" ? "Vocês agora são amigos." : data === "ja_amigos" ? "Vocês já são amigos." : "Você já mandou um pedido para essa pessoa.");
+    await load("all");
+    return true;
+  }, [load, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+  const acceptFriend = useCallback(async (id: string) => {
+    const { error } = await sb().rpc("accept_friend", { p_id: id });
+    if (error) { rpcError(error); return; }
+    toast("Amizade aceita.");
+    await load("all");
+  }, [load, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+  const removeFriend = useCallback(async (id: string) => {
+    const { error } = await sb().from("friendships").delete().eq("id", id);
+    if (error) { toast(friendlyError(error)); return; }
+    await load("all");
+  }, [load, toast]);
+  const nudge = useCallback(async (to: string, msg: NudgeKey) => {
+    const { error } = await sb().rpc("nudge_friend", { p_to: to, p_msg: msg });
+    if (error) { rpcError(error); return false; }
+    toast("Chamado enviado.");
+    return true;
+  }, [toast]); // eslint-disable-line react-hooks/exhaustive-deps
+  const setAcceptNudges = useCallback(async (v: boolean) => {
+    setMembers((ms) => ms.map((m) => (m.user_id === uid ? { ...m, accept_nudges: v } : m)));
+    const { error } = await sb().from("room_members").update({ accept_nudges: v }).eq("user_id", uid);
+    if (error) { toast(friendlyError(error)); load("members"); }
+  }, [uid, load, toast]);
+
   const totals = useMemo(() => {
     const out: Record<string, Record<string, number>> = {};
     const from = addDays(todayKey(), -34);
@@ -189,7 +237,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     return groups.filter((g) => codes.has(g.code)).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [groups, memberships, uid]);
 
-  const value = useMemo<Room>(() => ({ ready, members, groups, memberships, totals, me, myGroups, join, updateMe, leave, createGroup, joinGroup, leaveGroup }),
-    [ready, members, groups, memberships, totals, me, myGroups, join, updateMe, leave, createGroup, joinGroup, leaveGroup]);
+  const value = useMemo<Room>(() => ({ ready, members, groups, memberships, totals, me, myGroups, join, updateMe, leave, createGroup, joinGroup, leaveGroup, friends, sendFriend, acceptFriend, removeFriend, nudge, setAcceptNudges }),
+    [ready, members, groups, memberships, totals, me, myGroups, join, updateMe, leave, createGroup, joinGroup, leaveGroup, friends, sendFriend, acceptFriend, removeFriend, nudge, setAcceptNudges]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -9,6 +9,7 @@ import { fmtClock } from "@/lib/calc";
 import { Brand } from "./Brand";
 import { Icon, useNow } from "./ui";
 import { EvalModal } from "./modals";
+import { useWeeklyReport } from "./notifications";
 
 function TimerPill() {
   const st = useStore();
@@ -29,6 +30,8 @@ export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname() || "/painel";
   const page = PAGES.find((p) => path.startsWith(p.href)) || PAGES[0];
   const live = room.members.filter((m) => m.studying && m.user_id !== st.uid).length;
+  const unread = st.notes.filter((n) => !n.read_at).length;
+  useWeeklyReport();
 
   // tema salvo no perfil
   const skin = st.profile?.skin;
@@ -51,6 +54,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <Link key={p.href} href={p.href} aria-current={page.href === p.href ? "page" : undefined}>
               <Icon d={p.ic} /><span>{p.full}</span>
               {p.href === "/sala" && live > 0 && <span className="chip ok" style={{ marginLeft: "auto" }} title="Estudando agora">{live}</span>}
+              {p.href === "/notificacoes" && unread > 0 && <span className="chip warn" style={{ marginLeft: "auto" }} title="Não lidas">{unread}</span>}
             </Link>
           ))}
         </nav>
@@ -69,7 +73,8 @@ export function Shell({ children }: { children: ReactNode }) {
       </div>
       <nav className="mobile-nav" aria-label="Navegação">
         {PAGES.filter((p) => p.href !== "/configuracoes").map((p) => (
-          <Link key={p.href} href={p.href} aria-current={page.href === p.href ? "page" : undefined}><Icon d={p.ic} s={20} /><span>{p.nm}</span></Link>
+          <Link key={p.href} href={p.href} aria-current={page.href === p.href ? "page" : undefined} style={{ position: "relative" }}><Icon d={p.ic} s={20} /><span>{p.nm}</span>
+            {p.href === "/notificacoes" && unread > 0 && <i className="dot" aria-label={`${unread} não lidas`} style={{ position: "absolute", top: 2, right: 10, background: "var(--warn)" }} />}</Link>
         ))}
       </nav>
       {st.evalId && <EvalModal id={st.evalId} onClose={() => st.setEvalId(null)} />}

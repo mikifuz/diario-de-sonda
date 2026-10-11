@@ -9,7 +9,7 @@ const SUB = (p: Partial<Subject> = {}): Subject => ({
   id: "s", name: "Cálculo III", code: "", professor: "", semester: "", credits: null, hours: null, color: "#4f86f7", min_avg: 7, schedule: "", notes: "",
   traits: {}, exam_enabled: false, exam_w_avg: 1, exam_w_exam: 1, exam_min_final: 5, exam_min_take: null, archived: false, study_pref: null, recovery: "sub", sub_replace_lower: false, ...p,
 });
-const A = (p: Partial<Assessment>): Assessment => ({ id: "p2", subject_id: "s", name: "P2", kind: "prova", date: "2026-10-17", time: null, weight: 1, grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "", ...p });
+const A = (p: Partial<Assessment>): Assessment => ({ id: "p2", subject_id: "s", name: "P2", kind: "prova", date: "2026-10-17", time: null, weight: 1, grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "", sub_id: null, ...p });
 const T = (p: Partial<Topic>): Topic => ({ id: "t", subject_id: "s", parent_id: null, name: "Integrais triplas", position: 0, taught_on: "2026-10-01", assessment_id: "p2", ...p });
 const B = (wd: number, start = "14:00", end = "16:00"): RoutineBlock => ({ id: `b${wd}${start}`, weekday: wd, start_time: start, end_time: end, kind: "estudo", subject_id: null, label: "" });
 const S = (p: Partial<Session>): Session => ({ id: Math.random().toString(), subject_id: "s", topic_id: "t", activity: "exercicios", started_at: new Date(2026, 9, 10, 10).toISOString(), duration_min: 30,

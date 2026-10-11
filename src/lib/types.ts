@@ -128,6 +128,8 @@ export interface Assessment {
   priority: Priority;
   status: Status;
   description: string;
+  /** prova: SUB que pode substituí-la (null = não tem SUB) */
+  sub_id: string | null;
 }
 
 export interface CalEvent {
@@ -152,6 +154,9 @@ export interface RoomMember {
   accum_ms: number;
   subject: string;
   updated_at: string;
+  /** código para adicionar como amigo */
+  friend_code?: string;
+  accept_nudges?: boolean;
 }
 
 export interface StudyGroup {
@@ -230,4 +235,25 @@ export interface Todo {
   due: string | null;
   done: boolean;
   done_at: string | null;
+}
+
+export type NotificationKind = "relatorio" | "amizade" | "chamado" | "aviso";
+export interface AppNotification {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  from_user: string | null;
+  created_at: string;
+  read_at: string | null;
+}
+
+/** Amizade vista por mim (vem da função my_friendships) */
+export interface Friend {
+  id: string;
+  other: string;
+  nick: string;
+  status: "pendente" | "aceito";
+  incoming: boolean;
 }

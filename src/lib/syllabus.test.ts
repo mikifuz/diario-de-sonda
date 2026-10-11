@@ -90,3 +90,16 @@ test("células de Excel e Word a partir do XML", () => {
   assert.deepEqual(xlsxCells(sheet, "<sst><si><t>Data</t></si><si><t>Conteúdo</t></si></sst>"), [["Data", "", "Conteúdo"], ["46237", "", "Vetores"]]);
   assert.deepEqual(docxCells("<w:tbl><w:tr><w:tc><w:p><w:r><w:t>07.08</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Uni</w:t></w:r><w:r><w:t>dade 1</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"), [["07.08", "Unidade 1"]]);
 });
+
+test("cada SUB fica ligada às provas certas", async () => {
+  const { subCoverage } = await import("./syllabus");
+  const fis = buildPlan(fromPdf("fisica"));
+  const cov = subCoverage(fis.exams);
+  const names = (k: string) => fis.exams.filter((x) => cov.get(k)!.includes(x.key)).map((x) => x.name);
+  const subs = fis.exams.filter((x) => x.kind === "sub");
+  assert.deepEqual(names(subs[0].key), ["Avaliação parcial A1", "Avaliação parcial A2"]);
+  assert.deepEqual(names(subs[1].key), ["Avaliação parcial A3", "Avaliação parcial A4"]);
+  const calc = buildPlan(fromPdf("calculo"));
+  const c = subCoverage(calc.exams);
+  assert.equal(c.get(calc.exams.find((x) => x.kind === "sub")!.key)!.length, 3); // SUB única: todas as provas antes dela
+});

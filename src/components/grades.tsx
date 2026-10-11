@@ -3,7 +3,7 @@
 // na visão geral de Disciplinas. Os cálculos ficam em calc.ts (gradeCalc).
 import { useState } from "react";
 import { useStore } from "@/lib/store";
-import { gradeCalc, nf, parseNum, type GradeResult } from "@/lib/calc";
+import { gradeCalc, nf, parseNum, type GradeResult, type SubResult } from "@/lib/calc";
 import { RECOVERY } from "@/lib/constants";
 import type { Assessment, Recovery, Scenario, Subject } from "@/lib/types";
 import { ConfirmButton, I, Icon, Tabs } from "./ui";
@@ -29,18 +29,18 @@ export const sortItems = (items: Assessment[]) => [...items].sort((a, b) =>
 /** Situação da disciplina em uma frase curta, com cor */
 export function verdict(r: GradeResult): { t: string; c: string } {
   if (!r.nItems) return { t: "sem avaliações cadastradas", c: "var(--muted)" };
-  if (r.sub?.official && r.sub.final != null && r.sub.replaced) return r.sub.final >= r.min ? { t: `aprovado com a SUB (${nf(r.sub.final)})`, c: "var(--ok)" } : { t: `abaixo da mínima mesmo com a SUB (${nf(r.sub.final)})`, c: "var(--bad)" };
+  if (r.subOfficial && r.subFinal != null && r.subs.some((x) => x.replaced)) return r.subFinal >= r.min ? { t: `aprovado com a SUB (${nf(r.subFinal)})`, c: "var(--ok)" } : { t: `abaixo da mínima mesmo com a SUB (${nf(r.subFinal)})`, c: "var(--bad)" };
   if (r.final != null) return r.final >= r.min ? { t: `aprovado (${nf(r.final)})`, c: "var(--ok)" } : { t: `abaixo da mínima (${nf(r.final)})`, c: "var(--bad)" };
   if ((r.needed ?? 0) <= 0) return { t: "mínima já garantida", c: "var(--ok)" };
   if ((r.needed ?? 0) > r.max) return { t: `precisaria de ${nf(r.needed)} nas restantes (acima de 10)`, c: "var(--bad)" };
   return { t: `precisa de ${nf(r.needed)} nas restantes`, c: (r.needed ?? 0) > 8 ? "var(--warn)" : "var(--fg)" };
 }
 
-/** Frase da SUB: qual prova substitui e quanto precisa */
-export function subLine(r: GradeResult, sc?: Scenario): string | null {
-  const sb = r.sub;
+/** Frase de uma SUB: qual prova substitui e quanto precisa */
+export function subLine(r: GradeResult, sc?: Scenario, sb: SubResult | null = r.sub): string | null {
   if (!sb) return null;
-  if (!sb.target) return "A SUB substitui a menor nota entre as provas; lance as notas das provas para ver qual seria.";
+  if (!sb.covered) return "Nenhuma prova marcada com esta SUB. Em \"Tem SUB?\", marque as provas que ela pode substituir.";
+  if (!sb.target) return "Substitui a menor nota entre as provas marcadas; lance as notas para ver qual seria.";
   if (sb.base == null) return `A SUB substituiria a prova de menor nota; faltam notas${sc ? ` (ou a simulação do cenário ${SN[sc]})` : ""} para calcular quanto precisa.`;
   let t = `Substituiria ${sb.target.name} (${nf(sb.target.value)}). `;
   t += sb.need == null ? "A média já atinge a mínima sem ela." : sb.need > 10 ? "Mesmo com 10 na SUB não chega à mínima." : `Precisa de ${nf(Math.max(0, sb.need))} na SUB.`;
@@ -55,13 +55,20 @@ export function GradesPanel({ s }: { s: Subject }) {
   const items = sortItems(st.assessments.filter((a) => a.subject_id === s.id));
   const r = gradeCalc(s, items, sc);
   const v = verdict(r);
-  const sl = subLine(r, sc);
+
   const grade = (x: string): number | null | false => { const n = parseNum(x); if (n != null && (n < 0 || n > 10)) { st.toast("Use notas entre 0 e 10."); return false; } return n; };
   const setItem = async (a: Assessment, patch: Partial<Assessment>) => st.save("assessments", { ...a, ...patch });
   const setSub = async (patch: Partial<Subject>) => st.save("subjects", { ...s, ...patch });
-  const blank = (p: Partial<Assessment>): Assessment => ({ id: crypto.randomUUID(), subject_id: s.id, name: "", kind: "prova", date: null, time: null, weight: 1, grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "", ...p });
+  const blank = (p: Partial<Assessment>): Assessment => ({ id: crypto.randomUUID(), subject_id: s.id, name: "", kind: "prova", date: null, time: null, weight: 1, grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "", sub_id: null, ...p });
   const nProvas = items.filter((i) => i.kind !== "sub").length;
-  const hasSub = items.some((i) => i.kind === "sub");
+  const subs = items.filter((i) => i.kind === "sub");
+  const subCol = s.recovery === "sub" && subs.length > 0;
+  // primeira SUB: vale para todas as provas que ainda não têm SUB (dá para desmarcar)
+  const addSub = async () => {
+    const row = blank({ name: subs.length ? `SUB ${subs.length + 1}` : "SUB", kind: "sub" });
+    if (!(await st.save("assessments", row))) return;
+    if (!subs.length) await st.saveMany("assessments", items.filter((i) => i.kind === "prova" && !i.sub_id).map((i) => ({ ...i, sub_id: row.id })));
+  };
   const ex = r.exam;
   const projV = r.proj[sc];
 
@@ -73,7 +80,7 @@ export function GradesPanel({ s }: { s: Subject }) {
       </div>
       {items.length > 0 ? (
         <div className="tbl-wrap"><table className="grades">
-          <thead><tr><th>Avaliação</th><th className="hide-m">Data</th><th className="n">Peso</th>{showPred && <th className="n" title="Nota que você esperava, anotada antes da prova">Previsão</th>}<th className="n">Nota</th><th className="n">Simul.</th><th /></tr></thead>
+          <thead><tr><th>Avaliação</th><th className="hide-m">Data</th><th className="n">Peso</th>{showPred && <th className="n" title="Nota que você esperava, anotada antes da prova">Previsão</th>}<th className="n">Nota</th><th className="n">Simul.</th>{subCol && <th title="Esta prova pode ser substituída pela SUB?">Tem SUB?</th>}<th /></tr></thead>
           <tbody>{items.map((a) => (
             <tr key={a.id}>
               <td><Cell wide value={a.name} label="Nome da avaliação" style={{ minWidth: 70 }} onSave={(x) => (x.trim() ? setItem(a, { name: x.trim() }) : false)} /><div className="show-m" style={{ marginTop: 3 }}><Cell type="date" value={a.date || ""} label="Data" style={{ maxWidth: 140, textAlign: "left", fontSize: ".8em", padding: "2px 4px" }} onSave={(x) => setItem(a, { date: x || null })} /></div></td>
@@ -83,6 +90,10 @@ export function GradesPanel({ s }: { s: Subject }) {
               {showPred && <td className="n"><Cell value={show(a.predicted)} label="Previsão" placeholder="–" style={{ maxWidth: 58 }} onSave={(x) => { const g = grade(x); return g === false ? false : setItem(a, { predicted: g }); }} /></td>}
               <td className="n"><Cell value={show(a.grade)} label="Nota oficial" placeholder="–" style={{ maxWidth: 58, fontWeight: 600 }} onSave={(x) => { const g = grade(x); return g === false ? false : setItem(a, { grade: g, status: g != null ? "concluido" : "pendente" }); }} /></td>
               <td className="n">{a.grade != null ? <span className="muted small">–</span> : <Cell value={show(a[simKey(sc)])} label={`Nota simulada (${SN[sc]})`} placeholder="–" style={{ maxWidth: 58, fontStyle: "italic" }} onSave={(x) => { const g = grade(x); return g === false ? false : setItem(a, { [simKey(sc)]: g }); }} />}</td>
+              {subCol && <td>{a.kind === "prova" ? (subs.length === 1
+                ? <input type="checkbox" aria-label="Tem SUB" checked={a.sub_id === subs[0].id} onChange={(e) => setItem(a, { sub_id: e.target.checked ? subs[0].id : null })} style={{ width: 18, height: 18, accentColor: "var(--accent)" }} />
+                : <select value={a.sub_id || ""} onChange={(e) => setItem(a, { sub_id: e.target.value || null })} aria-label="Qual SUB" style={{ width: "auto", padding: "3px 6px", fontSize: ".85em" }}>
+                  <option value="">Não</option>{subs.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>) : null}</td>}
               <td><ConfirmButton small label={<Icon d={I.trash} s={14} />} confirmLabel="Remover" onConfirm={() => st.remove("assessments", a.id)} /></td>
             </tr>
           ))}</tbody>
@@ -91,7 +102,7 @@ export function GradesPanel({ s }: { s: Subject }) {
 
       <div className="row" style={{ marginTop: 10, gap: 6 }}>
         <button className="btn sm" onClick={() => st.save("assessments", blank({ name: `P${nProvas + 1}` }))}><Icon d={I.plus} s={14} />Avaliação</button>
-        {s.recovery === "sub" && !hasSub && <button className="btn sm" onClick={() => st.save("assessments", blank({ name: "SUB", kind: "sub" }))}><Icon d={I.plus} s={14} />SUB</button>}
+        {s.recovery === "sub" && <button className="btn sm" onClick={addSub}><Icon d={I.plus} s={14} />{subs.length ? "Outra SUB" : "SUB"}</button>}
         {r.nRem > 0 && r.needed != null && r.needed > 0 && r.needed <= 10 && (
           <button className="btn sm ghost" onClick={() => { const n = Math.round((r.needed ?? 0) * 10) / 10; st.saveMany("assessments", items.filter((i) => i.grade == null && i.kind !== "sub").map((i) => ({ ...i, [simKey(sc)]: n }))); }}>Simular {nf(r.needed)} nas restantes</button>
         )}
@@ -105,7 +116,9 @@ export function GradesPanel({ s }: { s: Subject }) {
             {" · "}<span style={{ color: v.c }}>{v.t}</span>
             {projV != null && r.nRem > 0 && <> · projeção {SN[sc]} <b className="num" style={{ color: projV >= r.min ? "var(--ok)" : "var(--bad)" }}>{nf(projV)}</b></>}
           </div>
-          {sl && <div><span className="chip acc">SUB</span> {sl}</div>}
+          {r.subs.map((x) => <div key={x.id}><span className="chip acc">{x.name}</span> {subLine(r, sc, x)}</div>)}
+          {r.subs.length > 1 && r.subFinal != null && <div>Com todas as SUBs: média {r.subOfficial ? "final" : "projetada"} <b className="num">{nf(r.subFinal)}</b>.</div>}
+          {s.recovery === "sub" && !subs.length && <div className="muted">Esta disciplina tem SUB? Use o botão &quot;+ SUB&quot; e depois marque em cada prova se ela tem SUB.</div>}
           {ex && ex.need != null && <div>Exame: {ex.eligible === false ? `média ${nf(ex.base)} abaixo do mínimo para fazer exame (${nf(ex.minTake)}).` : `precisaria de ${nf(Math.max(0, ex.need))} no exame${ex.need > 10 ? " (não alcançável)" : ""}.`}</div>}
           <span className="muted">Simulação é estimativa e não entra na média atual. Média = Σ(peso × nota) ÷ Σ(pesos).</span>
         </div>

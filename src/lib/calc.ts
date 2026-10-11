@@ -108,7 +108,11 @@ export function signal(st: Stats): { k: SignalKind; t: string; why: string } {
 
 /* ============ Médias ============ */
 export interface SubResult {
-  /** prova de menor nota, a que a SUB substituiria */
+  id: string;
+  name: string;
+  /** provas marcadas com esta SUB */
+  covered: number;
+  /** prova de menor nota (entre as marcadas), a que a SUB substituiria */
   target: { id: string; name: string; value: number; weight: number } | null;
   /** média sem a SUB (final, ou projeção do cenário) */
   base: number | null;
@@ -129,7 +133,12 @@ export interface GradeResult {
   final: number | null;
   proj: Record<Scenario, number | null>;
   exam: null | { wa: number; we: number; mf: number; minTake: number | null; base?: number; need?: number; eligible?: boolean };
+  /** primeira SUB (atalho) e todas as SUBs da disciplina */
   sub: SubResult | null;
+  subs: SubResult[];
+  /** média com todas as SUBs que têm nota (oficial ou simulada) aplicadas */
+  subFinal: number | null;
+  subOfficial: boolean;
 }
 const has = (v: number | null | undefined): v is number => v != null && !isNaN(Number(v));
 const simOf = (a: Assessment, k: Scenario) => (k === "c" ? a.sim_c : k === "e" ? a.sim_e : a.sim_o);
@@ -166,6 +175,9 @@ export function gradeCalc(sub: GradeRules, items: Assessment[], scen?: Scenario)
     proj: { c: proj("c"), e: proj("e"), o: proj("o") },
     exam: null,
     sub: null,
+    subs: [],
+    subFinal: null,
+    subOfficial: false,
   };
   const base = r.final != null ? r.final : scen && r.proj[scen] != null ? r.proj[scen] : null;
   if (sub.recovery === "exame") {
@@ -181,25 +193,32 @@ export function gradeCalc(sub: GradeRules, items: Assessment[], scen?: Scenario)
   if (sub.recovery === "sub") {
     // valor de cada prova: nota oficial, ou simulação do cenário quando ainda não há nota
     const val = (a: Assessment) => (has(a.grade) ? Number(a.grade) : scen && has(simOf(a, scen)) ? Number(simOf(a, scen)) : null);
-    let target: SubResult["target"] = null;
-    for (const a of valid) {
-      if (a.kind !== "prova") continue;
-      const v = val(a);
-      if (v == null) continue;
-      // menor nota; no empate, a de maior peso (é a que mais pesa na média)
-      if (!target || v < target.value || (v === target.value && Number(a.weight) > target.weight)) target = { id: a.id, name: a.name, value: v, weight: Number(a.weight) };
-    }
-    const s = items.find((i) => i.kind === "sub");
-    const value = s ? val(s) : null;
-    const res: SubResult = { target, base, need: null, value, official: !!s && has(s.grade) && r.final != null, replaced: false, final: null };
-    if (target && base != null && W) {
-      if (base < min) res.need = target.value + ((min - base) * W) / target.weight;
-      if (value != null) {
-        res.replaced = value > target.value || (sub.sub_replace_lower && value !== target.value);
-        res.final = res.replaced ? base + ((value - target.value) * target.weight) / W : base;
+    let gain = 0, anyValue = false, allOfficial = true;
+    for (const s of items.filter((i) => i.kind === "sub")) {
+      // cada prova diz se tem SUB (e qual); a SUB substitui a menor nota entre as provas marcadas com ela
+      const covered = valid.filter((a) => a.kind === "prova" && a.sub_id === s.id);
+      let target: SubResult["target"] = null;
+      for (const a of covered) {
+        const v = val(a);
+        if (v == null) continue;
+        // menor nota; no empate, a de maior peso (é a que mais pesa na média)
+        if (!target || v < target.value || (v === target.value && Number(a.weight) > target.weight)) target = { id: a.id, name: a.name, value: v, weight: Number(a.weight) };
       }
+      const value = val(s);
+      const res: SubResult = { id: s.id, name: s.name, covered: covered.length, target, base, need: null, value, official: has(s.grade) && r.final != null, replaced: false, final: null };
+      if (target && base != null && W) {
+        if (base < min) res.need = target.value + ((min - base) * W) / target.weight;
+        if (value != null) {
+          res.replaced = value > target.value || (sub.sub_replace_lower && value !== target.value);
+          const g = res.replaced ? ((value - target.value) * target.weight) / W : 0;
+          res.final = base + g;
+          gain += g; anyValue = true; if (!res.official) allOfficial = false;
+        }
+      }
+      r.subs.push(res);
     }
-    r.sub = res;
+    r.sub = r.subs[0] ?? null;
+    if (anyValue && base != null) { r.subFinal = base + gain; r.subOfficial = allOfficial; }
   }
   return r;
 }

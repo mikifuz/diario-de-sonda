@@ -12,7 +12,7 @@ import { DEFAULT_MASTERY, masteryCfg, type MasteryCfg } from "@/lib/mastery";
 
 // ordem das chaves estrangeiras: conteúdos apontam para provas, erros para sessões, revisões para erros
 const ORDER: Table[] = ["subjects", "assessments", "topics", "study_sessions", "events", "routine_blocks", "mistakes", "review_items", "review_logs", "tasks"];
-const NONE = { routine_blocks: [], mistakes: [], review_items: [], review_logs: [], tasks: [] };
+const NONE = { routine_blocks: [], mistakes: [], review_items: [], review_logs: [], tasks: [], notifications: [] };
 
 export default function Configuracoes() {
   const st = useStore();
@@ -57,7 +57,7 @@ export default function Configuracoes() {
         const subjects = (j.subjects || []).map((x: Record<string, unknown>) => (x.recovery ? x : { ...x, recovery: x.exam_enabled ? "exame" : "nenhuma" }));
         rows = {
           subjects, topics: j.topics || [], assessments: j.assessments || [], study_sessions: j.sessions || [], events: j.events || [],
-          routine_blocks: j.routine_blocks || [], mistakes: j.mistakes || [], review_items: j.review_items || [], review_logs: j.review_logs || [], tasks: j.tasks || [],
+          routine_blocks: j.routine_blocks || [], mistakes: j.mistakes || [], review_items: j.review_items || [], review_logs: j.review_logs || [], tasks: j.tasks || [], notifications: [],
         };
         const { id: _id, timer: _t, ...rest } = j.profile || {};
         void _id; void _t;
@@ -91,7 +91,7 @@ export default function Configuracoes() {
     setBusy("Apagando…");
     try {
       if (room.me) await room.leave();
-      for (const t of ["events", "routine_blocks", "tasks", "subjects"] as const) {
+      for (const t of ["events", "routine_blocks", "tasks", "notifications", "subjects"] as const) {
         const { error } = await sb().from(t).delete().eq("user_id", st.uid);
         if (error) throw error;
       }

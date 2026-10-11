@@ -7,7 +7,7 @@ const STEPS = [1, 3, 7, 14, 30];
 const TODAY = "2026-10-12"; // segunda-feira
 const A = (p: Partial<Assessment>): Assessment => ({
   id: "p", subject_id: "s", name: "P2", kind: "prova", date: null, time: null, weight: 1,
-  grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "", ...p,
+  grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "", sub_id: null, ...p,
 });
 const SUB = (p: Partial<Subject> = {}): Subject => ({
   id: "s", name: "Cálculo III", code: "", professor: "", semester: "", credits: null, hours: null, color: "#4f86f7", min_avg: 7, schedule: "", notes: "",
