@@ -29,6 +29,19 @@ export function parseSteps(txt: string): number[] | string {
   return n;
 }
 
+/** Horários escolhidos (índices) → intervalos; horários seguidos viram um bloco só */
+export function slotRanges(idx: number[], slots: { start: string; end: string }[]): { start: string; end: string }[] {
+  const sorted = [...new Set(idx)].filter((i) => slots[i]).sort((a, b) => a - b);
+  const out: { start: string; end: string }[] = [];
+  let prev = -2;
+  for (const i of sorted) {
+    if (i === prev + 1 && out.length) out[out.length - 1].end = slots[i].end;
+    else out.push({ start: slots[i].start, end: slots[i].end });
+    prev = i;
+  }
+  return out;
+}
+
 /* ============ Prova de cada revisão ============ */
 const isExam = (a: Assessment) => a.kind === "prova" || a.kind === "sub";
 
