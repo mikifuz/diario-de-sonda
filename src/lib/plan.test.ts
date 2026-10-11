@@ -143,3 +143,17 @@ test("horários de aula seguidos viram um bloco só", () => {
   assert.deepEqual(slotRanges([0, 2, 3], S4), [{ start: "08:20", end: "10:10" }, { start: "13:30", end: "17:00" }]);
   assert.deepEqual(slotRanges([], S4), []);
 });
+
+test("cronograma: aula mais recente e aula remarcada empurra as seguintes", async () => {
+  const { lastTaught, pushLessons } = await import("./plan");
+  const ts = [T({ id: "a", taught_on: "2026-10-12" }), T({ id: "b", taught_on: "2026-10-15" }), T({ id: "c", taught_on: "2026-10-19" }), T({ id: "z", subject_id: "outra", taught_on: "2026-10-20" })];
+  assert.equal(lastTaught(ts, "s", "2026-10-16")?.id, "b");
+  assert.equal(lastTaught(ts, "s", "2026-10-01"), null);
+  // aula de segunda (12/10) cancelada → vai para quinta (15/10); as seguintes andam uma aula (seg/qui)
+  const r = pushLessons(ts, "a", "2026-10-15", [1, 4]);
+  assert.deepEqual(r.map((x) => `${x.id}:${x.taught_on}`), ["a:2026-10-15", "b:2026-10-19", "c:2026-10-22"]);
+  // sem rotina, usa os dias da semana dos próprios conteúdos (seg e qui)
+  assert.deepEqual(pushLessons(ts, "a", "2026-10-15", []).map((x) => x.taught_on), ["2026-10-15", "2026-10-19", "2026-10-22"]);
+  // antecipar não mexe nas outras
+  assert.equal(pushLessons(ts, "b", "2026-10-13", [1, 4]).length, 1);
+});

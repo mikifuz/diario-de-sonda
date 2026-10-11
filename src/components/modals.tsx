@@ -7,6 +7,7 @@ import { dkey, fmtMin, pad, parseNum, todayKey } from "@/lib/calc";
 import { activeSubjects, useStore } from "@/lib/store";
 import type { Activity, Assessment, AssessmentKind, Autonomy, CalEvent, Comprehension, EventType, Priority, Result, Session, Status, StudyPref, Subject, Topic, Traits } from "@/lib/types";
 import { MistakeModal } from "./planning";
+import { pushLessons } from "@/lib/plan";
 
 /* ============ Conteúdos em árvore ============ */
 export function TopicOptions({ topics, subjectId, exclude }: { topics: Topic[]; subjectId: string | null; exclude?: Set<string> }) {
@@ -223,7 +224,11 @@ export function TopicModal({ id, onClose }: { id: string; onClose: () => void })
   const [parent, setParent] = useState(t?.parent_id || "");
   const [taught, setTaught] = useState(t?.taught_on || "");
   const [exam, setExam] = useState(t?.assessment_id || "");
+  const [push, setPush] = useState(true);
   if (!t) return null;
+  // aula remarcada para depois: oferece empurrar as aulas seguintes
+  const later = t.taught_on && taught && taught > t.taught_on ? st.topics.filter((x) => x.subject_id === t.subject_id && x.id !== t.id && x.taught_on && x.taught_on > t.taught_on!).length : 0;
+  const classDays = st.blocks.filter((b) => b.kind === "aula" && b.subject_id === t.subject_id).map((b) => b.weekday);
   const exams = st.assessments.filter((a) => a.subject_id === t.subject_id && (a.kind === "prova" || a.kind === "sub")).sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
   const desc = new Set([t.id]);
   let grew = true;
@@ -233,7 +238,13 @@ export function TopicModal({ id, onClose }: { id: string; onClose: () => void })
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    if (await st.save("topics", { ...t, name: name.trim(), parent_id: parent || null, taught_on: taught || null, assessment_id: exam || null })) onClose();
+    const row = { ...t, name: name.trim(), parent_id: parent || null, taught_on: taught || null, assessment_id: exam || null };
+    if (later && push) {
+      const moved = pushLessons(st.topics, t.id, taught, classDays).map((x) => (x.id === t.id ? { ...row, taught_on: x.taught_on } : x));
+      if (await st.saveMany("topics", moved)) { st.toast(`Aula remarcada; ${moved.length - 1} aula(s) seguinte(s) empurrada(s).`); onClose(); }
+      return;
+    }
+    if (await st.save("topics", row)) onClose();
   };
   return (
     <Modal title="Editar conteúdo" sub={sub?.name} onClose={onClose}>
@@ -245,6 +256,8 @@ export function TopicModal({ id, onClose }: { id: string; onClose: () => void })
           <label className="f"><span>Cai na prova</span><select value={exam} onChange={(e) => setExam(e.target.value)}><option value="">Próxima prova da disciplina</option>
             {exams.map((a) => <option key={a.id} value={a.id}>{a.name}{a.date ? ` (${a.date.slice(8, 10)}/${a.date.slice(5, 7)})` : " (sem data)"}</option>)}</select></label>
         </div>
+        {later > 0 && <label className="check"><input type="checkbox" checked={push} onChange={(e) => setPush(e.target.checked)} />
+          Aula remarcada: empurrar também os {later} conteúdo(s) seguinte(s) para o próximo dia de aula{classDays.length ? "" : " (pelos dias em que a disciplina costuma ter aula)"}</label>}
         <p className="small muted" style={{ margin: 0 }}>A data da aula ajuda o plano do dia a sugerir o que adiantar ou consolidar. A prova define até quando este conteúdo é revisado.</p>
         <div className="modal-f">
           <span style={{ marginRight: "auto" }}><ConfirmButton label={<><Icon d={I.trash} s={15} />Excluir</>} question={n > 0 ? `${n} sessão(ões) ficarão como "geral da disciplina".` : "Excluir?"} confirmLabel="Excluir"

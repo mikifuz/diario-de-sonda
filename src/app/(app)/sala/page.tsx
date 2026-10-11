@@ -4,7 +4,8 @@ import { Suspense, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { activeSubjects, timerMs, topicName, useStore } from "@/lib/store";
 import { liveMs, todayMin, useRoom, weekMin } from "@/lib/room";
-import { dkey, fmtClock, fmtMin, inRange, keyDate, nf, pct, periodRange, stats, streak, type Period } from "@/lib/calc";
+import { daysBetween, dkey, fmtClock, fmtMin, inRange, keyDate, nf, pct, periodRange, stats, streak, todayKey, type Period } from "@/lib/calc";
+import { dm, lastTaught } from "@/lib/plan";
 import { ACT } from "@/lib/constants";
 import type { Activity, Session, Social } from "@/lib/types";
 import { ConfirmButton, Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
@@ -35,7 +36,9 @@ function TimerPanel({ onManual, onNewSubject }: { onManual: () => void; onNewSub
   const [subjectId, setSubjectId] = useState(pre && list.some((s) => s.id === pre) ? pre : list[0]?.id || "");
   // vindo de um alerta: já traz conteúdo e atividade
   const preTopic = params.get("conteudo"), preAct = params.get("atividade") as Activity | null;
-  const [topicId, setTopicId] = useState(preTopic && st.topics.some((x) => x.id === preTopic && x.subject_id === pre) ? preTopic : "");
+  const today = todayKey();
+  const lastOf = (sid: string) => lastTaught(st.topics, sid, today)?.id || "";
+  const [topicId, setTopicId] = useState(() => (preTopic && st.topics.some((x) => x.id === preTopic && x.subject_id === pre) ? preTopic : lastOf(pre && list.some((s) => s.id === pre) ? pre : list[0]?.id || "")));
   const [activity, setActivity] = useState<Activity>(preAct && preAct in ACT ? preAct : "exercicios");
   const [discard, setDiscard] = useState(false);
   const [start, setStart] = useState<StartArgs | null>(null);
@@ -79,10 +82,11 @@ function TimerPanel({ onManual, onNewSubject }: { onManual: () => void; onNewSub
     <div className="panel">
       <div className="panel-h"><h2>Começar a estudar</h2><button className="btn sm" onClick={onManual}><Icon d={I.plus} s={14} />Registrar manualmente</button></div>
       <div className="fgrid" style={{ gridTemplateColumns: "repeat(3,minmax(0,1fr))" }}>
-        <label className="f"><span>Disciplina</span><select value={subjectId} onChange={(e) => { setSubjectId(e.target.value); setTopicId(""); }}>{list.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+        <label className="f"><span>Disciplina</span><select value={subjectId} onChange={(e) => { setSubjectId(e.target.value); setTopicId(lastOf(e.target.value)); }}>{list.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
         <label className="f"><span>Conteúdo</span><select value={topicId} onChange={(e) => setTopicId(e.target.value)}><option value="">Geral da disciplina</option><TopicOptions topics={st.topics} subjectId={subjectId} /></select></label>
         <label className="f"><span>Atividade</span><select value={activity} onChange={(e) => setActivity(e.target.value as Activity)}>{Object.entries(ACT).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
       </div>
+      <TopicHint topicId={topicId} today={today} />
       <div className="row" style={{ marginTop: 14 }}>
         <button className="btn pri" onClick={() => setStart({ subject_id: subjectId, topic_id: topicId || null, activity })}><Icon d={I.play} s={16} />Começar</button>
         <span className="small muted">O tempo continua contando mesmo se você fechar a página ou trocar de aparelho.</span>
@@ -90,6 +94,20 @@ function TimerPanel({ onManual, onNewSubject }: { onManual: () => void; onNewSub
       {start && <StartModal args={start} onClose={() => setStart(null)} />}
     </div>
   );
+}
+
+/** "Estudando para quê": aula do conteúdo e a prova em que ele cai */
+function TopicHint({ topicId, today }: { topicId: string; today: string }) {
+  const st = useStore();
+  const t = topicId ? st.topics.find((x) => x.id === topicId) : null;
+  if (!t) return null;
+  const a = t.assessment_id ? st.assessments.find((x) => x.id === t.assessment_id) : null;
+  const d = a?.date ? daysBetween(today, a.date) : null;
+  const parts = [
+    t.taught_on ? (t.taught_on <= today ? `aula de ${dm(t.taught_on)}` : `aula prevista para ${dm(t.taught_on)}`) : "",
+    a ? `cai na ${a.name}${d != null && d >= 0 ? (d === 0 ? " (hoje)" : d === 1 ? " (amanhã)" : ` (em ${d} dias)`) : ""}` : "",
+  ].filter(Boolean);
+  return parts.length ? <p className="small muted" style={{ margin: "8px 0 0" }}>Estudando para: {parts.join(" · ")}.</p> : null;
 }
 
 /* ============ Grupos ============ */

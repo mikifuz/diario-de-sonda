@@ -224,7 +224,7 @@ export function dayTasks(p: PlanInput): Task[] {
     seen.add(s.id);
     const start = toMin(b.start_time), end = toMin(b.end_time);
     if (todays.some((x) => x.subject_id === s.id && sessDay(x).m >= start)) continue;
-    const t = p.topics.find((x) => x.subject_id === s.id && x.taught_on === p.today);
+    const t = lastTaught(p.topics, s.id, p.today);
     tasks.push({
       key: "c" + s.id, kind: "consolidar", title: `Consolidar a aula de ${s.name}${t ? `: ${t.name}` : ""}`, subject_id: s.id, topic_id: t?.id ?? null,
       minutes: CLASS_MIN, notBefore: end,
@@ -241,7 +241,7 @@ export function dayTasks(p: PlanInput): Task[] {
     if (todays.some((x) => x.subject_id === s.id)) continue;
     const t = p.topics.filter((x) => x.subject_id === s.id && x.taught_on && x.taught_on >= tomorrow).sort((x, y) => x.taught_on!.localeCompare(y.taught_on!))[0];
     tasks.push({
-      key: "a" + s.id, kind: "adiantar", title: `Adiantar ${s.name}${t ? `: ${t.name}` : ""}`, subject_id: s.id, topic_id: t?.id ?? null, minutes: CLASS_MIN,
+      key: "a" + s.id, kind: "adiantar", title: `Adiantar ${s.name}${t ? `: ${t.name}${t.taught_on !== tomorrow ? ` (previsto para ${dm(t.taught_on!)})` : ""}` : ""}`, subject_id: s.id, topic_id: t?.id ?? null, minutes: CLASS_MIN,
       why: `Aula amanhã às ${b.start_time.slice(0, 5)}; você prefere chegar com o conteúdo adiantado.${t ? "" : " Cadastre a data das aulas nos conteúdos para saber qual é o próximo."}`,
       rank: [1, 1, 0, 0, 1, 0],
     });
@@ -311,4 +311,31 @@ export function examLoads(p: Pick<PlanInput, "today" | "blocks" | "events" | "as
     });
   }
   return out;
+}
+
+/* ============ Cronograma: aula atual e aula remarcada ============ */
+/** Conteúdo da aula mais recente (até hoje) de uma disciplina */
+export function lastTaught(topics: Topic[], subjectId: string, today: string): Topic | null {
+  return topics.filter((t) => t.subject_id === subjectId && t.taught_on && t.taught_on <= today)
+    .sort((a, b) => b.taught_on!.localeCompare(a.taught_on!))[0] ?? null;
+}
+
+/** Próximo dia de aula depois de `day`, pelos dias da semana informados */
+export function nextClassDay(day: string, weekdays: number[]): string {
+  const set = new Set(weekdays);
+  for (let i = 1; i <= 14; i++) { const k = addDays(day, i); if (!set.size || set.has(keyDate(k).getDay())) return set.size ? k : addDays(day, 7); }
+  return addDays(day, 7);
+}
+
+/** Aula remarcada: o conteúdo vai para `newDate` e cada conteúdo seguinte da disciplina
+ *  passa para o próximo dia de aula. Os dias de aula vêm da rotina; sem rotina, dos próprios conteúdos. */
+export function pushLessons(topics: Topic[], id: string, newDate: string, classWeekdays: number[]): Topic[] {
+  const t = topics.find((x) => x.id === id);
+  if (!t) return [];
+  const old = t.taught_on;
+  const moved = [{ ...t, taught_on: newDate }];
+  if (!old || newDate <= old) return moved;
+  const same = topics.filter((x) => x.subject_id === t.subject_id && x.id !== id && x.taught_on);
+  const wds = classWeekdays.length ? classWeekdays : [...new Set(same.map((x) => keyDate(x.taught_on!).getDay()))];
+  return [...moved, ...same.filter((x) => x.taught_on! > old).map((x) => ({ ...x, taught_on: nextClassDay(x.taught_on!, wds) }))];
 }
