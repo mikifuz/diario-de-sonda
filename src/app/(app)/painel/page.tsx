@@ -27,7 +27,7 @@ export default function Painel() {
             <p style={{ margin: 0, maxWidth: "62ch" }}>O diário cruza três coisas que costumam ficar separadas: quanto você estudou, quão seguro se sentiu e quanto realmente acertou. Com poucas semanas de registros ele mostra onde a confiança e o resultado não andam juntos.</p>
             <div className="steps">
               <div><span className="n">PASSO 1</span><b>Cadastre as disciplinas</b><span className="small muted">Nome, professor, média mínima e os conteúdos de cada uma.</span><button className="btn pri sm" onClick={() => setModal({ k: "subject" })}><Icon d={I.plus} s={14} />Nova disciplina</button></div>
-              <div><span className="n">PASSO 2</span><b>Registre uma sessão</b><span className="small muted">Use o cronômetro e responda 3 perguntas rápidas ao terminar.</span><Link className="btn sm" href="/sessoes"><Icon d={I.play} s={14} />Ir para sessões</Link></div>
+              <div><span className="n">PASSO 2</span><b>Registre uma sessão</b><span className="small muted">Use o cronômetro e responda 3 perguntas rápidas ao terminar.</span><Link className="btn sm" href="/sala"><Icon d={I.play} s={14} />Ir para a sala</Link></div>
               <div><span className="n">PASSO 3</span><b>Coloque as provas</b><span className="small muted">Com pesos e datas, o sistema calcula quanto você precisa tirar.</span><button className="btn sm" onClick={() => setModal({ k: "event", id: null })}><Icon d={I.plus} s={14} />Adicionar prova</button></div>
             </div>
             <p className="small muted" style={{ margin: 0 }}>Já usava a primeira versão? Importe sua cópia em <Link href="/configuracoes">Configurações</Link>.</p>
@@ -98,7 +98,7 @@ export default function Painel() {
       <section className="grid g3">
         <div className="panel span2">
           <div className="panel-h"><h2>Horas por dia</h2><span className="lbl">últimos 14 dias</span></div>
-          {days.some((d) => d.total) ? <ChartDays days={days} /> : <Empty>Nenhuma sessão nos últimos 14 dias.<Link className="btn pri sm" href="/sessoes"><Icon d={I.play} s={14} />Iniciar sessão</Link></Empty>}
+          {days.some((d) => d.total) ? <ChartDays days={days} /> : <Empty>Nenhuma sessão nos últimos 14 dias.<Link className="btn pri sm" href="/sala"><Icon d={I.play} s={14} />Iniciar sessão</Link></Empty>}
           <div className="legend" style={{ marginTop: 8 }}>{list.map((s) => <span key={s.id}><i style={{ background: s.color }} />{s.name}</span>)}</div>
         </div>
         <div className="panel">

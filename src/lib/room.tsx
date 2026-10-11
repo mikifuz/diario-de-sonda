@@ -1,6 +1,7 @@
 "use client";
 // Sala de estudos: presença ao vivo, grupos e placar. Só lê/escreve as tabelas
 // compartilhadas (room_members, study_groups, group_members) e os totais agregados.
+// O banco só devolve quem divide algum grupo comigo (migration sala_por_grupos).
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { sb, friendlyError } from "./supabase";
 import { useStore, timerMs } from "./store";
@@ -18,7 +19,7 @@ interface Room {
   totals: Record<string, Record<string, number>>;
   me: RoomMember | null;
   myGroups: StudyGroup[];
-  join: (nick: string, share: boolean) => Promise<void>;
+  join: (nick: string, share: boolean) => Promise<boolean>;
   updateMe: (patch: Partial<Pick<RoomMember, "nick" | "share_subject">>) => Promise<void>;
   leave: () => Promise<void>;
   createGroup: (name: string) => Promise<string | null>;
@@ -103,12 +104,15 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const pushing = useRef(false);
   useEffect(() => {
     if (!me || pushing.current) return;
+    // "estudar sozinho": o cronômetro roda, mas a sala não mostra a sessão
+    const t = timer && timer.social !== "sozinho" ? timer : null;
+    const showSubject = t ? (t.social ? t.social === "materia" : me.share_subject) : false;
     const want = {
-      studying: !!(timer && timer.running),
-      paused: !!(timer && !timer.running),
-      since: timer && timer.running ? new Date(timer.since).toISOString() : null,
-      accum_ms: timer ? Math.round(timer.running ? timer.accum || 0 : timerMs(timer)) : 0,
-      subject: me.share_subject && timer ? subjName.slice(0, 120) : "",
+      studying: !!(t && t.running),
+      paused: !!(t && !t.running),
+      since: t && t.running ? new Date(t.since).toISOString() : null,
+      accum_ms: t ? Math.round(t.running ? t.accum || 0 : timerMs(t)) : 0,
+      subject: showSubject && t ? subjName.slice(0, 120) : "",
     };
     const same = want.studying === me.studying && want.paused === me.paused && want.accum_ms === Number(me.accum_ms) && want.subject === me.subject &&
       (want.since ? !!me.since && Math.abs(new Date(me.since).getTime() - new Date(want.since).getTime()) < 1000 : !me.since);
@@ -123,9 +127,9 @@ export function RoomProvider({ children }: { children: ReactNode }) {
 
   const join = useCallback(async (nick: string, share: boolean) => {
     const { error } = await sb().from("room_members").upsert({ user_id: uid, nick: nick.trim().slice(0, 30), share_subject: share });
-    if (error) { toast(friendlyError(error)); return; }
+    if (error) { toast(friendlyError(error)); return false; }
     await load("all");
-    toast("Você entrou na sala.");
+    return true;
   }, [uid, load, toast]);
 
   const updateMe = useCallback(async (patch: Partial<Pick<RoomMember, "nick" | "share_subject">>) => {
@@ -159,17 +163,18 @@ export function RoomProvider({ children }: { children: ReactNode }) {
 
   const joinGroup = useCallback(async (code: string) => {
     const c = code.trim().toUpperCase();
-    if (!groups.some((g) => g.code === c)) { toast("Nenhum grupo com esse código. Confira com quem criou."); return false; }
+    // os códigos não são listáveis: só dá para saber se existe tentando entrar
     const { error } = await sb().from("group_members").insert({ code: c, user_id: uid });
+    if (error && error.code === "23503") { toast("Nenhum grupo com esse código. Confira com quem criou."); return false; }
     if (error && error.code !== "23505") { toast(friendlyError(error)); return false; }
-    await load("groups");
+    await load("all");
     return true;
-  }, [groups, uid, load, toast]);
+  }, [uid, load, toast]);
 
   const leaveGroup = useCallback(async (code: string) => {
     const { error } = await sb().from("group_members").delete().eq("code", code).eq("user_id", uid);
     if (error) { toast(friendlyError(error)); return; }
-    await load("groups");
+    await load("all");
   }, [uid, load, toast]);
 
   const totals = useMemo(() => {

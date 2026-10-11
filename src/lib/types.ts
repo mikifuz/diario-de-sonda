@@ -24,7 +24,10 @@ export interface Timer {
   /** ms acumulados antes do último "retomar" */
   accum: number;
   running: boolean;
+  /** como a sessão aparece na sala: com a matéria, sem a matéria ou só para mim (ausente = sessões antigas) */
+  social?: Social;
 }
+export type Social = "materia" | "anonimo" | "sozinho";
 
 export interface Profile {
   id: string;

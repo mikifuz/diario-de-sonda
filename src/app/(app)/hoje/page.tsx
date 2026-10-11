@@ -10,10 +10,11 @@ import type { Activity, MistakeCategory, ReviewItem, StudyPref } from "@/lib/typ
 import { Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
 import { BlockModal, MistakeModal, ReviewItemModal, ReviewModal } from "@/components/planning";
 import { ImportSigaModal } from "@/components/importSiga";
+import { StartModal, type StartArgs } from "@/components/studyStart";
 
 type Tab = "plano" | "revisoes" | "erros" | "rotina";
 const TABS: [Tab, string][] = [["plano", "Plano do dia"], ["revisoes", "Revisões"], ["erros", "Banco de erros"], ["rotina", "Rotina"]];
-type ModalState = null | { k: "review"; id: string } | { k: "item"; id: string | null } | { k: "mistake"; id: string | null } | { k: "block"; id: string | null; weekday?: number } | { k: "siga" };
+type ModalState = null | { k: "review"; id: string } | { k: "item"; id: string | null } | { k: "mistake"; id: string | null } | { k: "block"; id: string | null; weekday?: number } | { k: "siga" } | { k: "start"; args: StartArgs };
 type Open = (m: ModalState) => void;
 
 export default function HojePage() {
@@ -38,6 +39,7 @@ function Hoje() {
       {modal?.k === "mistake" && <MistakeModal id={modal.id} onClose={close} />}
       {modal?.k === "block" && <BlockModal id={modal.id} weekday={modal.weekday} onClose={close} />}
       {modal?.k === "siga" && <ImportSigaModal onClose={close} />}
+      {modal?.k === "start" && <StartModal args={modal.args} onClose={close} />}
     </>
   );
 }
@@ -58,7 +60,7 @@ function TaskRow({ t, at, open }: { t: Task; at?: string; open: Open }) {
       </div>
       <div className="row" style={{ gap: 6, justifyContent: "flex-end" }}>
         <button className="btn sm" disabled={!!st.profile?.timer} title={st.profile?.timer ? "Já existe uma sessão em andamento" : undefined}
-          onClick={() => { st.startTimer(t.subject_id, t.topic_id, ACT_OF[t.kind]); st.toast(t.item_id ? "Cronômetro iniciado. Ao terminar, marque a revisão como feita." : "Cronômetro iniciado."); }}>
+          onClick={() => open({ k: "start", args: { subject_id: t.subject_id, topic_id: t.topic_id, activity: ACT_OF[t.kind] } })}>
           <Icon d={I.play} s={14} />Começar</button>
         {t.item_id && <button className="btn sm pri" onClick={() => open({ k: "review", id: t.item_id! })}>Revisei</button>}
       </div>
