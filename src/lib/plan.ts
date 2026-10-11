@@ -46,6 +46,44 @@ export function slotRanges(idx: number[], slots: { start: string; end: string }[
 /* ============ Prova de cada revisão ============ */
 const isExam = (a: Assessment) => a.kind === "prova" || a.kind === "sub";
 
+/** Provas em que um conteúdo cai, sem pedir nada ao aluno:
+ *  1) a prova marcada no conteúdo;
+ *  2) num assunto com subconteúdos (ex.: "Oscilações"), as provas dos subconteúdos;
+ *  3) sem marcação, pela data da aula: a primeira prova depois dela.
+ *  Lista vazia = não dá para saber (sem marcação, sem aula e sem prova com data). */
+export function topicExams(topic: Topic, topics: Topic[], assessments: Assessment[], seen = new Set<string>()): Assessment[] {
+  seen.add(topic.id);
+  if (topic.assessment_id) {
+    const a = assessments.find((x) => x.id === topic.assessment_id);
+    if (a) return [a];
+  }
+  const kids = topics.filter((t) => t.parent_id === topic.id && !seen.has(t.id));
+  if (kids.length) {
+    const out = new Map<string, Assessment>();
+    for (const k of kids) for (const a of topicExams(k, topics, assessments, seen)) out.set(a.id, a);
+    if (out.size) return [...out.values()];
+  }
+  if (topic.taught_on) {
+    const a = assessments
+      .filter((x) => x.subject_id === topic.subject_id && x.kind === "prova" && x.status !== "cancelado" && x.date && x.date > topic.taught_on!)
+      .sort((x, y) => x.date!.localeCompare(y.date!))[0];
+    if (a) return [a];
+  }
+  return [];
+}
+
+/** Conteúdos que caem numa prova (todos os níveis). Conteúdo de prova que já passou fica de fora;
+ *  numa SUB entram os conteúdos das provas que ela substitui; sem como saber, o conteúdo vai para
+ *  a próxima prova (nextId). */
+export function topicsForExam(exam: Assessment, topics: Topic[], assessments: Assessment[], nextId: string | null | undefined): Topic[] {
+  return topics.filter((t) => {
+    if (t.subject_id !== exam.subject_id) return false;
+    const ex = topicExams(t, topics, assessments);
+    if (!ex.length) return exam.id === nextId;
+    return ex.some((a) => a.id === exam.id || (exam.kind === "sub" && a.sub_id === exam.id));
+  });
+}
+
 /** Prova em que a revisão de um conteúdo se encerra: a indicada no conteúdo ou,
  *  se não houver, a próxima prova da disciplina. */
 export function anchorFor(subjectId: string, topic: Topic | null | undefined, assessments: Assessment[], today: string): { a: Assessment; why: string } | null {

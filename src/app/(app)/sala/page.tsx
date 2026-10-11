@@ -4,8 +4,8 @@ import { Suspense, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { activeSubjects, timerMs, topicName, useStore } from "@/lib/store";
 import { liveMs, NUDGES, todayMin, useRoom, weekMin, type NudgeKey } from "@/lib/room";
-import { daysBetween, dkey, fmtClock, fmtMin, inRange, keyDate, nf, pct, periodRange, stats, streak, todayKey, type Period } from "@/lib/calc";
-import { dm, lastTaught } from "@/lib/plan";
+import { daysBetween, dkey, fmtClock, fmtMin, inRange, keyDate, nf, pct, periodRange, stats, streak, todayKey, type Period, qt } from "@/lib/calc";
+import { dm, lastTaught, topicExams } from "@/lib/plan";
 import { ACT } from "@/lib/constants";
 import type { Activity, Session, Social } from "@/lib/types";
 import { ConfirmButton, Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
@@ -101,7 +101,9 @@ function TopicHint({ topicId, today }: { topicId: string; today: string }) {
   const st = useStore();
   const t = topicId ? st.topics.find((x) => x.id === topicId) : null;
   if (!t) return null;
-  const a = t.assessment_id ? st.assessments.find((x) => x.id === t.assessment_id) : null;
+  // prova marcada, a dos subconteúdos ou a primeira depois da aula; num assunto com várias, a próxima
+  const ex = topicExams(t, st.topics, st.assessments).sort((x, y) => (x.date || "").localeCompare(y.date || ""));
+  const a = ex.find((x) => x.date && x.date >= today) ?? ex[ex.length - 1] ?? null;
   const d = a?.date ? daysBetween(today, a.date) : null;
   const parts = [
     t.taught_on ? (t.taught_on <= today ? `aula de ${dm(t.taught_on)}` : `aula prevista para ${dm(t.taught_on)}`) : "",
@@ -155,7 +157,7 @@ function GroupsArea() {
           <>
             <div className="row between" style={{ marginBottom: 12 }}>
               <Tabs value={cur.code} onChange={setG} label="Grupo" options={groups.map((x) => [x.code, x.name] as [string, string])} />
-              <span className="small muted">{members.length} pessoa(s) no grupo</span>
+              <span className="small muted">{qt(members.length, "pessoa", "pessoas")} no grupo</span>
             </div>
             <div className="panel-h"><h2>Estudando agora</h2><span className="chip ok">{now.filter((m) => m.studying).length} ao vivo</span></div>
             {now.length ? (
@@ -214,7 +216,7 @@ function FriendsPanel() {
   const add = async (e: FormEvent) => { e.preventDefault(); if (code.trim() && (await room.sendFriend(code))) setCode(""); };
   return (
     <div className="panel">
-      <div className="panel-h"><h3>Amigos</h3>{incoming.length > 0 && <span className="chip warn">{incoming.length} pedido(s)</span>}</div>
+      <div className="panel-h"><h3>Amigos</h3>{incoming.length > 0 && <span className="chip warn">{qt(incoming.length, "pedido", "pedidos")}</span>}</div>
       <div className="row small" style={{ gap: 6, marginBottom: 8 }}>Seu código de amigo: <b className="num" style={{ letterSpacing: ".1em" }}>{me.friend_code || "–"}</b>{me.friend_code && <button className="btn sm ghost" onClick={copy}>Copiar</button>}</div>
       {incoming.map((f) => (
         <div key={f.id} className="li"><div className="grow small"><b>{f.nick}</b> quer ser seu amigo</div>

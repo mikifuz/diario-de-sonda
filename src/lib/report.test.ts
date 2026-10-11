@@ -26,7 +26,7 @@ test("relatório com horas, comparação, acerto e confiança separados e provas
   assert.equal(r.data.conf, 3); // confiança à parte
   assert.deepEqual(r.data.mistakes, [{ cat: "Sinal", n: 1 }]);
   assert.deepEqual(r.data.exams.map((e) => e.name), ["P2"]);
-  assert.match(r.body, /Você estudou 2h em 2 sessão\(ões\), em 2 dia\(s\); \+1h em relação à semana anterior; acerto conferido de 40%/);
+  assert.match(r.body, /Você estudou 2h em 2 sessões, em 2 dias; \+1h em relação à semana anterior; acerto conferido de 40%/);
   assert.match(r.body, /Na semana que vem: P2 de Cálculo III \(13\/10\)/);
 });
 

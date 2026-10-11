@@ -1,7 +1,7 @@
 // Alertas do painel: o que pede ação agora, com o motivo. Função pura e testada.
 // Confiança e acerto continuam separados: cada alerta diz qual dos dois está baixo.
-import { addDays, daysBetween, dkey, nf, pct, stats } from "./calc";
-import { itemState } from "./plan";
+import { addDays, daysBetween, dkey, nf, pct, stats, qt } from "./calc";
+import { itemState, topicsForExam } from "./plan";
 import { mastery, topicFamily, type MasteryCfg } from "./mastery";
 import type { Assessment, Mistake, ReviewItem, ReviewLog, Session, Subject, Topic } from "./types";
 
@@ -29,13 +29,14 @@ export function buildAlerts(p: AlertInput): Alert[] {
     for (const a of exams) {
       const d = daysBetween(p.today, a.date!);
       if (d > HORIZON) break;
-      // conteúdos da prova: os marcados para ela; para a próxima prova, também os sem prova marcada
-      const inSet = ts.filter((t) => t.assessment_id === a.id || (!t.assessment_id && a.id === exams[0].id));
+      // conteúdos da prova: marcados, pelos subconteúdos ou pela data da aula; os de provas passadas ficam de fora
+      const inSet = topicsForExam(a, ts, p.assessments, exams[0].id);
       const ids = new Set(inSet.map((t) => t.id));
       const tops = inSet.filter((t) => !t.parent_id || !ids.has(t.parent_id));
       const fragile: { t: Topic; score: number; why: string }[] = [], building: { t: Topic; score: number; why: string }[] = [], nodata: Topic[] = [], lowconf: { t: Topic; conf: number }[] = [];
       for (const t of tops) {
-        const fam = topicFamily(p.topics, t.id);
+        // num assunto, só os subconteúdos que caem nesta prova
+        const fam = new Set([...topicFamily(p.topics, t.id)].filter((id) => ids.has(id)));
         const m = mastery(fam, mIn);
         if (m.score == null) nodata.push(t);
         else if (m.band === "fragil") fragile.push({ t, score: m.score, why: `${m.why} ${m.formula}` });
@@ -88,8 +89,8 @@ export function buildAlerts(p: AlertInput): Alert[] {
     // confiança × resultado nos últimos 30 dias (métricas separadas)
     const s30 = stats(p.sessions.filter((x) => x.subject_id === s.id && daysBetween(dkey(x.started_at), p.today) <= 30));
     if (s30.accN >= 3 && s30.conf != null && s30.acc != null) {
-      if (s30.conf >= 4 && s30.acc < 0.6) out.push({ key: `cal-${s.id}`, level: "warn", text: `Em ${s.name} você se avalia com confiança ${nf(s30.conf)}/5, mas acertou ${pct(s30.acc)} do que conferiu nos últimos 30 dias.`, why: `${s30.accN} registro(s) conferido(s).` });
-      if (s30.conf <= 2.5 && s30.acc >= 0.8) out.push({ key: `cal2-${s.id}`, level: "info", text: `Em ${s.name} seus resultados (${pct(s30.acc)}) estão melhores do que sua confiança (${nf(s30.conf)}/5) sugere.`, why: `${s30.accN} registro(s) conferido(s).` });
+      if (s30.conf >= 4 && s30.acc < 0.6) out.push({ key: `cal-${s.id}`, level: "warn", text: `Em ${s.name} você se avalia com confiança ${nf(s30.conf)}/5, mas acertou ${pct(s30.acc)} do que conferiu nos últimos 30 dias.`, why: `${qt(s30.accN, "registro conferido", "registros conferidos")}.` });
+      if (s30.conf <= 2.5 && s30.acc >= 0.8) out.push({ key: `cal2-${s.id}`, level: "info", text: `Em ${s.name} seus resultados (${pct(s30.acc)}) estão melhores do que sua confiança (${nf(s30.conf)}/5) sugere.`, why: `${qt(s30.accN, "registro conferido", "registros conferidos")}.` });
     }
   }
 

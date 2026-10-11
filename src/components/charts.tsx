@@ -1,5 +1,5 @@
 // Gráficos em SVG desenhados com uma única escala por eixo; cores vêm dos tokens do tema.
-import { fmtMin, nf, pct } from "@/lib/calc";
+import { fmtMin, nf, pct, qt } from "@/lib/calc";
 
 export function Gauge({ v, label, sub, color }: { v: number | null; label: string; sub: string; color: string }) {
   const r = 34, c = Math.PI * r, val = v == null ? 0 : Math.max(0, Math.min(1, v));
@@ -56,7 +56,7 @@ export function ChartCalib({ rows }: { rows: { n: number; acc: number | null }[]
         const x = L + i * bw + bw * 0.2, w = bw * 0.6, rv = i / 4;
         return (
           <g key={i}>
-            {r.acc != null && <rect x={x} y={y(r.acc)} width={w} height={H - B - y(r.acc)} fill="var(--accent)" opacity={0.85}><title>{`Confiança ${i + 1}: ${pct(r.acc)} de acerto em ${r.n} registro(s)`}</title></rect>}
+            {r.acc != null && <rect x={x} y={y(r.acc)} width={w} height={H - B - y(r.acc)} fill="var(--accent)" opacity={0.85}><title>{`Confiança ${i + 1}: ${pct(r.acc)} de acerto em ${qt(r.n, "registro", "registros")}`}</title></rect>}
             <line x1={x - 3} x2={x + w + 3} y1={y(rv)} y2={y(rv)} stroke="var(--fg)" strokeWidth="2" strokeDasharray="3 2" />
             <text x={x + w / 2} y={H - B + 14} textAnchor="middle" fontSize="11" style={{ fill: "var(--fg)" }}>{i + 1}</text>
             <text x={x + w / 2} y={H - B + 27} textAnchor="middle" fontSize="9">n={r.n}</text>

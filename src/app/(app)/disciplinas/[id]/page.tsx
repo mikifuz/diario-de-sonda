@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
-import { dkey, fmtMin, gradeCalc, keyDate, nf, pct, signal, stats, todayKey } from "@/lib/calc";
+import { dkey, fmtMin, gradeCalc, keyDate, nf, pct, signal, stats, todayKey, qt } from "@/lib/calc";
 import { dm, itemState } from "@/lib/plan";
 import { BAND, mastery, masteryCfg, topicFamily } from "@/lib/mastery";
 import { MISTAKE, WD_S } from "@/lib/constants";
@@ -23,6 +23,8 @@ export default function Disciplina() {
   const [newTopic, setNewTopic] = useState("");
   const [parent, setParent] = useState("");
   const [why, setWhy] = useState<string | null>(null);
+  // vindo do guia de primeiros passos: abre direto a importação do cronograma
+  useEffect(() => { if (new URLSearchParams(window.location.search).get("abrir") === "cronograma") setModal({ k: "syllabus" }); }, []);
   const s = st.subjects.find((x) => x.id === id);
   if (!s) return <Empty title="Disciplina não encontrada">Ela pode ter sido excluída.<Link className="btn sm" href="/disciplinas">Ver disciplinas</Link></Empty>;
 
@@ -57,7 +59,7 @@ export default function Disciplina() {
               : <button className="btn sm ghost" onClick={() => setModal({ k: "review", topic: t.id })} title="Agendar revisão deste conteúdo">Revisar</button>}
             <button className="btn icon ghost" onClick={() => setModal({ k: "topic", id: t.id })} aria-label="Editar conteúdo"><Icon d={I.edit} s={15} /></button>
           </span>
-          <div className="tm"><span>{fmtMin(tst.min)}</span><span>{tst.n} sessões</span><span>confiança {tst.conf == null ? "–" : nf(tst.conf)}/5</span><span>acerto {pct(tst.acc)} ({tst.accN})</span><span>autonomia {pct(tst.solo)}</span>{last && <span>último: {keyDate(dkey(last.started_at)).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span>}{t.taught_on && <span>aula {dm(t.taught_on)}</span>}{exam && <span>cai na {exam.name}</span>}{nMist > 0 && <span>{nMist} erro(s)</span>}</div>
+          <div className="tm"><span>{fmtMin(tst.min)}</span><span>{qt(tst.n, "sessão", "sessões")}</span><span>confiança {tst.conf == null ? "–" : nf(tst.conf)}/5</span><span>acerto {pct(tst.acc)} ({tst.accN})</span><span>autonomia {pct(tst.solo)}</span>{last && <span>último: {keyDate(dkey(last.started_at)).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span>}{t.taught_on && <span>aula {dm(t.taught_on)}</span>}{exam && <span>cai na {exam.name}</span>}{nMist > 0 && <span>{qt(nMist, "erro", "erros")}</span>}</div>
           {why === t.id && (
             <div className="callout info small" style={{ gridColumn: "1/-1", marginTop: 4 }}>
               <div><b>{ms.why}</b>{ms.formula && <> <span className="num">{ms.formula}</span></>}</div>
@@ -107,8 +109,8 @@ export default function Disciplina() {
       </section>
       <section className="kpis">
         <div className="kpi"><span className="lbl">Horas totais</span><span className="v">{fmtMin(sp.min)}</span><span className="s">{sp.n} sessões</span></div>
-        <div className="kpi"><span className="lbl">Confiança média</span><span className="v">{sp.conf == null ? "–" : nf(sp.conf)}<small>/5</small></span><span className="s">{sp.confN} autoavaliação(ões)</span></div>
-        <div className="kpi"><span className="lbl">Acerto conferido</span><span className="v">{pct(sp.acc)}</span><span className="s">{sp.accN} registro(s)</span></div>
+        <div className="kpi"><span className="lbl">Confiança média</span><span className="v">{sp.conf == null ? "–" : nf(sp.conf)}<small>/5</small></span><span className="s">{qt(sp.confN, "autoavaliação", "autoavaliações")}</span></div>
+        <div className="kpi"><span className="lbl">Acerto conferido</span><span className="v">{pct(sp.acc)}</span><span className="s">{qt(sp.accN, "registro", "registros")}</span></div>
         <div className="kpi"><span className="lbl">Média atual</span><span className="v" style={{ color: gc.partial == null ? "inherit" : gc.partial >= gc.min ? "var(--ok)" : "var(--bad)" }}>{gc.partial == null ? "–" : nf(gc.partial)}</span>
           <span className="s">{gc.needed != null ? `precisa de ${nf(Math.max(0, gc.needed))} nas restantes` : `mínima ${nf(gc.min)}`} · <a href="#notas">notas</a></span></div>
       </section>

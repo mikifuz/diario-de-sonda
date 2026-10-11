@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addDays, gradeCalc, parseNum, periodRange, signal, stats, streak, verified, weekStartKey, fmtMin } from "./calc";
+import { addDays, gradeCalc, parseNum, periodRange, signal, stats, streak, verified, weekStartKey, fmtMin, qt } from "./calc";
 import type { Assessment, Session } from "./types";
 
 const A = (p: Partial<Assessment>): Assessment => ({
@@ -120,4 +120,10 @@ test("sequência de dias", () => {
   assert.equal(streak(d, false, "2026-10-10"), 2);
   assert.equal(streak({ "2026-10-09": 20 }, false, "2026-10-10"), 1);
   assert.equal(streak({}, true, "2026-10-10"), 1);
+});
+
+test("singular e plural sem \"(s)\"", () => {
+  assert.equal(qt(1, "sessão", "sessões"), "1 sessão");
+  assert.equal(qt(0, "sessão", "sessões"), "0 sessões");
+  assert.equal(qt(3, "revisão feita", "revisões feitas"), "3 revisões feitas");
 });

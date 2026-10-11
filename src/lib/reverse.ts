@@ -3,7 +3,7 @@
 // fica gravado): conforme você estuda, o que falta diminui e o plano se refaz.
 import { addDays, daysBetween, dkey } from "./calc";
 import { BAND, mastery, type Band, type MasteryCfg } from "./mastery";
-import { dm, freeStudy, toMin, type Task } from "./plan";
+import { dm, freeStudy, toMin, topicsForExam, type Task } from "./plan";
 import type { Assessment, CalEvent, Mistake, ReviewItem, ReviewLog, RoutineBlock, Session, Subject, Topic } from "./types";
 
 /** Minutos de estudo que cada conteúdo deve receber antes da prova, pela faixa do índice */
@@ -33,13 +33,13 @@ export interface ExamPlan {
 
 const r5 = (n: number) => Math.max(0, Math.round(n / 5) * 5);
 
-/** Conteúdos que caem numa prova: os ligados a ela e, para a próxima prova, os sem prova marcada.
+/** Conteúdos que caem numa prova (`topicsForExam`: marcados, pelos subconteúdos ou pela data da aula).
  *  Só os conteúdos "folha" (sem subconteúdos), para não contar o mesmo assunto duas vezes. */
 export function examTopics(exam: Assessment, topics: Topic[], assessments: Assessment[], today: string): Topic[] {
   const next = assessments.filter((a) => a.subject_id === exam.subject_id && a.kind === "prova" && a.grade == null && a.status !== "cancelado" && a.date && a.date >= today)
     .sort((a, b) => a.date!.localeCompare(b.date!))[0];
   const parents = new Set(topics.map((t) => t.parent_id).filter(Boolean));
-  return topics.filter((t) => t.subject_id === exam.subject_id && !parents.has(t.id) && (t.assessment_id === exam.id || (!t.assessment_id && next?.id === exam.id)));
+  return topicsForExam(exam, topics, assessments, next?.id).filter((t) => !parents.has(t.id));
 }
 
 export function reversePlan(p: RevInput): ExamPlan[] {
@@ -105,7 +105,7 @@ export function reversePlan(p: RevInput): ExamPlan[] {
         used.add(t.topic.id);
         const label = t.band ? `domínio ${t.score} (${BAND[t.band][0]})` : "sem resultado conferido";
         chunks.push({ key: `c-${exam.id}-${t.topic.id}-${d}`, examId: exam.id, subjectId: subject.id, topicId: t.topic.id, day: d, minutes: m,
-          title: `${t.topic.name}`, why: `Faltam ${daysBetween(d, exam.date!)} dia(s) para a ${exam.name} de ${subject.name}. ${t.topic.name}: ${label}; meta de ${t.target} min antes da prova, já estudou ${t.done} min.` });
+          title: `${t.topic.name}`, why: `${daysBetween(d, exam.date!) === 1 ? "Falta 1 dia" : `Faltam ${daysBetween(d, exam.date!)} dias`} para a ${exam.name} de ${subject.name}. ${t.topic.name}: ${label}; meta de ${t.target} min antes da prova, já estudou ${t.done} min.` });
         pending.splice(i, 1);
       }
     }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { activeSubjects, useStore } from "@/lib/store";
-import { daysBetween, todayKey } from "@/lib/calc";
+import { daysBetween, todayKey, qt } from "@/lib/calc";
 import { buildAlerts } from "@/lib/alerts";
 import { masteryCfg } from "@/lib/mastery";
 import type { Todo } from "@/lib/types";
@@ -73,7 +73,7 @@ export function TodoPanel() {
   };
   return (
     <section className="panel" aria-label="Tarefas">
-      <div className="panel-h"><h2>Tarefas</h2><span className="lbl">{open.length} pendente(s)</span></div>
+      <div className="panel-h"><h2>Tarefas</h2><span className="lbl">{qt(open.length, "pendente", "pendentes")}</span></div>
       <form className="stack" style={{ gap: 8, marginBottom: 8 }} onSubmit={add}>
         <div className="row" style={{ flexWrap: "nowrap" }}>
           <input type="text" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} placeholder="Nova tarefa, ex.: entregar lista 4" aria-label="Nova tarefa" required />
@@ -89,7 +89,7 @@ export function TodoPanel() {
         <details style={{ marginTop: 8 }}>
           <summary className="small">Concluídas ({done.length})</summary>
           <div className="list">{done.slice(0, 30).map((t) => <Row key={t.id} t={t} />)}</div>
-          <ConfirmButton small label="Apagar concluídas" question={`Apagar ${done.length} tarefa(s) concluída(s)?`} confirmLabel="Apagar" onConfirm={async () => { for (const t of done) await st.remove("tasks", t.id); }} />
+          <ConfirmButton small label="Apagar concluídas" question={`Apagar ${qt(done.length, "tarefa concluída", "tarefas concluídas")}?`} confirmLabel="Apagar" onConfirm={async () => { for (const t of done) await st.remove("tasks", t.id); }} />
         </details>
       )}
     </section>

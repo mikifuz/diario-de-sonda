@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { activeSubjects, topicName, useStore } from "@/lib/store";
-import { addDays, daysBetween, fmtMin, gradeCalc, keyDate, nf, todayKey } from "@/lib/calc";
+import { addDays, daysBetween, fmtMin, gradeCalc, keyDate, nf, todayKey, qt } from "@/lib/calc";
 import { cleanSteps, dm, firstDue, fromMin, itemState, parseSteps, planDay, weekCapacity, type PlanInput, type Task } from "@/lib/plan";
 import { BLOCK, MISTAKE, PREF, WD_S, WEEKDAYS } from "@/lib/constants";
 import { BAND, masteryCfg } from "@/lib/mastery";
@@ -27,7 +27,7 @@ function Hoje() {
   const params = useSearchParams();
   const pre = params.get("aba") as Tab | null;
   const [tab, setTab] = useState<Tab>(pre && TABS.some(([k]) => k === pre) ? pre : "plano");
-  const [modal, setModal] = useState<ModalState>(null);
+  const [modal, setModal] = useState<ModalState>(params.get("abrir") === "siga" ? { k: "siga" } : null);
   const close = () => setModal(null);
   return (
     <>
@@ -120,7 +120,7 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
   });
   const reactivate = async (o: (typeof subOffers)[number]) => {
     const rows: ReviewItem[] = o.closed.map((i) => ({ ...i, assessment_id: o.sub.id, step: 0, due: firstDue(steps, today, o.sub.date) }));
-    if (await st.saveMany("review_items", rows)) st.toast(`${rows.length} revisão(ões) reativada(s) até a SUB de ${o.s.name}.`);
+    if (await st.saveMany("review_items", rows)) st.toast(`${qt(rows.length, "revisão reativada", "revisões reativadas")} até a SUB de ${o.s.name}.`);
   };
 
   const dateLabel = keyDate(today).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
@@ -129,7 +129,7 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
       <section className="kpis">
         <div className="kpi"><span className="lbl">Tempo livre para estudo</span><span className="v">{fmtMin(plan.capacity)}</span><span className="s">no resto de {dateLabel}</span></div>
         <div className="kpi"><span className="lbl">Tarefas pedem</span><span className="v" style={{ color: plan.need > plan.capacity ? "var(--warn)" : undefined }}>{fmtMin(plan.need)}</span><span className="s">{plan.overflow.length ? `${plan.overflow.length} não couberam` : "tudo cabe"}</span></div>
-        <div className="kpi"><span className="lbl">Revisões vencidas</span><span className="v">{due.length}</span><span className="s">{due.filter((i) => i.due < today).length} atrasada(s)</span></div>
+        <div className="kpi"><span className="lbl">Revisões vencidas</span><span className="v">{due.length}</span><span className="s">{qt(due.filter((i) => i.due < today).length, "atrasada", "atrasadas")}</span></div>
         <div className="kpi"><span className="lbl">Próximos 7 dias</span><span className="v">{week.reduce((a, d) => a + d.n, 0)}</span><span className="s">~{fmtMin(week.reduce((a, d) => a + d.min, 0))} de revisão</span></div>
       </section>
 
@@ -141,7 +141,7 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
       )}
       {plan.notes.map((n) => <div key={n} className="callout">{n}</div>)}
       {plans.filter((pl) => pl.missing > 0 && pl.topics.length).map((pl) => (
-        <div key={pl.exam.id} className="callout"><b>{pl.exam.name} de {pl.subject.name} em {pl.days} dia(s): não cabe tudo.</b> Faltam {pl.missing} min de estudo antes da prova. <button className="btn sm ghost" onClick={goExams}>Ver o plano da prova</button></div>
+        <div key={pl.exam.id} className="callout"><b>{pl.exam.name} de {pl.subject.name} em {qt(pl.days, "dia", "dias")}: não cabe tudo.</b> Faltam {pl.missing} min de estudo antes da prova. <button className="btn sm ghost" onClick={goExams}>Ver o plano da prova</button></div>
       ))}
       {subOffers.map((o) => (
         <div key={o.sub.id} className="callout info stack" style={{ gap: 8 }}>
@@ -156,7 +156,7 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
 
       {plan.hasStudyBlocks && (
         <section className="panel">
-          <div className="panel-h"><h2>Agenda de estudo</h2><span className="lbl">{plan.slots.length} bloco(s) restante(s) hoje</span></div>
+          <div className="panel-h"><h2>Agenda de estudo</h2><span className="lbl">{qt(plan.slots.length, "bloco restante", "blocos restantes")} hoje</span></div>
           {plan.slots.length ? plan.slots.map((s) => (
             <div key={s.block.id} style={{ marginBottom: 14 }}>
               <div className="lbl" style={{ marginBottom: 4 }}>{fromMin(s.start)}–{s.block.end_time} · {BLOCK.estudo}{s.block.label ? ` · ${s.block.label}` : ""}</div>
@@ -186,7 +186,7 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
           <div className="panel-h"><h2>Próximos 7 dias</h2><span className="lbl">revisões agendadas</span></div>
           <div className="list">{week.map((d) => (
             <div key={d.k} className="li"><span className="cdays">{WD_S[keyDate(d.k).getDay()]} {dm(d.k)}</span>
-              <div className="grow small">{d.n ? `${d.n} revisão(ões) · ~${fmtMin(d.min)}` : <span className="muted">nenhuma</span>}</div></div>
+              <div className="grow small">{d.n ? `${qt(d.n, "revisão", "revisões")} · ~${fmtMin(d.min)}` : <span className="muted">nenhuma</span>}</div></div>
           ))}</div>
         </div>
         <div className="panel">
@@ -196,7 +196,7 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
             return (
               <div key={pl.exam.id} className="li"><span className={"cdays " + (pl.missing ? "bad" : pl.days <= 7 ? "warn" : "")}>{pl.days} d</span>
                 <div className="grow"><div className="t">{pl.exam.name} · {pl.subject.name}</div>
-                  <div className="m">{pl.topics.length ? `${pl.topics.length} conteúdo(s) · estudado ${done} de ${goal} min da meta${pl.missing ? ` · faltam ${pl.missing} min que não cabem` : ""}` : "sem conteúdos ligados"}</div></div></div>
+                  <div className="m">{pl.topics.length ? `${qt(pl.topics.length, "conteúdo", "conteúdos")} · estudado ${done} de ${goal} min da meta${pl.missing ? ` · faltam ${pl.missing} min que não cabem` : ""}` : "sem conteúdos ligados"}</div></div></div>
             );
           })}</div> : <p className="small muted" style={{ margin: 0 }}>Nenhuma prova nos próximos 30 dias.</p>}
         </div>
@@ -298,7 +298,7 @@ function MistakesTab({ open }: { open: Open }) {
                 <span className="num small" style={{ width: 28, textAlign: "right" }}>{c.n}</span>
               </button>
             ))}
-            <p className="small muted" style={{ margin: "6px 0 0" }}>{bySub.length < 5 ? `Só ${bySub.length} erro(s) registrado(s): ainda é cedo para tirar conclusões sobre o tipo mais comum.` : "Clique num tipo para filtrar a lista."}</p>
+            <p className="small muted" style={{ margin: "6px 0 0" }}>{bySub.length < 5 ? `Só ${qt(bySub.length, "erro registrado", "erros registrados")}: ainda é cedo para tirar conclusões sobre o tipo mais comum.` : "Clique num tipo para filtrar a lista."}</p>
           </div>
         ) : <Empty title="Nenhum erro registrado">Ao avaliar uma sessão com resultado parcial ou errado, o diário oferece registrar o erro. Você também pode registrar aqui.</Empty>}
       </section>
@@ -403,7 +403,7 @@ function ExamsTab({ open }: { open: Open }) {
           <section key={pl.exam.id} className="panel">
             <div className="panel-h">
               <h2><Dot c={pl.subject.color} /> {pl.exam.name} · {pl.subject.name}</h2>
-              <span className={"chip " + (pl.missing ? "bad" : pl.days <= 7 ? "warn" : "")}>{dm(pl.exam.date!)} · em {pl.days} dia(s)</span>
+              <span className={"chip " + (pl.missing ? "bad" : pl.days <= 7 ? "warn" : "")}>{dm(pl.exam.date!)} · em {qt(pl.days, "dia", "dias")}</span>
             </div>
             {pl.notes.map((n) => <div key={n} className={"callout small" + (n.startsWith("Conteúdos que ainda") ? " info" : "")} style={{ marginBottom: 8 }}>{n}</div>)}
             {pl.topics.length > 0 && (

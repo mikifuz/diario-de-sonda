@@ -1,6 +1,6 @@
 // Relatório semanal (chega no domingo de manhã, como notificação). Função pura e testada.
 // Só fatos do período; confiança e acerto conferido aparecem separados.
-import { addDays, daysBetween, dkey, fmtMin, keyDate, nf, pct, stats } from "./calc";
+import { addDays, daysBetween, dkey, fmtMin, keyDate, nf, pct, stats, qt } from "./calc";
 import { itemState } from "./plan";
 import { MISTAKE } from "./constants";
 import type { Assessment, Mistake, MistakeCategory, ReviewItem, ReviewLog, Session, Subject } from "./types";
@@ -56,9 +56,9 @@ export function buildReport(p: ReportInput): { title: string; body: string; data
   };
   const diff = data.minutes - data.prevMinutes;
   const parts = [
-    data.minutes ? `Você estudou ${fmtMin(data.minutes)} em ${data.sessions} sessão(ões), em ${data.days} dia(s)` : "Nenhuma sessão registrada nesta semana",
+    data.minutes ? `Você estudou ${fmtMin(data.minutes)} em ${qt(data.sessions, "sessão", "sessões")}, em ${qt(data.days, "dia", "dias")}` : "Nenhuma sessão registrada nesta semana",
     data.prevMinutes || data.minutes ? `${diff >= 0 ? "+" : "−"}${fmtMin(Math.abs(diff))} em relação à semana anterior` : "",
-    data.accN ? `acerto conferido de ${pct(data.acc)} (${data.accN} registro(s))` : "",
+    data.accN ? `acerto conferido de ${pct(data.acc)} (${qt(data.accN, "registro", "registros")})` : "",
     data.confN ? `confiança média ${nf(data.conf)}/5` : "",
   ].filter(Boolean);
   const body = parts.join("; ") + "." + (data.exams.length ? ` Na semana que vem: ${data.exams.map((e) => `${e.name} de ${e.subject} (${dm(e.date)})`).join(", ")}.` : "");

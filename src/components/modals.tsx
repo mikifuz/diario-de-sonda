@@ -3,7 +3,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Modal, Seg, ConfirmButton, Icon, I } from "./ui";
 import { ACT, AUTO, COLORS, COMP, CONF, DIFF, EVT, GRADED, PREF, PRIO, RES, STATUS } from "@/lib/constants";
-import { dkey, fmtMin, pad, parseNum, todayKey } from "@/lib/calc";
+import { dkey, fmtMin, pad, parseNum, todayKey, qt } from "@/lib/calc";
 import { activeSubjects, useStore } from "@/lib/store";
 import type { Activity, Assessment, AssessmentKind, Autonomy, CalEvent, Comprehension, EventType, Priority, Result, Session, Status, StudyPref, Subject, Topic, Traits } from "@/lib/types";
 import { MistakeModal } from "./planning";
@@ -207,7 +207,7 @@ export function SubjectModal({ id, onClose }: { id: string | null; onClose: () =
           </div>
         </details>
         <div className="modal-f">
-          {orig && <span style={{ marginRight: "auto" }}><ConfirmButton label={<><Icon d={I.trash} s={15} />Excluir</>} question={`Excluir a disciplina e suas ${nSes} sessão(ões)? Arquivar mantém o histórico.`} confirmLabel="Excluir tudo"
+          {orig && <span style={{ marginRight: "auto" }}><ConfirmButton label={<><Icon d={I.trash} s={15} />Excluir</>} question={`Excluir a disciplina e ${nSes === 1 ? "sua sessão" : `suas ${nSes} sessões`}? Arquivar mantém o histórico.`} confirmLabel="Excluir tudo"
             onConfirm={async () => { if (await st.remove("subjects", orig.id)) { st.toast("Disciplina excluída."); onClose(); router.push("/disciplinas"); } }} /></span>}
           <button type="button" className="btn ghost" onClick={onClose}>Cancelar</button><button className="btn pri">Salvar</button>
         </div>
@@ -241,7 +241,7 @@ export function TopicModal({ id, onClose }: { id: string; onClose: () => void })
     const row = { ...t, name: name.trim(), parent_id: parent || null, taught_on: taught || null, assessment_id: exam || null };
     if (later && push) {
       const moved = pushLessons(st.topics, t.id, taught, classDays).map((x) => (x.id === t.id ? { ...row, taught_on: x.taught_on } : x));
-      if (await st.saveMany("topics", moved)) { st.toast(`Aula remarcada; ${moved.length - 1} aula(s) seguinte(s) empurrada(s).`); onClose(); }
+      if (await st.saveMany("topics", moved)) { st.toast(`Aula remarcada; ${qt(moved.length - 1, "aula seguinte empurrada", "aulas seguintes empurradas")}.`); onClose(); }
       return;
     }
     if (await st.save("topics", row)) onClose();
@@ -257,10 +257,10 @@ export function TopicModal({ id, onClose }: { id: string; onClose: () => void })
             {exams.map((a) => <option key={a.id} value={a.id}>{a.name}{a.date ? ` (${a.date.slice(8, 10)}/${a.date.slice(5, 7)})` : " (sem data)"}</option>)}</select></label>
         </div>
         {later > 0 && <label className="check"><input type="checkbox" checked={push} onChange={(e) => setPush(e.target.checked)} />
-          Aula remarcada: empurrar também os {later} conteúdo(s) seguinte(s) para o próximo dia de aula{classDays.length ? "" : " (pelos dias em que a disciplina costuma ter aula)"}</label>}
+          Aula remarcada: empurrar também {later === 1 ? "o conteúdo seguinte" : `os ${later} conteúdos seguintes`} para o próximo dia de aula{classDays.length ? "" : " (pelos dias em que a disciplina costuma ter aula)"}</label>}
         <p className="small muted" style={{ margin: 0 }}>A data da aula ajuda o plano do dia a sugerir o que adiantar ou consolidar. A prova define até quando este conteúdo é revisado.</p>
         <div className="modal-f">
-          <span style={{ marginRight: "auto" }}><ConfirmButton label={<><Icon d={I.trash} s={15} />Excluir</>} question={n > 0 ? `${n} sessão(ões) ficarão como "geral da disciplina".` : "Excluir?"} confirmLabel="Excluir"
+          <span style={{ marginRight: "auto" }}><ConfirmButton label={<><Icon d={I.trash} s={15} />Excluir</>} question={n > 0 ? n === 1 ? `1 sessão ficará como "geral da disciplina".` : `${n} sessões ficarão como "geral da disciplina".` : "Excluir?"} confirmLabel="Excluir"
             onConfirm={async () => {
               // subconteúdos sobem um nível antes de excluir
               const kids = st.topics.filter((x) => x.parent_id === t.id).map((x) => ({ ...x, parent_id: t.parent_id }));

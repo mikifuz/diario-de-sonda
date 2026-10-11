@@ -2,7 +2,7 @@
 // Formulários do banco de erros, da revisão espaçada e da rotina semanal.
 import { useState, type FormEvent } from "react";
 import { activeSubjects, useStore } from "@/lib/store";
-import { addDays, parseNum, todayKey } from "@/lib/calc";
+import { addDays, parseNum, todayKey, qt } from "@/lib/calc";
 import { anchorFor, cleanSteps, dm, firstDue, nextReview, slotRanges, toMin } from "@/lib/plan";
 import { AUTO, BLOCK, CLASS_SLOTS, COLORS, CONF, MISTAKE, MISTAKE_D, WD_S } from "@/lib/constants";
 import type { Autonomy, BlockKind, Mistake, MistakeCategory, Result, ReviewItem, ReviewLog, RoutineBlock, Session, Subject } from "@/lib/types";
@@ -279,7 +279,7 @@ export function BlockModal({ id, weekday, onClose }: { id: string | null; weekda
     const clash = rows.flatMap((r) => st.blocks.filter((b) => b.id !== r.id && b.weekday === r.weekday && toMin(b.start_time) < toMin(r.end_time) && toMin(r.start_time) < toMin(b.end_time)));
     if (await st.saveMany("routine_blocks", rows)) {
       const created = f.subject_id === NEW && isClass ? ` Disciplina "${f.newName.trim()}" criada; complete os dados em Disciplinas quando quiser.` : "";
-      st.toast((clash.length ? `Salvo. Atenção: ${clash.length} bloco(s) no mesmo horário.` : "Rotina atualizada.") + created);
+      st.toast((clash.length ? `Salvo. Atenção: ${qt(clash.length, "bloco", "blocos")} no mesmo horário.` : "Rotina atualizada.") + created);
       onClose();
     }
   };

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useRoom } from "@/lib/room";
 import { sb } from "@/lib/supabase";
-import { fmtMin, nf, pct, todayKey } from "@/lib/calc";
+import { fmtMin, nf, pct, todayKey, qt } from "@/lib/calc";
 import { buildReport, reportWeek, type ReportData } from "@/lib/report";
 import type { AppNotification } from "@/lib/types";
 import { ConfirmButton, Empty, I, Icon } from "./ui";
@@ -37,13 +37,13 @@ function Report({ d }: { d: ReportData }) {
     <div className="stack small" style={{ gap: 8, marginTop: 8 }}>
       <div className="grid g3" style={{ gap: 8 }}>
         <div className="kpi"><span className="lbl">Tempo de estudo</span><span className="num">{fmtMin(d.minutes)}</span><span className="s">{d.minutes - d.prevMinutes >= 0 ? "+" : "−"}{fmtMin(Math.abs(d.minutes - d.prevMinutes))} vs. semana anterior</span></div>
-        <div className="kpi"><span className="lbl">Acerto conferido</span><span className="num">{pct(d.acc)}</span><span className="s">{d.accN} registro(s)</span></div>
-        <div className="kpi"><span className="lbl">Confiança média</span><span className="num">{d.conf == null ? "–" : `${nf(d.conf)}/5`}</span><span className="s">{d.confN} autoavaliação(ões)</span></div>
+        <div className="kpi"><span className="lbl">Acerto conferido</span><span className="num">{pct(d.acc)}</span><span className="s">{qt(d.accN, "registro", "registros")}</span></div>
+        <div className="kpi"><span className="lbl">Confiança média</span><span className="num">{d.conf == null ? "–" : `${nf(d.conf)}/5`}</span><span className="s">{qt(d.confN, "autoavaliação", "autoavaliações")}</span></div>
       </div>
       {d.bySubject.length > 0 && <div className="stack" style={{ gap: 4 }}>{d.bySubject.map((x) => (
         <div key={x.name} className="row" style={{ flexWrap: "nowrap", gap: 8 }}><span style={{ width: 160, flex: "none" }}>{x.name}</span><div className="bar" style={{ flex: 1 }}><i style={{ width: `${(x.minutes / max) * 100}%`, background: "var(--accent)" }} /></div><span className="num" style={{ width: 70, textAlign: "right" }}>{fmtMin(x.minutes)}</span></div>
       ))}</div>}
-      <div>{d.sessions} sessão(ões) em {d.days} dia(s) · {d.reviews} revisão(ões) feita(s){d.late ? ` · ${d.late} atrasada(s) agora` : ""}</div>
+      <div>{qt(d.sessions, "sessão", "sessões")} em {qt(d.days, "dia", "dias")} · {qt(d.reviews, "revisão feita", "revisões feitas")}{d.late ? ` · ${qt(d.late, "atrasada", "atrasadas")} agora` : ""}</div>
       {d.mistakes.length > 0 && <div>Erros mais registrados: {d.mistakes.map((m) => `${m.cat} (${m.n})`).join(", ")}</div>}
       {d.exams.length > 0 && <div><b>Semana que vem:</b> {d.exams.map((e) => `${e.name} de ${e.subject} (${e.date.slice(8, 10)}/${e.date.slice(5, 7)})`).join(", ")} · <Link href="/hoje?aba=provas">ver plano das provas</Link></div>}
       <span className="muted">Confiança e acerto aparecem separados: confiança é o que você sentiu, acerto é o que foi conferido.</span>
@@ -86,7 +86,7 @@ export function NotificationsList() {
             </div>
           );
         })}</div>
-        {read.length > 0 && <div style={{ marginTop: 10 }}><ConfirmButton small label="Apagar as lidas" question={`Apagar ${read.length} notificação(ões) lida(s)?`} confirmLabel="Apagar" onConfirm={async () => { for (const n of read) await st.remove("notifications", n.id); }} /></div>}
+        {read.length > 0 && <div style={{ marginTop: 10 }}><ConfirmButton small label="Apagar as lidas" question={`Apagar ${qt(read.length, "notificação lida", "notificações lidas")}?`} confirmLabel="Apagar" onConfirm={async () => { for (const n of read) await st.remove("notifications", n.id); }} /></div>}
       </section>
       <p className="small muted" style={{ margin: 0 }}>O relatório chega todo domingo a partir das 7h, sobre a semana de domingo a sábado. Por enquanto as notificações aparecem dentro do app; avisos no celular com o app fechado ficam para uma próxima etapa.</p>
     </>
