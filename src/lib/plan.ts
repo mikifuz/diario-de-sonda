@@ -3,6 +3,7 @@
 import { addDays, daysBetween, keyDate, pad } from "./calc";
 import { mastery, topicFamily, type MasteryCfg } from "./mastery";
 import { DEFAULT_STEPS } from "./constants";
+import { holidayOf } from "./holidays";
 import { effortOf, scaleMin } from "./effort";
 import type { Assessment, Autonomy, CalEvent, Mistake, Result, ReviewItem, ReviewLog, RoutineBlock, Session, StudyPref, Subject, Topic } from "./types";
 
@@ -43,6 +44,24 @@ export function slotRanges(idx: number[], slots: { start: string; end: string }[
   }
   return out;
 }
+
+/* ============ Dias sem aula ============ */
+export interface NoClass { all: string | null; subjects: Map<string, string> }
+/** Feriado nacional ou "Sem aula / feriado" no calendário (de todas as disciplinas ou de uma) */
+export function noClass(day: string, events: CalEvent[]): NoClass {
+  const h = holidayOf(day);
+  let all: string | null = h ? `feriado de ${h}` : null;
+  const subjects = new Map<string, string>();
+  for (const e of events) {
+    if (e.date !== day || e.type !== "sem_aula" || e.status === "cancelado") continue;
+    const why = e.title?.trim() || "sem aula";
+    if (e.subject_id) subjects.set(e.subject_id, why);
+    else all = all ?? why;
+  }
+  return { all, subjects };
+}
+/** Motivo de não haver aula desta disciplina no dia (null = tem aula) */
+export const classOff = (nc: NoClass, subjectId: string | null) => nc.all ?? (subjectId ? nc.subjects.get(subjectId) ?? null : null);
 
 /* ============ Prova de cada revisão ============ */
 const isExam = (a: Assessment) => a.kind === "prova" || a.kind === "sub";
@@ -207,8 +226,17 @@ const sessDay = (s: Session) => { const d = new Date(s.started_at); return { k: 
 /** Blocos de estudo que sobram no dia, descontando compromissos do calendário */
 export function freeStudy(blocks: RoutineBlock[], events: CalEvent[], day: string): { blocks: RoutineBlock[]; notes: string[] } {
   const wd = keyDate(day).getDay();
-  let list = blocks.filter((b) => b.kind === "estudo" && b.weekday === wd).sort((a, b) => a.start_time.localeCompare(b.start_time));
+  let list = blocks.filter((b) => b.kind === "estudo" && b.weekday === wd);
   const notes: string[] = [];
+  // dia sem aula: os horários de aula viram tempo de estudo
+  const nc = noClass(day, events);
+  const off = blocks.filter((b) => b.kind === "aula" && b.weekday === wd && classOff(nc, b.subject_id));
+  if (off.length) {
+    const why = [...new Set(off.map((b) => classOff(nc, b.subject_id)!))].join("; ");
+    notes.push(`Sem aula (${why}): ${off.length === 1 ? "o horário da aula virou" : "os horários de aula viraram"} tempo de estudo.`);
+    list = [...list, ...off.map((b) => ({ ...b, id: `${b.id}-livre`, kind: "estudo" as const, subject_id: null, label: "Horário de aula livre" }))];
+  }
+  list.sort((a, b) => a.start_time.localeCompare(b.start_time));
   for (const e of events) {
     if (e.date !== day || e.status === "cancelado" || (e.type !== "indisponivel" && e.type !== "pessoal")) continue;
     if (!e.time) {
@@ -255,12 +283,16 @@ export function dayTasks(p: PlanInput): Task[] {
   const wd = keyDate(p.today).getDay();
   const tomorrow = addDays(p.today, 1);
   const todays = p.sessions.filter((s) => sessDay(s).k === p.today);
-  const classes = (w: number) => p.blocks.filter((b) => b.kind === "aula" && b.weekday === w && b.subject_id && active.has(b.subject_id))
-    .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  // aulas do dia (sem as de feriado ou de dia marcado "sem aula")
+  const classes = (day: string) => {
+    const nc = noClass(day, p.events), w = keyDate(day).getDay();
+    return p.blocks.filter((b) => b.kind === "aula" && b.weekday === w && b.subject_id && active.has(b.subject_id) && !classOff(nc, b.subject_id))
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  };
   // dia de prova não tem aula de conteúdo: a aula daquele dia é a prova
   const examBetween = (sid: string, from: string, to: string) => p.assessments.find((a) => a.subject_id === sid && isExam(a) && a.status !== "cancelado" && a.date && a.date >= from && a.date <= to);
   const seen = new Set<string>();
-  for (const b of classes(wd).reverse()) {
+  for (const b of classes(p.today).reverse()) {
     const s = active.get(b.subject_id!)!;
     const pref = s.study_pref ?? p.pref;
     if (pref === "antes" || seen.has(s.id)) continue;
@@ -278,7 +310,7 @@ export function dayTasks(p: PlanInput): Task[] {
     });
   }
   seen.clear();
-  for (const b of classes((wd + 1) % 7)) {
+  for (const b of classes(tomorrow)) {
     const s = active.get(b.subject_id!)!;
     const pref = s.study_pref ?? p.pref;
     if (pref === "depois" || seen.has(s.id)) continue;

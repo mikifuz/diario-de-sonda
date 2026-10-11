@@ -1,10 +1,11 @@
+import { holidayOf, easter } from "./holidays";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { slotRanges, anchorFor, examLoads, firstDue, freeStudy, itemState, nextReview, parseSteps, planDay, type PlanInput } from "./plan";
+import { slotRanges, anchorFor, examLoads, firstDue, freeStudy, itemState, noClass, nextReview, parseSteps, planDay, type PlanInput } from "./plan";
 import type { Assessment, CalEvent, ReviewItem, RoutineBlock, Session, Subject, Topic } from "./types";
 
 const STEPS = [1, 3, 7, 14, 30];
-const TODAY = "2026-10-12"; // segunda-feira
+const TODAY = "2026-10-19"; // segunda-feira
 const A = (p: Partial<Assessment>): Assessment => ({
   id: "p", subject_id: "s", name: "P2", kind: "prova", date: null, time: null, weight: 1,
   grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "", sub_id: null, ...p,
@@ -19,7 +20,7 @@ const B = (p: Partial<RoutineBlock>): RoutineBlock => ({ id: Math.random().toStr
 const R = (p: Partial<ReviewItem>): ReviewItem => ({ id: "r", subject_id: "s", topic_id: null, mistake_id: null, assessment_id: null, title: "Revisar", step: 0, due: TODAY, est_min: 15, active: true, last_reviewed_at: null, ...p });
 const E = (p: Partial<CalEvent>): CalEvent => ({ id: "e", subject_id: null, title: "Médico", type: "pessoal", date: TODAY, time: null, priority: "media", status: "pendente", description: "", ...p });
 const S = (p: Partial<Session>): Session => ({
-  id: "x", subject_id: "s", topic_id: null, activity: "exercicios", started_at: new Date(2026, 9, 12, 9).toISOString(), duration_min: 30,
+  id: "x", subject_id: "s", topic_id: null, activity: "exercicios", started_at: new Date(2026, 9, 19, 9).toISOString(), duration_min: 30,
   questions: null, correct: null, notes: "", confidence: null, result: null, autonomy: null, difficulty: null, comprehension: null, ...p,
 });
 const input = (p: Partial<PlanInput>): PlanInput => ({ today: TODAY, nowMin: 7 * 60, pref: "depois", blocks: [], events: [], subjects: [SUB()], topics: [], sessions: [], assessments: [], items: [], mistakes: [], ...p });
@@ -27,7 +28,7 @@ const input = (p: Partial<PlanInput>): PlanInput => ({ today: TODAY, nowMin: 7 *
 test("escada: resultado conferido e autonomia decidem, confiança não entra", () => {
   const base = { step: 1, steps: STEPS, today: TODAY };
   assert.equal(nextReview({ ...base, result: "certo", autonomy: "sozinho" }).step, 2);
-  assert.equal(nextReview({ ...base, result: "certo", autonomy: "sozinho" }).due, "2026-10-19");
+  assert.equal(nextReview({ ...base, result: "certo", autonomy: "sozinho" }).due, "2026-10-26");
   assert.equal(nextReview({ ...base, result: "certo", autonomy: "anotacoes" }).step, 1);
   assert.equal(nextReview({ ...base, result: "certo", autonomy: "resolucao" }).step, 0);
   assert.equal(nextReview({ ...base, result: "parcial", autonomy: "sozinho" }).step, 0);
@@ -40,19 +41,19 @@ test("escada: resultado conferido e autonomia decidem, confiança não entra", (
 test("escada para no último degrau e sem prova fica em até 14 dias", () => {
   const r = nextReview({ step: 4, steps: STEPS, result: "certo", autonomy: "sozinho", today: TODAY });
   assert.equal(r.step, 4);
-  assert.equal(r.due, "2026-10-26");
+  assert.equal(r.due, "2026-11-02");
   assert.match(r.why, /14 dias/);
 });
 
 test("revisão não passa da véspera da prova e encerra perto dela", () => {
-  const r = nextReview({ step: 2, steps: STEPS, result: "certo", autonomy: "sozinho", today: TODAY, exam: { date: "2026-10-20", name: "P2" } });
-  assert.equal(r.due, "2026-10-19");
+  const r = nextReview({ step: 2, steps: STEPS, result: "certo", autonomy: "sozinho", today: TODAY, exam: { date: "2026-10-27", name: "P2" } });
+  assert.equal(r.due, "2026-10-26");
   assert.match(r.why, /véspera de P2/);
-  const fim = nextReview({ step: 0, steps: STEPS, result: "certo", autonomy: "sozinho", today: TODAY, exam: { date: "2026-10-13", name: "P2" } });
+  const fim = nextReview({ step: 0, steps: STEPS, result: "certo", autonomy: "sozinho", today: TODAY, exam: { date: "2026-10-20", name: "P2" } });
   assert.equal(fim.due, null);
   assert.match(fim.why, /última revisão/);
-  assert.equal(firstDue(STEPS, TODAY, "2026-10-13"), TODAY);
-  assert.equal(firstDue(STEPS, TODAY, "2026-11-30"), "2026-10-13");
+  assert.equal(firstDue(STEPS, TODAY, "2026-10-20"), TODAY);
+  assert.equal(firstDue(STEPS, TODAY, "2026-12-07"), "2026-10-20");
 });
 
 test("intervalos configuráveis", () => {
@@ -62,18 +63,18 @@ test("intervalos configuráveis", () => {
 });
 
 test("prova da revisão: a do conteúdo ou a próxima da disciplina", () => {
-  const as = [A({ id: "p1", name: "P1", date: "2026-10-01", grade: 6 }), A({ id: "p2", name: "P2", date: "2026-11-10" }), A({ id: "p3", name: "P3", date: "2026-12-01" })];
+  const as = [A({ id: "p1", name: "P1", date: "2026-10-08", grade: 6 }), A({ id: "p2", name: "P2", date: "2026-11-17" }), A({ id: "p3", name: "P3", date: "2026-12-08" })];
   assert.equal(anchorFor("s", T({ assessment_id: "p3" }), as, TODAY)?.a.id, "p3");
   assert.equal(anchorFor("s", T({}), as, TODAY)?.a.id, "p2");
   assert.equal(anchorFor("outra", null, as, TODAY), null);
 });
 
 test("revisão encerra depois da prova", () => {
-  const as = [A({ id: "p", name: "P1", date: "2026-10-10" })];
+  const as = [A({ id: "p", name: "P1", date: "2026-10-17" })];
   const st = itemState(R({ assessment_id: "p" }), as, TODAY);
   assert.equal(st.open, false);
-  assert.match(st.why, /P1 já foi realizada em 10\/10/);
-  assert.equal(itemState(R({ assessment_id: "p" }), [A({ id: "p", date: "2026-10-20" })], TODAY).open, true);
+  assert.match(st.why, /P1 já foi realizada em 17\/10/);
+  assert.equal(itemState(R({ assessment_id: "p" }), [A({ id: "p", date: "2026-10-27" })], TODAY).open, true);
   assert.equal(itemState(R({ active: false }), [], TODAY).open, false);
 });
 
@@ -86,11 +87,11 @@ test("compromissos do calendário tiram blocos de estudo", () => {
 });
 
 test("plano do dia: prioridade, encaixe nos blocos e o que não coube", () => {
-  const assessments = [A({ id: "perto", name: "P2", date: "2026-10-14", weight: 2 }), A({ id: "longe", name: "P3", date: "2026-11-20", weight: 3 })];
+  const assessments = [A({ id: "perto", name: "P2", date: "2026-10-21", weight: 2 }), A({ id: "longe", name: "P3", date: "2026-11-27", weight: 3 })];
   const items = [
     R({ id: "a", title: "Longe", assessment_id: "longe", est_min: 30 }),
     R({ id: "b", title: "Perto", assessment_id: "perto", est_min: 30 }),
-    R({ id: "c", title: "Amanhã", due: "2026-10-13" }),
+    R({ id: "c", title: "Amanhã", due: "2026-10-20" }),
     R({ id: "d", title: "Encerrada", assessment_id: "perto", active: false }),
   ];
   const p = planDay(input({ blocks: [B({ start_time: "14:00", end_time: "15:00" })], assessments, items }));
@@ -116,9 +117,9 @@ test("aulas: consolidar depois da aula ou adiantar a de amanhã, conforme a pref
   assert.equal(c.task.kind, "consolidar");
   assert.equal(c.start, 10 * 60); // só depois do fim da aula
   // já estudou a disciplina depois da aula: não sugere de novo
-  assert.equal(dayTasksCount(input({ blocks, sessions: [S({ started_at: new Date(2026, 9, 12, 10, 30).toISOString() })] })), 0);
+  assert.equal(dayTasksCount(input({ blocks, sessions: [S({ started_at: new Date(2026, 9, 19, 10, 30).toISOString() })] })), 0);
   const amanha = [B({ kind: "aula", subject_id: "s", weekday: 2, start_time: "08:20", end_time: "10:00" }), B({})];
-  const topics = [T({ id: "t2", name: "Teorema de Green", taught_on: "2026-10-13" })];
+  const topics = [T({ id: "t2", name: "Teorema de Green", taught_on: "2026-10-20" })];
   const antes = planDay(input({ pref: "antes", blocks: amanha, topics }));
   assert.equal(antes.slots[0].placed[0].task.title, "Adiantar Cálculo III: Teorema de Green");
   assert.equal(planDay(input({ pref: "depois", blocks: amanha })).slots[0].placed.length, 0);
@@ -128,7 +129,7 @@ test("aulas: consolidar depois da aula ou adiantar a de amanhã, conforme a pref
 function dayTasksCount(p: PlanInput) { const d = planDay(p); return d.slots.reduce((a, s) => a + s.placed.length, 0) + d.overflow.length; }
 
 test("carga até a prova avisa quando não cabe", () => {
-  const assessments = [A({ id: "p", name: "P2", date: "2026-10-14" })];
+  const assessments = [A({ id: "p", name: "P2", date: "2026-10-21" })];
   const items = [R({ assessment_id: "p", est_min: 60 }), R({ id: "r2", assessment_id: "p", est_min: 60 })];
   const blocks = [B({ weekday: 1, start_time: "14:00", end_time: "15:00" }), B({ weekday: 2, start_time: "14:00", end_time: "14:30" })];
   const [l] = examLoads({ today: TODAY, blocks, events: [], assessments, items, subjects: [SUB()] });
@@ -146,16 +147,16 @@ test("horários de aula seguidos viram um bloco só", () => {
 
 test("cronograma: aula mais recente e aula remarcada empurra as seguintes", async () => {
   const { lastTaught, pushLessons } = await import("./plan");
-  const ts = [T({ id: "a", taught_on: "2026-10-12" }), T({ id: "b", taught_on: "2026-10-15" }), T({ id: "c", taught_on: "2026-10-19" }), T({ id: "z", subject_id: "outra", taught_on: "2026-10-20" })];
-  assert.equal(lastTaught(ts, "s", "2026-10-16")?.id, "b");
-  assert.equal(lastTaught(ts, "s", "2026-10-01"), null);
+  const ts = [T({ id: "a", taught_on: "2026-10-19" }), T({ id: "b", taught_on: "2026-10-22" }), T({ id: "c", taught_on: "2026-10-26" }), T({ id: "z", subject_id: "outra", taught_on: "2026-10-27" })];
+  assert.equal(lastTaught(ts, "s", "2026-10-23")?.id, "b");
+  assert.equal(lastTaught(ts, "s", "2026-10-08"), null);
   // aula de segunda (12/10) cancelada → vai para quinta (15/10); as seguintes andam uma aula (seg/qui)
-  const r = pushLessons(ts, "a", "2026-10-15", [1, 4]);
-  assert.deepEqual(r.map((x) => `${x.id}:${x.taught_on}`), ["a:2026-10-15", "b:2026-10-19", "c:2026-10-22"]);
+  const r = pushLessons(ts, "a", "2026-10-22", [1, 4]);
+  assert.deepEqual(r.map((x) => `${x.id}:${x.taught_on}`), ["a:2026-10-22", "b:2026-10-26", "c:2026-10-29"]);
   // sem rotina, usa os dias da semana dos próprios conteúdos (seg e qui)
-  assert.deepEqual(pushLessons(ts, "a", "2026-10-15", []).map((x) => x.taught_on), ["2026-10-15", "2026-10-19", "2026-10-22"]);
+  assert.deepEqual(pushLessons(ts, "a", "2026-10-22", []).map((x) => x.taught_on), ["2026-10-22", "2026-10-26", "2026-10-29"]);
   // antecipar não mexe nas outras
-  assert.equal(pushLessons(ts, "b", "2026-10-13", [1, 4]).length, 1);
+  assert.equal(pushLessons(ts, "b", "2026-10-20", [1, 4]).length, 1);
 });
 
 test("matéria difícil para o aluno: mais tempo no plano, com o motivo", () => {
@@ -169,8 +170,8 @@ test("matéria difícil para o aluno: mais tempo no plano, com o motivo", () => 
 
 test("dia de prova não tem aula de conteúdo: nada de adiantar matéria nova nem consolidar a 'aula' da prova", () => {
   // prova na quarta (14/10); o cronograma marca "Centróides" no mesmo dia
-  const topics = [T({ id: "c", name: "Centróides e baricentros", taught_on: "2026-10-14" })];
-  const prova = A({ id: "p2", subject_id: "s", name: "P2", kind: "prova", date: "2026-10-14" });
+  const topics = [T({ id: "c", name: "Centróides e baricentros", taught_on: "2026-10-21" })];
+  const prova = A({ id: "p2", subject_id: "s", name: "P2", kind: "prova", date: "2026-10-21" });
   const terca = [B({ kind: "aula", subject_id: "s", weekday: 2, start_time: "08:20", end_time: "10:00" }), B({})];
   // segunda (12/10), aula amanhã (13/10): a próxima aula de conteúdo seria no dia da prova → não adianta
   assert.equal(planDay(input({ pref: "antes", blocks: terca, topics, assessments: [prova] })).slots[0].placed.length, 0);
@@ -178,5 +179,31 @@ test("dia de prova não tem aula de conteúdo: nada de adiantar matéria nova ne
   assert.equal(planDay(input({ pref: "antes", blocks: terca, topics })).slots[0].placed.length, 1);
   // no dia da prova, a "aula" foi a prova: não sugere consolidar
   const hoje = [B({ kind: "aula", subject_id: "s", start_time: "08:20", end_time: "10:00" }), B({ start_time: "09:00", end_time: "12:00" })];
-  assert.equal(dayTasksCount(input({ blocks: hoje, assessments: [A({ id: "p", subject_id: "s", kind: "prova", date: "2026-10-12" })] })), 0);
+  assert.equal(dayTasksCount(input({ blocks: hoje, assessments: [A({ id: "p", subject_id: "s", kind: "prova", date: "2026-10-19" })] })), 0);
+});
+
+test("feriado nacional: sem aula, e os horários de aula viram tempo de estudo", () => {
+  assert.equal(holidayOf("2026-10-12"), "Nossa Senhora Aparecida");
+  assert.equal(holidayOf("2026-04-03"), "Sexta-feira Santa"); // Páscoa 2026: 5/4
+  assert.equal(easter(2027), "2027-03-28");
+  assert.equal(holidayOf("2026-10-13"), null);
+  const feriado = "2026-10-12"; // segunda
+  const blocks = [B({ kind: "aula", subject_id: "s", weekday: 1, start_time: "08:20", end_time: "12:00" }), B({ weekday: 1, start_time: "19:00", end_time: "21:00" })];
+  const f = freeStudy(blocks, [], feriado);
+  assert.deepEqual(f.blocks.map((b) => `${b.start_time}-${b.end_time}`), ["08:20-12:00", "19:00-21:00"]);
+  assert.match(f.notes[0], /Sem aula \(feriado de Nossa Senhora Aparecida\): o horário da aula virou tempo de estudo/);
+  // no feriado não há aula para consolidar
+  const d = planDay(input({ today: feriado, blocks }));
+  assert.ok(!d.slots.flatMap((s) => s.placed).some((p) => p.task.kind === "consolidar"));
+});
+
+test("'Sem aula / feriado' no calendário: de todas as disciplinas ou só de uma", () => {
+  const blocks = [B({ kind: "aula", subject_id: "s", start_time: "08:20", end_time: "10:00" }), B({ kind: "aula", subject_id: "x", start_time: "10:20", end_time: "12:00" })];
+  const recesso = E({ type: "sem_aula", title: "Recesso", time: null });
+  assert.equal(freeStudy(blocks, [recesso], TODAY).blocks.length, 2);
+  const soCalculo = E({ type: "sem_aula", title: "Professor em congresso", subject_id: "s", time: null });
+  const f = freeStudy(blocks, [soCalculo], TODAY);
+  assert.deepEqual(f.blocks.map((b) => b.start_time), ["08:20"]);
+  assert.match(f.notes[0], /Professor em congresso/);
+  assert.equal(noClass(TODAY, [soCalculo]).all, null);
 });
