@@ -17,7 +17,7 @@ Acompanhamento de estudos universitários, pensado para Engenharia de Petróleo.
 | Folha da semana | A semana que passou (resumo) + os próximos 7 dias numa folha A4 deitada: aulas, provas, tarefas de estudo com horário, hábitos e tarefas |
 | Folha do dia | Plano de hoje ou de amanhã em uma folha A4 para imprimir ou salvar em PDF: agenda por horário com caixinhas, o que não coube, tarefas, hábitos, anotações e provas chegando |
 | Hábitos e rotina | Hábitos do dia para marcar (ex.: pouco tempo no celular), com contagem da semana e dias seguidos; bloco de exercício físico na rotina com as horas por semana; dificuldade de cada matéria para você (ou estimada pelos seus registros) aumentando o tempo planejado |
-| Notificações | Relatório da semana todo domingo de manhã (horas, acerto × confiança, erros, provas da semana seguinte), pedidos de amizade e chamados para estudar |
+| Notificações | Relatório da semana todo domingo de manhã (horas, acerto × confiança, erros, provas da semana seguinte), pedidos de amizade e chamados para estudar; avisos no celular com o app fechado (pedidos, chamados e resumo da manhã com provas, revisões e tarefas do dia), ativados por aparelho em Configurações |
 | Demonstração | Em `/demo` (link "Ver demonstração sem conta" na tela de login): um semestre de exemplo com 4 disciplinas, sessões, erros, revisões, rotina, sala e notificações, tudo só na memória da aba e marcado com uma faixa; nada é salvo |
 | Conta | Login por e-mail e senha, recuperação de senha, 5 temas visuais, exportar e importar dados (inclusive da primeira versão) |
 
@@ -78,6 +78,19 @@ Sem isso, os links de confirmação e de recuperação de senha apontam para o l
 ### 4. Trazer seus dados da primeira versão
 
 Na página antiga (publicada no Claude), vá em **Configurações → Exportar cópia (JSON)**. No site novo, crie sua conta e use **Configurações → Importar cópia**. Importe uma vez só: repetir duplica os registros.
+
+### 5. Avisos no celular (opcional)
+
+1. Gere um par de chaves de aviso (VAPID): no computador, `npx web-push generate-vapid-keys` (ou peça ao Claude).
+2. Na Vercel, **Settings → Environment Variables**, adicione:
+   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` = a chave pública (Public Key)
+   - `VAPID_PRIVATE_KEY` = a chave privada (Private Key) — secreta
+   - `SUPABASE_SERVICE_ROLE_KEY` = no Supabase, **Project Settings → API Keys → service_role** — secreta, só na Vercel
+   - `CRON_SECRET` = uma senha longa qualquer (protege o resumo da manhã)
+3. Em **Deployments**, clique nos três pontinhos do último e em **Redeploy** (as variáveis só valem depois disso).
+4. No app, **Configurações → Avisos no celular → Ativar avisos neste aparelho**. No iPhone, antes, adicione o app à Tela de Início pelo Safari (Compartilhar → Adicionar à Tela de Início) e abra por lá.
+
+O resumo da manhã sai uma vez por dia, entre 7h e 8h (horário de Brasília), pelo agendamento em `vercel.json`.
 
 ## Rodar no computador (opcional)
 

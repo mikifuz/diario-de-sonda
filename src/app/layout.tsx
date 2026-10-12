@@ -4,6 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Fundo do Poço",
   description: "Acompanhamento de estudos: sessões cronometradas, confiança × acerto, calendário de provas, médias e sala de estudos com colegas.",
+  appleWebApp: { capable: true, title: "Fundo do Poço", statusBarStyle: "default" },
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 

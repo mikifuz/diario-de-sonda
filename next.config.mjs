@@ -7,6 +7,10 @@ const nextConfig = {
   // "adivinha" tipos de arquivo e os links externos não recebem o endereço completo das páginas
   async headers() {
     return [{
+      // o aviso no celular depende deste arquivo; o navegador precisa sempre buscar a versão nova
+      source: "/sw.js",
+      headers: [{ key: "Cache-Control", value: "no-cache" }],
+    }, {
       source: "/:path*",
       headers: [
         { key: "X-Frame-Options", value: "DENY" },

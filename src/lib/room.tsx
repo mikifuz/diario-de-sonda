@@ -9,6 +9,7 @@ import { sb, friendlyError } from "./supabase";
 import { useStore, timerMs } from "./store";
 import { addDays, todayKey, weekStartKey } from "./calc";
 import { deskState, type Desk } from "./timer";
+import { flushPush } from "./pushClient";
 import type { DailyTotal, Friend, GroupMember, RoomMember, StudyGroup } from "./types";
 
 interface Room {
@@ -207,6 +208,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     const { data, error } = await sb().rpc("send_friend_request", { p_code: code.trim().toUpperCase() });
     if (error) { rpcError(error); return false; }
     if (data === "nao_encontrado") { toast("Nenhuma pessoa com esse código."); return false; }
+    if (data === "enviado" || data === "aceito") flushPush();
     toast(data === "enviado" ? "Pedido de amizade enviado." : data === "aceito" ? "Vocês agora são amigos." : data === "ja_amigos" ? "Vocês já são amigos." : "Você já mandou um pedido para essa pessoa.");
     await load("all");
     return true;
@@ -214,6 +216,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const acceptFriend = useCallback(async (id: string) => {
     const { error } = await sb().rpc("accept_friend", { p_id: id });
     if (error) { rpcError(error); return; }
+    flushPush();
     toast("Amizade aceita.");
     await load("all");
   }, [load, toast]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -237,6 +240,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const nudge = useCallback(async (to: string, msg: NudgeKey) => {
     const { error } = await sb().rpc("nudge_friend", { p_to: to, p_msg: msg });
     if (error) { rpcError(error); return false; }
+    flushPush();
     toast("Chamado enviado.");
     return true;
   }, [toast]); // eslint-disable-line react-hooks/exhaustive-deps

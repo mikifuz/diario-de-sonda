@@ -10,6 +10,7 @@ import type { Profile, Skin } from "@/lib/types";
 import { ConfirmButton, I, Icon } from "@/components/ui";
 import { DEFAULT_MASTERY, masteryCfg, type MasteryCfg } from "@/lib/mastery";
 import { DEMO_FLAG } from "@/lib/demo";
+import { PushSettings } from "@/components/pushSettings";
 
 // ordem das chaves estrangeiras: conteúdos apontam para provas, erros para sessões, revisões para erros
 const ORDER: Table[] = ["subjects", "assessments", "topics", "study_sessions", "events", "routine_blocks", "mistakes", "review_items", "review_logs", "tasks", "curriculum", "habits", "habit_checks"];
@@ -129,6 +130,7 @@ export default function Configuracoes() {
           <div className="full row"><button className="btn pri">Salvar perfil</button></div>
         </form>
       </section>
+      <PushSettings />
       <MasterySettings />
       <section className="panel">
         <div className="panel-h"><h2>Seus dados</h2><span className="lbl">{st.subjects.length} disciplinas, {st.sessions.length} sessões, {st.assessments.length + st.events.length} itens de calendário</span></div>

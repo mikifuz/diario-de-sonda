@@ -579,4 +579,30 @@ do $$ begin
   end;
 end $$;
 reset role;
+-- ============ Avisos no celular ============
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.push_subscriptions (endpoint, p256dh, auth) values ('https://fcm.googleapis.com/fcm/send/abc', 'chave', 'segredo');
+do $$ begin
+  begin
+    insert into public.push_subscriptions (endpoint, p256dh, auth) values ('https://site-qualquer.com/recebe', 'chave', 'segredo');
+    raise exception 'FALHOU: aviso apontando para um site qualquer';
+  exception when check_violation then null;
+  end;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+update public.push_subscriptions set amigos = false;
+delete from public.push_subscriptions;
+do $$ begin
+  if (select count(*) from public.push_subscriptions) <> 0 then raise exception 'Bruno vê os aparelhos de Ana'; end if;
+  begin
+    insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values ('00000000-0000-0000-0000-00000000000a', 'https://fcm.googleapis.com/fcm/send/xyz', 'k', 'a');
+    raise exception 'FALHOU: aparelho cadastrado em nome de outra pessoa';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+do $$ begin
+  if (select count(*) from public.push_subscriptions where user_id = '00000000-0000-0000-0000-00000000000a' and amigos) <> 1 then raise exception 'Bruno mexeu nos aparelhos de Ana'; end if;
+end $$;
 select 'RLS OK' as resultado;

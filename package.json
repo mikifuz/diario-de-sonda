@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/lib/calc.test.ts src/lib/plan.test.ts src/lib/siga.test.ts src/lib/mastery.test.ts src/lib/syllabus.test.ts src/lib/reverse.test.ts src/lib/report.test.ts src/lib/effort.test.ts src/lib/habits.test.ts src/lib/verdict.test.ts src/lib/curriculum.test.ts src/lib/demo.test.ts src/lib/legacy.test.ts src/lib/timer.test.ts"
+    "test": "tsx --test src/lib/calc.test.ts src/lib/plan.test.ts src/lib/siga.test.ts src/lib/mastery.test.ts src/lib/syllabus.test.ts src/lib/reverse.test.ts src/lib/report.test.ts src/lib/effort.test.ts src/lib/habits.test.ts src/lib/verdict.test.ts src/lib/curriculum.test.ts src/lib/demo.test.ts src/lib/legacy.test.ts src/lib/timer.test.ts src/lib/digest.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.57.4",
@@ -16,12 +16,14 @@
     "next": "15.5.27",
     "pdfjs-dist": "4.10.38",
     "react": "19.1.9",
-    "react-dom": "19.1.9"
+    "react-dom": "19.1.9",
+    "web-push": "3.6.7"
   },
   "devDependencies": {
     "@types/node": "22.18.6",
     "@types/react": "19.1.13",
     "@types/react-dom": "19.1.9",
+    "@types/web-push": "3.6.4",
     "tsx": "4.20.5",
     "typescript": "5.9.2"
   },
