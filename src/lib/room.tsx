@@ -59,6 +59,12 @@ export function weekMin(m: RoomMember, days: Record<string, number> = {}) {
   return s + liveFrom(m, keyDate(a).getTime()) / 60000;
 }
 
+/** Minutos por dia com o cronômetro ao vivo de hoje somado (para o placar do mês e as sequências) */
+export function withLive(m: RoomMember, days: Record<string, number> = {}) {
+  const t = todayKey();
+  return { ...days, [t]: todayMin(m, days) };
+}
+
 /** Mesinha de cada pessoa: acesa, cinza (parou há menos de 1 h) ou nada */
 export function memberDesk(m: RoomMember, days: Record<string, number> = {}, now = Date.now()): Desk {
   const t = todayKey();
