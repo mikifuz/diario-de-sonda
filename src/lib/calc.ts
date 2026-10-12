@@ -232,3 +232,15 @@ export function streak(days: Record<string, number>, studyingNow: boolean, today
   while (days[k] > 0 || (k === today && studyingNow)) { n++; k = addDays(k, -1); }
   return n;
 }
+
+/** Placar do mês (do dia 1 até hoje): minutos, dias com estudo, maior sequência e melhor dia */
+export function monthStats(days: Record<string, number>, today = todayKey()) {
+  let minutes = 0, active = 0, run = 0, bestStreak = 0, bestDay = 0, bestDayKey: string | null = null;
+  for (let k = today.slice(0, 8) + "01"; k <= today; k = addDays(k, 1)) {
+    const v = days[k] || 0;
+    minutes += v;
+    if (v > 0) { active++; run++; bestStreak = Math.max(bestStreak, run); } else run = 0;
+    if (v > bestDay) { bestDay = v; bestDayKey = k; }
+  }
+  return { minutes, active, elapsed: Number(today.slice(8)), bestStreak, bestDay, bestDayKey };
+}

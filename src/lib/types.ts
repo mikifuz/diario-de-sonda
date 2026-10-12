@@ -1,4 +1,4 @@
-export type Skin = "sonda" | "caderno" | "blueprint" | "terminal" | "moderno" | "rosa";
+export type Skin = "sonda" | "caderno" | "blueprint" | "terminal" | "moderno" | "rosa" | "musgo";
 export type Activity = "aula" | "leitura" | "exercicios" | "revisao" | "simulado" | "resumo" | "teorico" | "pratico";
 export type Result = "certo" | "parcial" | "errado" | "nao";
 export type Autonomy = "sozinho" | "anotacoes" | "ajuda" | "resolucao";
@@ -24,6 +24,10 @@ export interface Timer {
   /** ms acumulados antes do último "retomar" */
   accum: number;
   running: boolean;
+  /** ms epoch da última pausa (ausente em sessões antigas: usa `since`) */
+  paused_at?: number;
+  /** ms epoch do início do trecho sem pausa, quando ele passou da meia-noite (a regra das 20 h conta daqui) */
+  run_since?: number;
   /** como a sessão aparece na sala: com a matéria, sem a matéria ou só para mim (ausente = sessões antigas) */
   social?: Social;
 }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addDays, gradeCalc, parseNum, periodRange, signal, stats, streak, verified, weekStartKey, fmtMin, qt } from "./calc";
+import { addDays, gradeCalc, parseNum, periodRange, signal, stats, streak, monthStats, verified, weekStartKey, fmtMin, qt } from "./calc";
 import type { Assessment, Session } from "./types";
 
 const A = (p: Partial<Assessment>): Assessment => ({
@@ -120,6 +120,12 @@ test("sequência de dias", () => {
   assert.equal(streak(d, false, "2026-10-10"), 2);
   assert.equal(streak({ "2026-10-09": 20 }, false, "2026-10-10"), 1);
   assert.equal(streak({}, true, "2026-10-10"), 1);
+});
+
+test("placar do mês: total, dias, maior sequência e melhor dia", () => {
+  const d = { "2026-09-30": 500, "2026-10-01": 30, "2026-10-02": 40, "2026-10-03": 50, "2026-10-05": 200, "2026-10-06": 10 };
+  assert.deepEqual(monthStats(d, "2026-10-06"), { minutes: 330, active: 5, elapsed: 6, bestStreak: 3, bestDay: 200, bestDayKey: "2026-10-05" });
+  assert.deepEqual(monthStats({}, "2026-10-01"), { minutes: 0, active: 0, elapsed: 1, bestStreak: 0, bestDay: 0, bestDayKey: null });
 });
 
 test("singular e plural sem \"(s)\"", () => {

@@ -4,7 +4,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { sb, friendlyError } from "./supabase";
 import type { DemoData } from "./demo";
-import { autoStop, forgotten } from "./timer";
+import { autoStop, forgotten, rollover } from "./timer";
 import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic, AppNotification, Course, Habit, HabitCheck } from "./types";
 
 export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs" | "tasks" | "notifications" | "curriculum" | "habits" | "habit_checks";
@@ -199,15 +199,41 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
   }, [updateProfile]);
   const pauseTimer = useCallback(() => {
     const t = dataRef.current.profile?.timer; if (!t || !t.running) return;
-    updateProfile({ timer: { ...t, accum: timerMs(t), running: false } });
+    updateProfile({ timer: { ...t, accum: timerMs(t), running: false, paused_at: Date.now() } });
   }, [updateProfile]);
-  const resumeTimer = useCallback(() => {
+  /** grava um pedaço do cronômetro como sessão (no dia em que começou); devolve o id ou null */
+  const saveTimerPart = useCallback(async (t: Timer, ms: number, startedAt: number, notes: string) => {
+    const minutes = Math.round(ms / 60000);
+    if (minutes < 1 || !dataRef.current.subjects.some((x) => x.id === t.subject_id)) return null;
+    const s: Session = {
+      id: crypto.randomUUID(), subject_id: t.subject_id, topic_id: t.topic_id || null, activity: t.activity,
+      started_at: new Date(startedAt).toISOString(), duration_min: Math.min(1440, minutes),
+      questions: null, correct: null, notes, confidence: null, result: null, autonomy: null, difficulty: null, comprehension: null,
+    };
+    return (await save("study_sessions", s)) ? s.id : null;
+  }, [save]);
+  const resumeTimer = useCallback(async () => {
     const t = dataRef.current.profile?.timer; if (!t || t.running) return;
-    updateProfile({ timer: { ...t, since: Date.now(), running: true } });
-  }, [updateProfile]);
+    const now = Date.now();
+    const r = rollover(t, now);
+    if (r) {
+      // pausada num dia anterior: aquela sessão fica no dia dela e começa uma nova hoje
+      await saveTimerPart(t, r.keepMs, r.startedAt, "Sessão pausada encerrada na virada do dia.");
+      toast("A sessão pausada de outro dia foi salva; começando uma sessão nova hoje.");
+      updateProfile({ timer: { subject_id: t.subject_id, topic_id: t.topic_id, activity: t.activity, since: now, started: now, accum: 0, running: true, social: t.social } });
+      return;
+    }
+    updateProfile({ timer: { ...t, since: now, running: true } });
+  }, [updateProfile, saveTimerPart, toast]);
   const discardTimer = useCallback(() => { updateProfile({ timer: null }); }, [updateProfile]);
   const stopTimer = useCallback(async () => {
-    const t = dataRef.current.profile?.timer; if (!t) return;
+    let t = dataRef.current.profile?.timer; if (!t) return;
+    const r = rollover(t);
+    if (r?.next) {
+      // passou da meia-noite ligado e a virada ainda não tinha sido feita: o pedaço de ontem fica em ontem
+      await saveTimerPart(t, r.keepMs, r.startedAt, "Parte de antes da meia-noite; a sessão continuou no dia seguinte.");
+      t = r.next;
+    }
     const ms = timerMs(t);
     const s: Session = {
       id: crypto.randomUUID(), subject_id: t.subject_id, topic_id: t.topic_id || null, activity: t.activity,
@@ -218,7 +244,7 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     await updateProfile({ timer: null });
     if (!exists) { toast("A disciplina desta sessão foi excluída; o tempo não foi salvo."); return; }
     if (await save("study_sessions", s)) setEvalId(s.id);
-  }, [save, toast, updateProfile]);
+  }, [save, saveTimerPart, toast, updateProfile]);
 
   // cronômetro esquecido: mais de 20 h seguidas sem pausa → desliga sozinho e avisa
   const autoStopping = useRef(false);
@@ -226,7 +252,28 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     if (!ready) return;
     const check = async () => {
       const t = dataRef.current.profile?.timer;
-      if (!t || !forgotten(t) || autoStopping.current) return;
+      if (!t || autoStopping.current) return;
+      if (!forgotten(t)) {
+        const r = rollover(t);
+        if (!r) return;
+        autoStopping.current = true;
+        const day = new Date(r.startedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+        if (r.next) {
+          // atravessou a meia-noite ligado: o pedaço de ontem vira sessão e o cronômetro segue
+          await updateProfile({ timer: r.next });
+          await saveTimerPart(t, r.keepMs, r.startedAt, "Parte de antes da meia-noite; a sessão continuou no dia seguinte.");
+        } else {
+          // pausada desde um dia anterior: encerra e salva no dia em que foi feita
+          await updateProfile({ timer: null });
+          const id = await saveTimerPart(t, r.keepMs, r.startedAt, "Sessão pausada encerrada na virada do dia.");
+          if (id) {
+            toast(`A sessão pausada de ${day} foi encerrada e salva nesse dia. Para continuar, comece uma nova.`);
+            setEvalId(id);
+          }
+        }
+        autoStopping.current = false;
+        return;
+      }
       autoStopping.current = true;
       const { keepMs, lostSince, minutes } = autoStop(t);
       const subj = dataRef.current.subjects.find((x) => x.id === t.subject_id);
@@ -243,6 +290,7 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
       const body = `O cronômetro${subj ? ` de ${subj.name}` : ""} ficou ligado mais de 20 h sem pausa (desde ${from}) e foi desligado sozinho. ` +
         "Esse trecho não foi salvo, porque não dá para saber quando você parou de verdade" +
         (minutes >= 1 ? `; os ${minutes} min de antes da última pausa foram salvos. ` : ". ") +
+        (t.run_since ? "O que foi até a meia-noite já tinha sido salvo como sessão do dia anterior; se não estudou nesse tempo, apague essa sessão no histórico da Sala. " : "") +
         "Se estudou nesse período, registre o tempo certo em Sala → Registrar manualmente.";
       toast("Cronômetro desligado sozinho: ficou mais de 20 h ligado sem pausa.");
       await save("notifications", { id: crypto.randomUUID(), kind: "aviso", title: "Cronômetro desligado sozinho", body, data: {}, from_user: null, created_at: new Date().toISOString(), read_at: null });
@@ -251,7 +299,7 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     check();
     const iv = setInterval(check, 60000);
     return () => clearInterval(iv);
-  }, [ready, updateProfile, save, toast]);
+  }, [ready, updateProfile, save, saveTimerPart, toast]);
 
   const value = useMemo<Store>(() => ({
     ...data, uid, email, ready, demo: isDemo, save, saveMany, remove, updateProfile, reload, toast, evalId, setEvalId,
