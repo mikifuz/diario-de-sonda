@@ -7,8 +7,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { sb, friendlyError } from "./supabase";
 import { useStore, timerMs } from "./store";
-import { addDays, todayKey, weekStartKey } from "./calc";
-import { deskState, type Desk } from "./timer";
+import { addDays, keyDate, todayKey, weekStartKey } from "./calc";
+import { deskState, liveFrom, type Desk } from "./timer";
 import type { DailyTotal, Friend, GroupMember, RoomMember, StudyGroup } from "./types";
 
 interface Room {
@@ -49,13 +49,14 @@ export const useRoom = () => {
 
 export const liveMs = (m: RoomMember, now = Date.now()) => (m.accum_ms || 0) + (m.studying && m.since ? now - new Date(m.since).getTime() : 0);
 export function todayMin(m: RoomMember, days: Record<string, number> = {}) {
-  return (days[todayKey()] || 0) + (m.studying || m.paused ? liveMs(m) / 60000 : 0);
+  const t = todayKey();
+  return (days[t] || 0) + liveFrom(m, keyDate(t).getTime()) / 60000;
 }
 export function weekMin(m: RoomMember, days: Record<string, number> = {}) {
   const a = weekStartKey(todayKey());
   let s = 0;
   for (const [k, v] of Object.entries(days)) if (k >= a) s += v;
-  return s + (m.studying || m.paused ? liveMs(m) / 60000 : 0);
+  return s + liveFrom(m, keyDate(a).getTime()) / 60000;
 }
 
 /** Mesinha de cada pessoa: acesa, cinza (parou há menos de 1 h) ou nada */
