@@ -1,4 +1,4 @@
-export type Skin = "sonda" | "caderno" | "blueprint" | "terminal" | "moderno" | "rosa";
+export type Skin = "sonda" | "caderno" | "blueprint" | "terminal" | "moderno" | "rosa" | "musgo";
 export type Activity = "aula" | "leitura" | "exercicios" | "revisao" | "simulado" | "resumo" | "teorico" | "pratico";
 export type Result = "certo" | "parcial" | "errado" | "nao";
 export type Autonomy = "sozinho" | "anotacoes" | "ajuda" | "resolucao";

@@ -28,6 +28,15 @@ img{max-width:100%}
   --radius:16px; --fs:15px; --shadow:0 2px 0 #f7cfe0,0 6px 18px rgba(214,51,127,.08); color-scheme:light;
   --texture:radial-gradient(rgba(214,51,127,.13) 2.2px,transparent 2.7px) 0 0/24px 24px,radial-gradient(rgba(214,51,127,.08) 2.2px,transparent 2.7px) 12px 12px/24px 24px}
 
+/* Tema musgo: verde-musgo bem clarinho com bege, letras de impresso antigo e números de máquina de escrever */
+:root[data-skin="musgo"]{
+  --bg:#eceedd; --panel:#f7f4e6; --panel2:#e6e9d3; --fg:#33392a; --muted:#6c7258; --line:#cdd2b4;
+  --accent:#5d7442; --accent-fg:#f7f4e6; --ok:#4f7a3a; --warn:#9a6b1c; --bad:#a0402e;
+  --f-display:"IM Fell English",Georgia,serif; --f-body:"Lora",Georgia,serif; --f-mono:"Special Elite","Courier New",monospace;
+  --display-case:none; --display-track:.01em; --display-scale:1.12;
+  --radius:6px; --fs:15px; --shadow:0 1px 0 rgba(70,80,40,.10),0 3px 10px rgba(70,80,40,.05); color-scheme:light;
+  --texture:radial-gradient(rgba(93,116,66,.07) 1px,transparent 1.3px) 0 0/6px 6px,linear-gradient(180deg,rgba(214,200,160,.18),rgba(214,200,160,0) 60%)}
+
 /* Temas próprios (visual fixo, independente do claro/escuro do sistema) */
 :root[data-skin="sonda"]{
   --bg:#1f221b; --panel:#292d23; --panel2:#33382b; --fg:#ece4cb; --muted:#a6a189; --line:#474c3b;
@@ -380,3 +389,5 @@ ul.plain{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:co
 /* Tema rosa: barras e etiquetas redondas (depois das regras gerais de tema) */
 :root[data-skin="rosa"] .bar{border-radius:999px}
 :root[data-skin="rosa"] .chip{border-radius:999px}
+/* Tema musgo: a fonte antiga só tem um peso; negrito falso fica borrado */
+:root[data-skin="musgo"] :is(h1,h2,h3,.disp){font-weight:400}

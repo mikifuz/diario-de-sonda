@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Libre+Baskerville:wght@400;700&family=Crimson+Pro:wght@400;500;600&family=Courier+Prime:wght@400;700&family=VT323&family=Share+Tech+Mono&family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700&display=swap" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Libre+Baskerville:wght@400;700&family=Crimson+Pro:wght@400;500;600&family=Courier+Prime:wght@400;700&family=VT323&family=Share+Tech+Mono&family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700&family=IM+Fell+English:ital@0;1&family=Lora:wght@400;500;600&family=Special+Elite&display=swap" />
       </head>
       <body>{children}</body>
     </html>

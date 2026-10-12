@@ -3,8 +3,8 @@
 import { Suspense, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { activeSubjects, timerMs, topicName, useStore } from "@/lib/store";
-import { liveMs, memberDesk, NUDGES, todayMin, useRoom, weekMin, type NudgeKey } from "@/lib/room";
-import { dkey, fmtClock, fmtMin, inRange, keyDate, nf, pct, periodRange, stats, streak, todayKey, type Period, qt } from "@/lib/calc";
+import { liveMs, memberDesk, NUDGES, todayMin, useRoom, weekMin, withLive, type NudgeKey } from "@/lib/room";
+import { dkey, fmtClock, fmtMin, inRange, keyDate, monthStats, nf, pct, periodRange, stats, streak, todayKey, type Period, qt } from "@/lib/calc";
 import { lastTaught, studyHint, topicExams } from "@/lib/plan";
 import { ACT } from "@/lib/constants";
 import type { Activity, RoomMember, Session, Social } from "@/lib/types";
@@ -137,7 +137,7 @@ function GroupsArea() {
   const room = useRoom();
   useNow();
   const [g, setG] = useState("");
-  const [per, setPer] = useState<"hoje" | "semana">("hoje");
+  const [per, setPer] = useState<"hoje" | "semana" | "mes">("hoje");
   const [nick, setNick] = useState(() => st.profile?.name?.split(" ")[0] || "");
   const me = room.me;
   if (!room.ready) return null;
@@ -149,7 +149,7 @@ function GroupsArea() {
         <div className="panel stack" style={{ gap: 14 }}>
           <span className="lbl">Estudar junto</span>
           <h2>Sala de estudos em grupo</h2>
-          <p style={{ margin: 0, maxWidth: "60ch" }}>Escolha um apelido e depois entre no grupo de um colega (com o código dele) ou crie o seu, para ver quem está estudando agora e o placar do dia e da semana. Só quem está no mesmo grupo vê você.</p>
+          <p style={{ margin: 0, maxWidth: "60ch" }}>Escolha um apelido e depois entre no grupo de um colega (com o código dele) ou crie o seu, para ver quem está estudando agora e o placar do dia, da semana e do mês. Só quem está no mesmo grupo vê você.</p>
           <form className="row" style={{ flexWrap: "nowrap" }} onSubmit={join}>
             <input type="text" maxLength={30} required value={nick} onChange={(e) => setNick(e.target.value)} placeholder="Seu apelido, ex.: Mica" aria-label="Apelido" />
             <button className="btn pri">Entrar na sala</button>
@@ -168,9 +168,24 @@ function GroupsArea() {
   const desk = (m: typeof members[number]) => memberDesk(m, room.totals[m.user_id]);
   const now = members.filter((m) => desk(m)).sort((a, b) => Number(b.studying) - Number(a.studying) || Number(b.paused) - Number(a.paused) || liveMs(b) - liveMs(a));
   const ago = (m: typeof members[number]) => Math.max(1, Math.round((Date.now() - new Date(m.updated_at).getTime()) / 60000));
-  const val = (m: typeof members[number]) => (per === "hoje" ? todayMin(m, room.totals[m.user_id]) : weekMin(m, room.totals[m.user_id]));
+  const month = new Map(members.map((m) => [m.user_id, monthStats(withLive(m, room.totals[m.user_id]))]));
+  const ms = (m: typeof members[number]) => month.get(m.user_id)!;
+  const val = (m: typeof members[number]) => (per === "hoje" ? todayMin(m, room.totals[m.user_id]) : per === "semana" ? weekMin(m, room.totals[m.user_id]) : ms(m).minutes);
   const rank = [...members].sort((a, b) => val(b) - val(a));
   const top = Math.max(1, ...rank.map(val));
+  const monthName = new Date().toLocaleDateString("pt-BR", { month: "long" });
+  const groupMonth = members.reduce((a, m) => a + ms(m).minutes, 0);
+  // destaques do mês: só aparecem com dado de verdade (ninguém ganha com zero)
+  const best = (f: (x: ReturnType<typeof monthStats>) => number) => {
+    const b = [...members].sort((a, c) => f(ms(c)) - f(ms(a)))[0];
+    return b && f(ms(b)) > 0 ? b : null;
+  };
+  const hl = per === "mes" ? [
+    { k: "Mais horas", m: best((x) => x.minutes), t: (x: ReturnType<typeof monthStats>) => fmtMin(Math.round(x.minutes)) },
+    { k: "Mais dias estudados", m: best((x) => x.active), t: (x: ReturnType<typeof monthStats>) => `${x.active} de ${x.elapsed} dias` },
+    { k: "Maior sequência", m: best((x) => x.bestStreak), t: (x: ReturnType<typeof monthStats>) => qt(x.bestStreak, "dia seguido", "dias seguidos") },
+    { k: "Maior dia", m: best((x) => x.bestDay), t: (x: ReturnType<typeof monthStats>) => `${fmtMin(Math.round(x.bestDay))}${x.bestDayKey ? ` em ${x.bestDayKey.slice(8)}/${x.bestDayKey.slice(5, 7)}` : ""}` },
+  ].filter((h) => h.m) : [];
 
   return (
     <section className="grid g3">
@@ -201,7 +216,21 @@ function GroupsArea() {
                 ))}
               </div>
             ) : <p className="small muted" style={{ margin: 0 }}>Ninguém do grupo estudou na última hora.</p>}
-            <div className="panel-h" style={{ marginTop: 22 }}><h2>Placar</h2><Tabs value={per} onChange={setPer} options={[["hoje", "Hoje"], ["semana", "Semana"]]} /></div>
+            <div className="panel-h" style={{ marginTop: 22 }}><h2>Placar</h2><Tabs value={per} onChange={setPer} options={[["hoje", "Hoje"], ["semana", "Semana"], ["mes", "Mês"]]} /></div>
+            {per === "mes" && (
+              <div className="panel" style={{ padding: 14, background: "var(--panel2)", marginBottom: 10 }}>
+                <div className="small muted">O grupo estudou em {monthName}</div>
+                <div className="num" style={{ fontSize: "1.8rem" }}>{fmtMin(Math.round(groupMonth))}</div>
+                <div className="small muted">somando {qt(members.length, "pessoa", "pessoas")}{members.length ? ` · média de ${fmtMin(Math.round(groupMonth / members.length))} por pessoa` : ""}</div>
+                {hl.length > 0 && (
+                  <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 8, marginTop: 12 }}>
+                    {hl.map((h) => (
+                      <div key={h.k} className="small"><span className="lbl">{h.k}</span><div><b>{h.m!.nick}{isMe(h.m!.user_id) ? " (você)" : ""}</b></div><div className="muted">{h.t(ms(h.m!))}</div></div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="list">{rank.map((m, i) => {
               const v = val(m), sk = streak(room.totals[m.user_id] || {}, m.studying);
               return (
@@ -210,13 +239,14 @@ function GroupsArea() {
                   <div className="grow">
                     <div className="row between" style={{ flexWrap: "nowrap" }}><span className="t">{m.nick}{isMe(m.user_id) ? " (você)" : ""}</span><span className="num">{fmtMin(v)}</span></div>
                     <div className="bar" style={{ marginTop: 5 }}><i style={{ width: `${(v / top) * 100}%`, background: isMe(m.user_id) ? "var(--accent)" : "var(--muted)" }} /></div>
+                    {per === "mes" && <div className="small muted" style={{ marginTop: 3 }}>estudou {ms(m).active} de {ms(m).elapsed} dias · maior sequência: {qt(ms(m).bestStreak, "dia", "dias")}</div>}
                   </div>
                   <FriendAdd m={m} />
-                  <span className={"chip " + (sk >= 3 ? "warn" : "")} title="Dias seguidos com estudo">{sk} dia{sk === 1 ? "" : "s"}</span>
+                  <span className={"chip " + (sk >= 3 ? "warn" : "")} title="Dias seguidos com estudo, até hoje">{qt(sk, "dia", "dias")}</span>
                 </div>
               );
             })}</div>
-            <p className="small muted" style={{ margin: "10px 0 0" }}>A semana começa na segunda-feira. O placar soma as sessões salvas (inclusive as feitas &quot;só para mim&quot;) e o cronômetro em andamento de quem está visível.</p>
+            <p className="small muted" style={{ margin: "10px 0 0" }}>A semana começa na segunda-feira e o mês, no dia 1. O placar soma as sessões salvas (inclusive as feitas &quot;só para mim&quot;) e o cronômetro em andamento de quem está visível.</p>
           </>
         ) : (
           <Empty title="Você ainda não está em nenhum grupo">Use os botões "Entrar num grupo" (se um colega já te passou o código) ou "Criar um grupo" (se ninguém criou ainda). Ninguém te vê até vocês estarem no mesmo grupo.</Empty>
