@@ -91,7 +91,7 @@ export function NotificationsList() {
         {read.length > 0 && <div style={{ marginTop: 10 }}><ConfirmButton small label="Apagar as lidas" question={`Apagar ${qt(read.length, "notificação lida", "notificações lidas")}?`} confirmLabel="Apagar" onConfirm={async () => { for (const n of read) await st.remove("notifications", n.id); }} /></div>}
       </section>
       {week && <WeekPrint start={todayKey()} onDone={() => setWeek(false)} />}
-      <p className="small muted" style={{ margin: 0 }}>O relatório chega todo domingo a partir das 7h, sobre a semana de domingo a sábado. Por enquanto as notificações aparecem dentro do app; avisos no celular com o app fechado ficam para uma próxima etapa.</p>
+      <p className="small muted" style={{ margin: 0 }}>O relatório chega todo domingo a partir das 7h, sobre a semana de domingo a sábado. Para receber pedidos de amizade, chamados e um resumo pela manhã mesmo com o app fechado, ative os <Link href="/configuracoes">avisos no celular</Link>.</p>
     </>
   );
 }
