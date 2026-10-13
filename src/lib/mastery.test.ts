@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_MASTERY, mastery, masteryCfg, topicFamily } from "./mastery";
-import { buildAlerts, type AlertInput } from "./alerts";
+import { buildAlerts, shortExam, type AlertInput } from "./alerts";
 import type { Assessment, Mistake, ReviewItem, ReviewLog, Session, Subject, Topic } from "./types";
 
 const TODAY = "2026-10-12";
@@ -130,4 +130,20 @@ test("alerta: conteúdo de prova que já passou não é cobrado na próxima (cas
   assert.match(nomes(comSub), /SUB de Cálculo III/);
   assert.match(nomes(comSub), /MHS|Oscilações/);
   assert.doesNotMatch(nomes(comSub), /Ondas|Gravitação/);
+});
+
+test("alerta curto para o celular: título com a prova e a disciplina, uma linha por problema", () => {
+  assert.equal(shortExam("2ª Avaliação – Análise de estruturas"), "Avaliação 2");
+  assert.equal(shortExam("Segunda avaliação"), "Avaliação 2");
+  assert.equal(shortExam("1ª PROVA"), "Prova 1");
+  assert.equal(shortExam("Prova 3 - Termodinâmica"), "Prova 3");
+  assert.equal(shortExam("P2"), "P2");
+  assert.equal(shortExam("SUB"), "SUB");
+  const sessions = [S({ result: "parcial", autonomy: "anotacoes" }), S({ result: "parcial", autonomy: "anotacoes" }), S({ result: "errado", autonomy: "sozinho" })];
+  const al = buildAlerts(inp({ sessions, assessments: [A({ name: "2ª Avaliação – Análise de estruturas", date: "2026-10-13" })] }));
+  const b = al.find((a) => a.key.startsWith("bd-"))!;
+  assert.equal(b.head, "Avaliação 2 · Cálculo III");
+  assert.equal(b.when, "amanhã");
+  assert.equal(b.short, "Em construção: Integrais triplas.");
+  assert.ok(al.filter((a) => a.group).every((a) => a.group === "p2"));
 });
