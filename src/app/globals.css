@@ -391,3 +391,17 @@ ul.plain{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:co
 :root[data-skin="rosa"] .chip{border-radius:999px}
 /* Tema musgo: a fonte antiga só tem um peso; negrito falso fica borrado */
 :root[data-skin="musgo"] :is(h1,h2,h3,.disp){font-weight:400}
+
+/* ============ Painel: alertas em cartões curtos (um por prova) ============ */
+.alerts{display:flex;flex-direction:column;gap:8px}
+.alert-card{border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:var(--radius);padding:10px 12px;background:var(--panel);min-width:0}
+.alert-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+.alert-h b{font-weight:600;overflow-wrap:anywhere}
+.alert-l{display:flex;gap:8px;align-items:baseline;line-height:1.35;overflow-wrap:anywhere}
+.alert-l .dot{width:8px;height:8px;flex:none;transform:translateY(-1px)}
+.alert-l+.alert-l{margin-top:2px}
+.alert-f{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;flex-wrap:wrap}
+.alert-f details{flex:1;min-width:0}
+.alert-f summary{font-weight:400;cursor:pointer;color:var(--muted)}
+.alert-f details[open]{flex-basis:100%}
+@media (max-width:760px){.alert-f .btn{width:100%;justify-content:center}}

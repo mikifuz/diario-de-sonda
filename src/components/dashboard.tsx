@@ -19,24 +19,51 @@ export function AlertsPanel() {
     today: todayKey(), subjects: st.subjects, topics: st.topics, sessions: st.sessions, assessments: st.assessments,
     items: st.reviews, logs: st.reviewLogs, mistakes: st.mistakes, cfg: masteryCfg(st.profile?.mastery_cfg),
   });
-  const shown = all ? alerts : alerts.slice(0, 5);
+  // alertas da mesma prova viram um cartão só: título curto, "amanhã" ao lado e uma linha por problema
+  const groups: { id: string; items: typeof alerts }[] = [];
+  for (const a of alerts) {
+    const id = a.group ?? a.key;
+    const g = groups.find((x) => x.id === id);
+    if (g) g.items.push(a); else groups.push({ id, items: [a] });
+  }
+  const shown = all ? groups : groups.slice(0, 4);
   return (
     <section className="panel" aria-label="Alertas">
-      <div className="panel-h"><h2>Alertas</h2><span className="lbl">{alerts.length ? `${alerts.length} item(ns)` : "nada urgente"}</span></div>
-      {alerts.length ? (
-        <div className="list">{shown.map((a) => (
-          <div key={a.key} className="li" style={{ alignItems: "flex-start" }}>
-            <i className="dot" style={{ background: ICON[a.level], width: 10, height: 10, marginTop: 6, flex: "none" }} />
-            <div className="grow">
-              <div>{a.text}</div>
-              {a.why && <details className="small" style={{ marginTop: 2 }}><summary style={{ fontWeight: 400 }}>por quê?</summary><span className="muted">{a.why}</span></details>}
+      <div className="panel-h"><h2>Alertas</h2><span className="lbl">{groups.length ? qt(groups.length, "aviso", "avisos") : "nada urgente"}</span></div>
+      {groups.length ? (
+        <div className="alerts">{shown.map(({ id, items }) => {
+          const top = items[0];
+          const act = items.find((a) => a.action)?.action;
+          const whys = items.filter((a) => a.why || a.short);
+          return (
+            <div key={id} className="alert-card" style={{ borderLeftColor: ICON[top.level] }}>
+              {top.head ? (
+                <div className="alert-h">
+                  <b>{top.head}</b>
+                  {top.when && <span className={`chip ${top.level === "bad" ? "bad" : top.level === "warn" ? "warn" : "acc"}`}>{top.when}</span>}
+                </div>
+              ) : null}
+              {items.map((a) => (
+                <div key={a.key} className="alert-l">
+                  <i className="dot" style={{ background: ICON[a.level] }} />
+                  <span>{a.short ?? a.text}</span>
+                </div>
+              ))}
+              <div className="alert-f">
+                {whys.length > 0 && (
+                  <details className="small">
+                    <summary>por quê?</summary>
+                    {whys.map((a) => <p key={a.key} className="muted" style={{ margin: "4px 0 0" }}>{a.short ? `${a.text} ` : ""}{a.why}</p>)}
+                  </details>
+                )}
+                {act && <Link className="btn sm" href={act.href}>{act.label}</Link>}
+              </div>
             </div>
-            {a.action && <Link className="btn sm" href={a.action.href}>{a.action.label}</Link>}
-          </div>
-        ))}</div>
+          );
+        })}</div>
       ) : <p className="small muted" style={{ margin: 0 }}>Nenhuma prova nos próximos 14 dias com conteúdo frágil, confiança baixa ou sem resultado conferido, e nenhuma revisão atrasada.</p>}
-      {alerts.length > 5 && <button className="btn sm ghost" style={{ marginTop: 6 }} onClick={() => setAll(!all)}>{all ? "Mostrar menos" : `Mostrar todos (${alerts.length})`}</button>}
-      <p className="small muted" style={{ margin: "8px 0 0" }}>Os alertas usam o índice de domínio de cada conteúdo (acerto conferido, autonomia, prática recente e erros) e a confiança separadamente. Pesos em <Link href="/configuracoes">Configurações</Link>.</p>
+      {groups.length > 4 && <button className="btn sm ghost" style={{ marginTop: 6 }} onClick={() => setAll(!all)}>{all ? "Mostrar menos" : `Mostrar todos (${groups.length})`}</button>}
+      <p className="small muted hide-m" style={{ margin: "8px 0 0" }}>Os alertas usam o índice de domínio de cada conteúdo (acerto conferido, autonomia, prática recente e erros) e a confiança separadamente. Pesos em <Link href="/configuracoes">Configurações</Link>.</p>
     </section>
   );
 }
