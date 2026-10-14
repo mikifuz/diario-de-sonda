@@ -250,6 +250,7 @@ svg text{font-family:var(--f-mono);fill:var(--muted)}
 /* Rotina semanal */
 .week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
 .wday{display:flex;flex-direction:column;gap:6px;min-width:0;padding:8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2)}
+.wday.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .blk{appearance:none;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:1px;padding:5px 7px;font-size:.78rem;line-height:1.25;border:1px solid var(--line);border-left:3px solid var(--c);border-radius:var(--radius);background:var(--panel);color:var(--fg);min-width:0;overflow-wrap:anywhere}
 .blk .num{font-family:var(--f-mono);color:var(--muted);font-size:.72rem}
 .blk.estudo{background:color-mix(in srgb,var(--accent) 12%,var(--panel))}
