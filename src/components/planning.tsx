@@ -4,9 +4,9 @@ import { useState, type FormEvent } from "react";
 import { activeSubjects, useStore } from "@/lib/store";
 import { addDays, parseNum, todayKey, qt } from "@/lib/calc";
 import { anchorFor, cleanSteps, dm, firstDue, nextReview, slotRanges, toMin } from "@/lib/plan";
-import { AUTO, BLOCK, CLASS_SLOTS, COLORS, CONF, MISTAKE, MISTAKE_D, WD_S } from "@/lib/constants";
+import { AUTO_OPTS, BLOCK, CLASS_SLOTS, COLORS, CONF_OPTS, MISTAKE, MISTAKE_D, RES_OPTS, WD_S } from "@/lib/constants";
 import type { Autonomy, BlockKind, Mistake, MistakeCategory, Result, ReviewItem, ReviewLog, RoutineBlock, Session, Subject } from "@/lib/types";
-import { ConfirmButton, I, Icon, Modal, Seg } from "./ui";
+import { ConfirmButton, I, Icon, Modal, Seg, Slider } from "./ui";
 import { TopicOptions } from "./modals";
 
 const short = (t: string, n = 80) => (t.length > n ? t.slice(0, n - 1).trimEnd() + "…" : t);
@@ -212,11 +212,12 @@ export function ReviewModal({ id, onClose }: { id: string; onClose: () => void }
         )}
         <p className="small muted" style={{ margin: 0 }}>Refaça uma questão parecida sem olhar a resolução e responda com o resultado conferido.</p>
         <div className="qblock"><span className="q">Como foi o resultado?</span>
-          <Seg value={result} onChange={setResult} options={[["certo", "Resolvi corretamente"], ["parcial", "Resolvi parcialmente"], ["errado", "Não consegui resolver"], ["nao", "Ainda não conferi"]]} /></div>
+          <Slider label="Resultado" value={result === "nao" ? null : result} onChange={setResult} options={RES_OPTS} />
+          <label className="check small"><input type="checkbox" checked={result === "nao"} onChange={(e) => setResult(e.target.checked ? "nao" : null)} />Ainda não conferi (a data não muda)</label></div>
         <div className="qblock"><span className="q">Quanto apoio você usou?</span>
-          <Seg value={autonomy} onChange={setAutonomy} options={Object.entries(AUTO) as [Autonomy, string][]} /></div>
+          <Slider label="Apoio usado" value={autonomy} onChange={setAutonomy} options={AUTO_OPTS} /></div>
         <div className="qblock"><span className="q">Confiança (opcional, não muda a data)</span>
-          <Seg scale value={confidence} onChange={setConfidence} options={[1, 2, 3, 4, 5].map((n) => [n, String(n), CONF[n - 1]] as [number, string, string])} /></div>
+          <Slider label="Confiança" value={confidence} onChange={setConfidence} options={CONF_OPTS} /></div>
         {nr && <div className="callout info small">{nr.why}</div>}
         <div className="row small">
           <label className="check"><input type="checkbox" checked={asSession} onChange={(e) => setAsSession(e.target.checked)} />Registrar também como sessão de revisão</label>

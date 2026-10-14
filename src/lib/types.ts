@@ -137,6 +137,8 @@ export interface Assessment {
   description: string;
   /** prova: SUB que pode substituí-la (null = não tem SUB) */
   sub_id: string | null;
+  /** "Como foi a prova?" (1 muito mal … 5 muito bem; 0 = não perguntar). Impressão, não é nota. */
+  felt?: number | null;
 }
 
 export interface CalEvent {

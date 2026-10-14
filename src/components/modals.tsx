@@ -1,8 +1,8 @@
 "use client";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Modal, Seg, ConfirmButton, Icon, I } from "./ui";
-import { ACT, AUTO, COLORS, COMP, CONF, DIFF, EVT, GRADED, PREF, PRIO, RES, STATUS } from "@/lib/constants";
+import { Modal, Seg, Slider, ConfirmButton, Icon, I } from "./ui";
+import { ACT, AUTO_OPTS, COLORS, COMP_OPTS, CONF_OPTS, DIFF, RES_OPTS, EVT, GRADED, PREF, PRIO, RES, STATUS } from "@/lib/constants";
 import { dkey, fmtMin, pad, parseNum, todayKey, qt } from "@/lib/calc";
 import { activeSubjects, useStore } from "@/lib/store";
 import { EFFORT } from "@/lib/effort";
@@ -46,11 +46,12 @@ export function EvalFields({ v, set }: { v: EvalState; set: (v: EvalState) => vo
   return (
     <>
       <div className="qblock"><span className="q">Quão confiante você se sentiu resolvendo?</span>
-        <Seg scale value={v.confidence} onChange={(x) => up({ confidence: x })} options={[1, 2, 3, 4, 5].map((n) => [n, String(n), CONF[n - 1]] as [number, string, string])} /></div>
+        <Slider label="Confiança" value={v.confidence} onChange={(x) => up({ confidence: x })} options={CONF_OPTS} /></div>
       <div className="qblock"><span className="q">Como foi o resultado?</span>
-        <Seg value={v.result} onChange={(x) => up({ result: x })} options={Object.entries(RES) as [Result, string][]} /></div>
+        <Slider label="Resultado" value={v.result === "nao" ? null : v.result} onChange={(x) => up({ result: x })} options={RES_OPTS} />
+        <label className="check small"><input type="checkbox" checked={v.result === "nao"} onChange={(e) => up({ result: e.target.checked ? "nao" : null })} />{RES.nao} (não entra no acerto)</label></div>
       <div className="qblock"><span className="q">Quanto apoio você usou?</span>
-        <Seg value={v.autonomy} onChange={(x) => up({ autonomy: x })} options={Object.entries(AUTO) as [Autonomy, string][]} /></div>
+        <Slider label="Apoio usado" value={v.autonomy} onChange={(x) => up({ autonomy: x })} options={AUTO_OPTS} /></div>
       <details open={open}>
         <summary>Mais detalhes (opcional)</summary>
         <div className="stack" style={{ marginTop: 12, gap: 14 }}>
@@ -59,9 +60,9 @@ export function EvalFields({ v, set }: { v: EvalState; set: (v: EvalState) => vo
             <label className="f"><span>Questões certas (conferidas)</span><input type="number" min={0} value={v.correct} onChange={(e) => up({ correct: e.target.value })} /></label>
           </div>
           <div className="qblock"><span className="q">Dificuldade percebida</span>
-            <Seg value={v.difficulty} onChange={(x) => up({ difficulty: x })} options={DIFF.map((d, i) => [i, d] as [number, string])} /></div>
+            <Slider label="Dificuldade percebida" value={v.difficulty} onChange={(x) => up({ difficulty: x })} options={DIFF.map((d, i) => [i, d] as [number, string])} /></div>
           <div className="qblock"><span className="q">Compreensão</span>
-            <Seg value={v.comprehension} onChange={(x) => up({ comprehension: x })} options={Object.entries(COMP) as [Comprehension, string][]} /></div>
+            <Slider label="Compreensão" value={v.comprehension} onChange={(x) => up({ comprehension: x })} options={COMP_OPTS} /></div>
           <label className="f"><span>Observações</span><textarea value={v.notes} onChange={(e) => up({ notes: e.target.value })} placeholder="Onde travou, o que precisa rever…" /></label>
           <p className="small muted" style={{ margin: 0 }}>Quando você informa questões feitas e certas, o acerto conferido usa esse número. Sem isso, usa o resultado declarado (&quot;Ainda não conferi&quot; não entra no cálculo).</p>
         </div>

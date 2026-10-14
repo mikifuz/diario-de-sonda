@@ -9,6 +9,7 @@ import { fmtClock } from "@/lib/calc";
 import { Brand } from "./Brand";
 import { Icon, useNow } from "./ui";
 import { EvalModal } from "./modals";
+import { ExamCheckHost } from "./examCheck";
 import { useWeeklyReport } from "./notifications";
 import { DEMO_FLAG } from "@/lib/demo";
 
@@ -89,6 +90,7 @@ export function Shell({ children }: { children: ReactNode }) {
         ))}
       </nav>
       {st.evalId && <EvalModal id={st.evalId} onClose={() => st.setEvalId(null)} />}
+      <ExamCheckHost />
     </div>
   );
 }
