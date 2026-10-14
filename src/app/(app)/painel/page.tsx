@@ -11,14 +11,21 @@ import { EventModal, SubjectModal } from "@/components/modals";
 import { AlertsPanel, TodoPanel, VerdictCard } from "@/components/dashboard";
 import { HabitsPanel } from "@/components/habits";
 import { GettingStarted } from "@/components/onboarding";
+import { WeekRoutine } from "@/components/routine";
+import { BlockModal } from "@/components/planning";
+import { ImportSigaModal } from "@/components/importSiga";
 
 export default function Painel() {
   const st = useStore();
   const router = useRouter();
   const [per, setPer] = useState<Period>("mes");
-  const [modal, setModal] = useState<null | { k: "subject" } | { k: "event"; id: string | null; src?: "event" | "item" }>(null);
+  const [modal, setModal] = useState<null | { k: "subject" } | { k: "event"; id: string | null; src?: "event" | "item" } | { k: "block"; id: string | null; weekday?: number } | { k: "siga" }>(null);
   const all = st.sessions, t = todayKey(), list = activeSubjects(st.subjects);
-  const modals = modal && (modal.k === "subject" ? <SubjectModal id={null} onClose={() => setModal(null)} /> : <EventModal id={modal.id} src={modal.src} onClose={() => setModal(null)} />);
+  const close = () => setModal(null);
+  const modals = modal && (modal.k === "subject" ? <SubjectModal id={null} onClose={close} />
+    : modal.k === "block" ? <BlockModal id={modal.id} weekday={modal.weekday} onClose={close} />
+    : modal.k === "siga" ? <ImportSigaModal onClose={close} />
+    : <EventModal id={modal.id} src={modal.src} onClose={close} />);
 
   if (!list.length && !all.length) {
     return (
@@ -69,6 +76,9 @@ export default function Painel() {
 
   return (
     <>
+      <WeekRoutine title="Sua rotina semanal" onBlock={(id, weekday) => setModal({ k: "block", id, weekday })} onSiga={() => setModal({ k: "siga" })}>
+        <p className="small muted" style={{ margin: "0 0 12px" }}>Toque num bloco para mudar. Preferências do plano e intervalos de revisão ficam em <Link href="/hoje?aba=rotina">Hoje → Rotina</Link>.</p>
+      </WeekRoutine>
       <GettingStarted />
       <VerdictCard />
       <section className="kpis" aria-label="Resumo">

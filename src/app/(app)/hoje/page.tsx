@@ -4,8 +4,8 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { activeSubjects, topicName, useStore } from "@/lib/store";
 import { addDays, daysBetween, fmtMin, gradeCalc, keyDate, nf, todayKey, qt } from "@/lib/calc";
-import { cleanSteps, dm, firstDue, fromMin, itemState, parseSteps, planDay, toMin, weekCapacity, type PlanInput, type Task } from "@/lib/plan";
-import { BLOCK, MISTAKE, PREF, WD_S, WEEKDAYS } from "@/lib/constants";
+import { cleanSteps, dm, firstDue, fromMin, itemState, parseSteps, planDay, type PlanInput, type Task } from "@/lib/plan";
+import { BLOCK, MISTAKE, PREF, WD_S } from "@/lib/constants";
 import { BAND, masteryCfg } from "@/lib/mastery";
 import { FINAL_MIN, RESERVE, TARGET, reversePlan, todayTasks, type ExamPlan } from "@/lib/reverse";
 import type { Activity, MistakeCategory, ReviewItem, StudyPref } from "@/lib/types";
@@ -15,6 +15,7 @@ import { ImportSigaModal } from "@/components/importSiga";
 import { DayPrint } from "@/components/dayPrint";
 import { WeekPrint } from "@/components/weekPrint";
 import { StartModal, type StartArgs } from "@/components/studyStart";
+import { WeekRoutine } from "@/components/routine";
 
 type Tab = "plano" | "provas" | "revisoes" | "erros" | "rotina";
 const TABS: [Tab, string][] = [["plano", "Plano do dia"], ["provas", "Provas"], ["revisoes", "Revisões"], ["erros", "Banco de erros"], ["rotina", "Rotina"]];
@@ -347,12 +348,6 @@ function RoutineTab({ open }: { open: Open }) {
   const st = useStore();
   const p = st.profile!;
   const [stepsTxt, setStepsTxt] = useState(cleanSteps(p.review_steps).join(", "));
-  const cap = weekCapacity(st.blocks);
-  const total = cap.reduce((a, b) => a + b, 0);
-  const color = (k: string, sid: string | null) => (k === "aula" ? st.subjects.find((s) => s.id === sid)?.color || "var(--muted)" : k === "estudo" ? "var(--accent)" : k === "exercicio" ? "var(--ok)" : "var(--line)");
-  const workout = st.blocks.filter((b) => b.kind === "exercicio").reduce((a, b) => a + Math.max(0, toMin(b.end_time) - toMin(b.start_time)), 0);
-  const workoutDays = new Set(st.blocks.filter((b) => b.kind === "exercicio").map((b) => b.weekday)).size;
-  const noClasses = activeSubjects(st.subjects).filter((s) => s.schedule && !st.blocks.some((b) => b.kind === "aula" && b.subject_id === s.id));
   const saveSteps = async () => {
     const r = parseSteps(stepsTxt);
     if (typeof r === "string") { st.toast(r); return; }
@@ -360,35 +355,9 @@ function RoutineTab({ open }: { open: Open }) {
   };
   return (
     <>
-      <section className="panel">
-        <div className="panel-h"><h2>Semana típica</h2><span className="row" style={{ gap: 6 }}><button className="btn sm" onClick={() => open({ k: "siga" })}>Importar aulas do SIGA (PDF)</button><button className="btn sm pri" onClick={() => open({ k: "block", id: null })}><Icon d={I.plus} s={14} />Adicionar bloco</button></span></div>
-        <p className="small muted" style={{ margin: "0 0 12px" }}>Cadastre aulas, blocos de estudo e o que mais ocupa sua semana (trabalho, deslocamento, descanso). Só os blocos de <b>estudo</b> recebem tarefas; os outros servem para você enxergar a semana. Exceções do dia a dia vão no calendário como &quot;Indisponível&quot; ou &quot;Compromisso pessoal&quot;.</p>
-        <div className="week">
-          {[1, 2, 3, 4, 5, 6, 0].map((d) => {
-            const bs = st.blocks.filter((b) => b.weekday === d).sort((a, b) => a.start_time.localeCompare(b.start_time));
-            return (
-              <div key={d} className="wday">
-                <div className="row between" style={{ flexWrap: "nowrap" }}><b className="small">{WEEKDAYS[d]}</b><span className="lbl">{cap[d] ? fmtMin(cap[d]) : ""}</span></div>
-                {bs.map((b) => {
-                  const s = b.subject_id ? st.subjects.find((x) => x.id === b.subject_id) : null;
-                  return (
-                    <button key={b.id} type="button" className={"blk " + b.kind} style={{ ["--c" as string]: color(b.kind, b.subject_id) }} onClick={() => open({ k: "block", id: b.id })}>
-                      <span className="num">{b.start_time}–{b.end_time}</span>
-                      <span>{b.kind === "aula" ? s?.name || "Aula" : BLOCK[b.kind]}{b.label ? ` · ${b.label}` : ""}</span>
-                    </button>
-                  );
-                })}
-                <button type="button" className="btn sm ghost" onClick={() => open({ k: "block", id: null, weekday: d })} aria-label={`Adicionar bloco na ${WEEKDAYS[d]}`}><Icon d={I.plus} s={13} /></button>
-              </div>
-            );
-          })}
-        </div>
-        <p className="small" style={{ margin: "12px 0 0" }}>
-          {total ? <>Sua rotina tem <b>{fmtMin(total)}</b> de estudo por semana{p.weekly_goal_h ? <> (meta: {nf(p.weekly_goal_h, 0)}h{total / 60 < p.weekly_goal_h ? `; faltam ${fmtMin(p.weekly_goal_h * 60 - total)} na rotina para chegar à meta` : ""})</> : ""}.</> : <span className="muted">Ainda não há blocos de estudo.</span>}
-        </p>
-        <p className="small" style={{ margin: "6px 0 0" }}>{workout ? <>Exercício físico: <b>{fmtMin(workout)}</b> por semana, em {qt(workoutDays, "dia", "dias")}.</> : <span className="muted">Nenhum bloco de exercício físico na rotina ainda.</span>}</p>
-        {noClasses.length > 0 && <p className="small muted" style={{ margin: "6px 0 0" }}>Com horário anotado, mas sem aula na rotina: {noClasses.map((s) => `${s.name} (${s.schedule})`).join("; ")}.</p>}
-      </section>
+      <WeekRoutine onBlock={(id, weekday) => open({ k: "block", id, weekday })} onSiga={() => open({ k: "siga" })}>
+        <p className="small muted" style={{ margin: "0 0 12px" }}>Cadastre aulas, blocos de estudo e o que mais ocupa sua semana (trabalho, deslocamento, descanso). Só os blocos de <b>estudo</b> recebem tarefas; os outros servem para você enxergar a semana. Exceções do dia a dia vão no calendário como &quot;Indisponível&quot; ou &quot;Compromisso pessoal&quot;. A mesma semana aparece no topo do Painel.</p>
+      </WeekRoutine>
       <section className="panel">
         <div className="panel-h"><h2>Preferências do plano</h2></div>
         <div className="fgrid">
