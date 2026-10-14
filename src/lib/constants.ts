@@ -57,3 +57,10 @@ export const PAGES = [
   { href: "/notificacoes", nm: "Avisos", full: "Notificações", t: "Notificações", ic: "M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" },
   { href: "/configuracoes", nm: "Ajustes", full: "Configurações", t: "Configurações", ic: "M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M14 4v4M8 10v4M16 16v4" },
 ] as const;
+
+/** Opções das barras de arrastar da autoavaliação, do pior para o melhor.
+ *  Confiança é registrada à parte e nunca vira acerto. */
+export const CONF_OPTS = CONF.map((c, i) => [i + 1, c] as [number, string]);
+export const RES_OPTS: [Result, string][] = [["errado", RES.errado], ["parcial", RES.parcial], ["certo", RES.certo]];
+export const AUTO_OPTS: [Autonomy, string][] = (["resolucao", "ajuda", "anotacoes", "sozinho"] as Autonomy[]).map((k) => [k, AUTO[k]]);
+export const COMP_OPTS: [Comprehension, string][] = (["nao", "duvidas", "parcial", "total"] as Comprehension[]).map((k) => [k, COMP[k]]);

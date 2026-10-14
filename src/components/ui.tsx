@@ -45,6 +45,30 @@ export function Modal({ title, sub, onClose, children }: { title: string; sub?: 
   );
 }
 
+/** Barra de arrastar com opções em ordem (do pior para o melhor). Começa sem resposta
+ *  (null): tocar ou arrastar responde; "limpar" volta a ficar sem resposta. */
+export function Slider<T extends string | number>({ value, options, onChange, label, hint }: {
+  value: T | null | undefined; options: [T, string][]; onChange: (v: T | null) => void; label: string; hint?: string;
+}) {
+  const idx = options.findIndex(([k]) => k === value);
+  const n = options.length;
+  const pos = idx < 0 ? Math.floor((n - 1) / 2) : idx;
+  const pick = (i: number) => onChange(options[Math.max(0, Math.min(n - 1, i))][0]);
+  return (
+    <div className={"slider" + (idx < 0 ? " unset" : "")} style={{ ["--p" as string]: `${(pos / (n - 1)) * 100}%` }}>
+      <div className="slider-v">
+        <b>{idx < 0 ? hint || "Arraste ou toque na barra" : options[idx][1]}</b>
+        {idx >= 0 && <button type="button" className="linkish small" onClick={() => onChange(null)}>limpar</button>}
+      </div>
+      <input type="range" min={0} max={n - 1} step={1} value={pos} aria-label={label} aria-valuetext={idx < 0 ? "sem resposta" : options[idx][1]}
+        onChange={(e) => pick(Number(e.target.value))}
+        onPointerUp={(e) => { if (idx < 0) pick(Number(e.currentTarget.value)); }}
+        onKeyDown={(e) => { if (idx < 0 && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); pick(pos); } }} />
+      <div className="slider-ends small muted" aria-hidden="true"><span>{options[0][1]}</span><span>{options[n - 1][1]}</span></div>
+    </div>
+  );
+}
+
 /** Grupo de botões de escolha única; clicar no selecionado limpa (exceto se required) */
 export function Seg<T extends string | number>({ value, options, onChange, scale, required }: {
   value: T | null | undefined; options: [T, string, string?][]; onChange: (v: T | null) => void; scale?: boolean; required?: boolean;

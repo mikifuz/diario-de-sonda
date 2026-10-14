@@ -62,7 +62,7 @@ const COLS: Record<Table, string> = {
   subjects: "id,name,code,professor,semester,credits,hours,color,min_avg,schedule,notes,traits,exam_enabled,exam_w_avg,exam_w_exam,exam_min_final,exam_min_take,archived,study_pref,recovery,sub_replace_lower",
   topics: "id,subject_id,parent_id,name,position,taught_on,assessment_id",
   study_sessions: "id,subject_id,topic_id,activity,started_at,duration_min,questions,correct,notes,confidence,result,autonomy,difficulty,comprehension",
-  assessments: "id,subject_id,name,kind,date,time,weight,grade,predicted,sim_c,sim_e,sim_o,priority,status,description,sub_id",
+  assessments: "id,subject_id,name,kind,date,time,weight,grade,predicted,sim_c,sim_e,sim_o,priority,status,description,sub_id,felt",
   events: "id,subject_id,title,type,date,time,priority,status,description",
   routine_blocks: "id,weekday,start_time,end_time,kind,subject_id,label",
   mistakes: "id,subject_id,topic_id,session_id,category,description,correction,source,occurred_on",
@@ -103,7 +103,9 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     if (t === "review_logs") q = q.order("reviewed_at", { ascending: false }).limit(10000);
     if (t === "notifications") q = q.order("created_at", { ascending: false }).limit(200);
     if (t === "habit_checks") q = q.order("day", { ascending: false }).limit(5000);
-    const { data: rows, error } = await q;
+    let { data: rows, error } = await q;
+    // banco ainda sem a coluna "felt" (migration de "Como foi a prova?" não rodada): carrega sem ela
+    if (error && t === "assessments" && /felt/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",felt", "")));
     if (error) throw error;
     let list = (rows || []) as unknown as RowOf[typeof t][];
     if (t === "assessments" || t === "events") list = (list as (Assessment | CalEvent)[]).map(normTime) as typeof list;
