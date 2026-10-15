@@ -62,7 +62,7 @@ export interface Traits {
   /** quanto a matéria custa para o aluno (não é a do professor): muda o tempo planejado */
   esforco?: Effort;
 }
-export type Effort = "facil" | "media" | "dificil" | "muito";
+export type Effort = "trivial" | "facil" | "media" | "dificil" | "muito";
 
 export interface Subject {
   id: string;

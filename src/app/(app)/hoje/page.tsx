@@ -14,6 +14,7 @@ import { BlockModal, MistakeModal, ReviewItemModal, ReviewModal } from "@/compon
 import { ImportSigaModal } from "@/components/importSiga";
 import { DayPrint } from "@/components/dayPrint";
 import { mistakeCats } from "@/lib/mistakes";
+import { easyReminders } from "@/lib/effort";
 import { WeekPrint } from "@/components/weekPrint";
 import { StartModal, type StartArgs } from "@/components/studyStart";
 import { WeekRoutine } from "@/components/routine";
@@ -159,6 +160,9 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
           <span className="row"><button className="btn sm pri" onClick={goRoutine}>Montar minha rotina</button><button className="btn sm" onClick={() => open({ k: "siga" })}>Importar aulas do SIGA (PDF)</button></span>
         </div>
       )}
+      {easyReminders(today, st.subjects, st.assessments).map((r) => (
+        <div key={r.key} className="callout"><b>{r.text}</b> <span className="small muted">{r.why}</span></div>
+      ))}
       <TripsPanel onEdit={(id) => open({ k: "event", id })} />
       <div className="row" style={{ justifyContent: "flex-end" }}>
         <button className="btn sm ghost" onClick={() => open({ k: "event", id: null, type: "viagem" })}><Icon d={I.plus} s={14} />Vai viajar? Adicionar viagem</button>

@@ -3,7 +3,7 @@
 // fica gravado): conforme você estuda, o que falta diminui e o plano se refaz.
 import { addDays, daysBetween, dkey, nf, qt } from "./calc";
 import { BAND, mastery, type Band, type MasteryCfg } from "./mastery";
-import { effortOf, scaleMin } from "./effort";
+import { effortOf, isTrivial, scaleMin } from "./effort";
 import { dm, freeStudy, toMin, topicsForExam, type Task } from "./plan";
 import type { Assessment, CalEvent, Mistake, ReviewItem, ReviewLog, RoutineBlock, Session, Subject, Topic } from "./types";
 
@@ -65,7 +65,7 @@ export function priorityOf(t: TopicNeed): Priority {
 export function reversePlan(p: RevInput): ExamPlan[] {
   const active = new Map(p.subjects.filter((s) => !s.archived).map((s) => [s.id, s]));
   const exams = p.assessments
-    .filter((a) => a.kind === "prova" && active.has(a.subject_id) && a.grade == null && a.status !== "cancelado" && a.date && a.date > p.today && daysBetween(p.today, a.date) <= HORIZON)
+    .filter((a) => a.kind === "prova" && active.has(a.subject_id) && !isTrivial(active.get(a.subject_id)) && a.grade == null && a.status !== "cancelado" && a.date && a.date > p.today && daysBetween(p.today, a.date) <= HORIZON)
     .sort((a, b) => a.date!.localeCompare(b.date!) || Number(b.weight) - Number(a.weight));
   // capacidade de cada dia (minutos de estudo livres, menos a reserva)
   const cap = new Map<string, number>();

@@ -3,6 +3,7 @@
 import { addDays, daysBetween, dkey, nf, pct, stats, qt } from "./calc";
 import { itemState, topicsForExam } from "./plan";
 import { mastery, topicFamily, type MasteryCfg } from "./mastery";
+import { easyReminders, isTrivial } from "./effort";
 import type { Assessment, Mistake, ReviewItem, ReviewLog, Session, Subject, Topic } from "./types";
 
 export type Level = "bad" | "warn" | "info";
@@ -44,8 +45,12 @@ export function buildAlerts(p: AlertInput): Alert[] {
   const mIn = { sessions: p.sessions, logs: p.logs, items: p.items, mistakes: p.mistakes, today: p.today, cfg: p.cfg };
   const isExam = (a: Assessment) => (a.kind === "prova" || a.kind === "sub") && a.grade == null && a.status !== "cancelado" && !!a.date && a.date >= p.today;
 
+  // matéria extremamente fácil: sem alertas de preparo; só o aviso na véspera e no dia da prova
+  for (const r of easyReminders(p.today, p.subjects, p.assessments))
+    out.push({ key: r.key, level: "warn", head: `${shortExam(r.exam.name)} · ${r.subject.name}`, when: r.when, short: r.text, text: r.text, why: r.why, days: r.when === "hoje" ? 0 : 1, group: `exam-${r.exam.id}` });
+
   for (const s of active) {
-    const exams = p.assessments.filter((a) => a.subject_id === s.id && isExam(a)).sort((a, b) => a.date!.localeCompare(b.date!));
+    const exams = isTrivial(s) ? [] : p.assessments.filter((a) => a.subject_id === s.id && isExam(a)).sort((a, b) => a.date!.localeCompare(b.date!));
     const ts = p.topics.filter((t) => t.subject_id === s.id);
     for (const a of exams) {
       const d = daysBetween(p.today, a.date!);

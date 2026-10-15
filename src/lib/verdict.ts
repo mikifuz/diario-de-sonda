@@ -2,6 +2,7 @@
 // Toda frase vem com o fato que a justifica; nada é inventado. A versão da frase muda por dia, não a cada abertura.
 import { addDays, daysBetween, dkey, fmtMin, gradeCalc, nf, pct, qt, stats } from "./calc";
 import type { Assessment, Session, Subject } from "./types";
+import { isTrivial } from "./effort";
 
 export type VerdictKind = "sumiu" | "parado" | "agua" | "prova_pouco" | "notas" | "pouco" | "voando" | "normal";
 export interface Verdict { kind: VerdictKind; level: "bad" | "warn" | "ok" | "info"; title: string; why: string; action?: { label: string; href: string } }
@@ -94,8 +95,10 @@ export function verdict(p: VerdictInput): Verdict | null {
   const before = p.sessions.filter((s) => inRange(s, addDays(p.today, -27), addDays(p.today, -7)));
   const avgBefore = before.reduce((a, s) => a + s.duration_min, 0) / 3;
   const active = new Set(p.subjects.filter((s) => !s.archived).map((s) => s.id));
+  // matéria extremamente fácil não conta aqui: não pede estudo antes da prova
+  const studyFor = new Set(p.subjects.filter((s) => !s.archived && !isTrivial(s)).map((s) => s.id));
   const exam = p.assessments
-    .filter((a) => active.has(a.subject_id) && (a.kind === "prova" || a.kind === "sub") && a.grade == null && a.status !== "cancelado" && a.date && a.date >= p.today && daysBetween(p.today, a.date) <= 7)
+    .filter((a) => studyFor.has(a.subject_id) && (a.kind === "prova" || a.kind === "sub") && a.grade == null && a.status !== "cancelado" && a.date && a.date >= p.today && daysBetween(p.today, a.date) <= 7)
     .sort((a, b) => a.date!.localeCompare(b.date!))[0];
   const examTxt = exam ? `${exam.name} de ${p.subjects.find((s) => s.id === exam.subject_id)?.name ?? ""} ${daysBetween(p.today, exam.date!) === 0 ? "hoje" : daysBetween(p.today, exam.date!) === 1 ? "amanhã" : `em ${daysBetween(p.today, exam.date!)} dias`}` : "";
 
