@@ -94,7 +94,7 @@ export function EvalModal({ id, onClose }: { id: string; onClose: () => void }) 
     <Modal title="Como foi a sessão?" sub={`${sub?.name || ""} · ${fmtMin(s.duration_min)}`} onClose={onClose}>
       <form className="stack" style={{ gap: 16 }} onSubmit={submit}>
         <EvalFields v={v} set={setV} />
-        {wrong && <label className="check"><input type="checkbox" checked={logMistake} onChange={(e) => setLogMistake(e.target.checked)} />Registrar no banco de erros o que deu errado</label>}
+        {wrong && <label className="check"><input type="checkbox" checked={logMistake} onChange={(e) => setLogMistake(e.target.checked)} />Registrar o erro (já agenda uma revisão)</label>}
         <div className="modal-f"><button type="button" className="btn ghost" onClick={onClose}>Pular</button><button className="btn pri">Salvar avaliação</button></div>
       </form>
     </Modal>

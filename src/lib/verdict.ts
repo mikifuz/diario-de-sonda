@@ -110,7 +110,7 @@ export function verdict(p: VerdictInput): Verdict | null {
     .filter((x) => x.g != null && x.g < x.s.min_avg);
   const st30 = stats(p.sessions.filter((s) => inRange(s, addDays(p.today, -29), p.today)));
   if (low.length && st30.accN >= 5 && st30.acc != null && st30.acc < 0.6)
-    return v("notas", "bad", `Abaixo da média: ${low.map((x) => `${x.s.name} (${nf(x.g)} de ${nf(x.s.min_avg)})`).join(", ")}. Acerto conferido nos últimos 30 dias: ${pct(st30.acc)} em ${qt(st30.accN, "registro", "registros")}. Veja no banco de erros o que mais se repete.`, { label: "Ver banco de erros", href: "/hoje?aba=erros" });
+    return v("notas", "bad", `Abaixo da média: ${low.map((x) => `${x.s.name} (${nf(x.g)} de ${nf(x.s.min_avg)})`).join(", ")}. Acerto conferido nos últimos 30 dias: ${pct(st30.acc)} em ${qt(st30.accN, "registro", "registros")}. Veja em Revisar os erros que mais se repetem.`, { label: "Ver meus erros", href: "/hoje?aba=revisar" });
 
   const ref = goal ?? (avgBefore > 0 ? avgBefore : null);
   if (ref && weekMin < ref * 0.4)

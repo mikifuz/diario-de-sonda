@@ -145,7 +145,7 @@ export default function Disciplina() {
         </div>
       </section>
       <section className="panel">
-        <div className="panel-h"><h2>Banco de erros</h2><button className="btn sm" onClick={() => setModal({ k: "mistake", id: null })}><Icon d={I.plus} s={14} />Registrar erro</button></div>
+        <div className="panel-h"><h2>Erros registrados</h2><button className="btn sm" onClick={() => setModal({ k: "mistake", id: null })}><Icon d={I.plus} s={14} />Registrar erro</button></div>
         {mistakes.length ? (
           <div className="list">{mistakes.slice(0, 6).map((m) => (
             <div key={m.id} className="li clickable" onClick={() => setModal({ k: "mistake", id: m.id })}>
@@ -154,7 +154,7 @@ export default function Disciplina() {
             </div>
           ))}</div>
         ) : <p className="small muted" style={{ margin: 0 }}>Nenhum erro registrado nesta disciplina.</p>}
-        {mistakes.length > 6 && <p className="small" style={{ margin: "8px 0 0" }}><Link href="/hoje?aba=erros">Ver todos os {mistakes.length} erros</Link></p>}
+        {mistakes.length > 6 && <p className="small" style={{ margin: "8px 0 0" }}><Link href="/hoje?aba=revisar">Ver todos os {mistakes.length} erros</Link></p>}
       </section>
       {modal?.k === "edit" && <SubjectModal id={s.id} onClose={() => setModal(null)} />}
       {modal?.k === "syllabus" && <ImportSyllabusModal s={s} onClose={() => setModal(null)} />}
