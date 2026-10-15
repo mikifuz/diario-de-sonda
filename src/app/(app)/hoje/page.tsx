@@ -21,8 +21,10 @@ import { WeekRoutine } from "@/components/routine";
 import { EventModal } from "@/components/modals";
 import { TripsPanel } from "@/components/trips";
 
-type Tab = "plano" | "provas" | "revisoes" | "erros" | "rotina";
-const TABS: [Tab, string][] = [["plano", "Plano do dia"], ["provas", "Provas"], ["revisoes", "Revisões"], ["erros", "Banco de erros"], ["rotina", "Rotina"]];
+type Tab = "plano" | "provas" | "revisar" | "rotina";
+const TABS: [Tab, string][] = [["plano", "Plano do dia"], ["provas", "Provas"], ["revisar", "Revisar"], ["rotina", "Rotina"]];
+// links antigos (?aba=revisoes, ?aba=erros) abrem a aba nova
+const OLD: Record<string, Tab> = { revisoes: "revisar", erros: "revisar" };
 type ModalState = null | { k: "review"; id: string } | { k: "item"; id: string | null } | { k: "mistake"; id: string | null } | { k: "block"; id: string | null; weekday?: number } | { k: "siga" } | { k: "start"; args: StartArgs } | { k: "event"; id: string | null; type?: EventType };
 type Open = (m: ModalState) => void;
 
@@ -32,16 +34,16 @@ export default function HojePage() {
 
 function Hoje() {
   const params = useSearchParams();
-  const pre = params.get("aba") as Tab | null;
-  const [tab, setTab] = useState<Tab>(pre && TABS.some(([k]) => k === pre) ? pre : "plano");
+  const aba = params.get("aba") || "";
+  const pre = (OLD[aba] || aba) as Tab;
+  const [tab, setTab] = useState<Tab>(TABS.some(([k]) => k === pre) ? pre : "plano");
   const [modal, setModal] = useState<ModalState>(params.get("abrir") === "siga" ? { k: "siga" } : null);
   const close = () => setModal(null);
   return (
     <>
       <Tabs value={tab} onChange={setTab} label="Seções" options={TABS} />
       {tab === "plano" && <PlanTab open={setModal} goRoutine={() => setTab("rotina")} goExams={() => setTab("provas")} />}
-      {tab === "revisoes" && <ReviewsTab open={setModal} />}
-      {tab === "erros" && <MistakesTab open={setModal} />}
+      {tab === "revisar" && <><ReviewsTab open={setModal} /><MistakesTab open={setModal} /></>}
       {tab === "rotina" && <RoutineTab open={setModal} />}
       {tab === "provas" && <ExamsTab open={setModal} />}
       {modal?.k === "review" && <ReviewModal id={modal.id} onClose={close} />}
@@ -245,7 +247,7 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
   );
 }
 
-/* ============ Revisões ============ */
+/* ============ Revisar: revisões (de conteúdo e de erros) ============ */
 function ReviewsTab({ open }: { open: Open }) {
   const st = useStore();
   const today = todayKey();
@@ -278,9 +280,15 @@ function ReviewsTab({ open }: { open: Open }) {
   return (
     <>
       <section className="panel">
-        <div className="panel-h"><h2>Revisões em aberto</h2><button className="btn sm" onClick={() => open({ k: "item", id: null })}><Icon d={I.plus} s={14} />Revisão de conteúdo</button></div>
+        <div className="panel-h"><h2>Para revisar</h2>
+          <div className="row" style={{ gap: 6 }}>
+            <button className="btn sm pri" onClick={() => open({ k: "mistake", id: null })}><Icon d={I.plus} s={14} />Registrar erro</button>
+            <button className="btn sm" onClick={() => open({ k: "item", id: null })}><Icon d={I.plus} s={14} />Revisão de conteúdo</button>
+          </div>
+        </div>
+        <p className="small muted" style={{ margin: "0 0 10px" }}>Revisões de conteúdo e dos erros que você registrou, juntas, da mais urgente para a mais distante.</p>
         {openRows.length ? <div className="list">{openRows.map(({ i, state }) => <Row key={i.id} i={i} why={state.why} isOpen />)}</div>
-          : <Empty title="Nenhuma revisão em aberto">Registre um erro (com &quot;Agendar revisão&quot;) ou crie a revisão de um conteúdo.</Empty>}
+          : <Empty title="Nada para revisar agora">Registre um erro (ele já agenda a revisão) ou crie a revisão de um conteúdo.</Empty>}
       </section>
       {closed.length > 0 && (
         <details className="panel">
@@ -300,7 +308,7 @@ function ReviewsTab({ open }: { open: Open }) {
   );
 }
 
-/* ============ Banco de erros ============ */
+/* ============ Revisar: histórico de erros ============ */
 function MistakesTab({ open }: { open: Open }) {
   const st = useStore();
   const subs = activeSubjects(st.subjects, true);
@@ -313,7 +321,7 @@ function MistakesTab({ open }: { open: Open }) {
   return (
     <>
       <section className="panel">
-        <div className="panel-h"><h2>Erros por tipo</h2><button className="btn sm pri" onClick={() => open({ k: "mistake", id: null })}><Icon d={I.plus} s={14} />Registrar erro</button></div>
+        <div className="panel-h"><h2>Erros que mais se repetem</h2><span className="lbl">{qt(bySub.length, "erro registrado", "erros registrados")}</span></div>
         <div className="row" style={{ marginBottom: 12 }}>
           <select value={sub} onChange={(e) => setSub(e.target.value)} aria-label="Disciplina" style={{ width: "auto" }}><option value="">Todas as disciplinas</option>{subs.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
           {cat && <button className="btn sm ghost" onClick={() => setCat("")}>Limpar filtro: {MISTAKE[cat]}</button>}
@@ -330,12 +338,12 @@ function MistakesTab({ open }: { open: Open }) {
             ))}
             <p className="small muted" style={{ margin: "6px 0 0" }}>{bySub.length < 5 ? `Só ${qt(bySub.length, "erro registrado", "erros registrados")}: ainda é cedo para tirar conclusões sobre o tipo mais comum.` : "Clique num tipo para filtrar a lista."}</p>
           </div>
-        ) : <Empty title="Nenhum erro registrado">Ao avaliar uma sessão com resultado parcial ou errado, o app oferece registrar o erro. Você também pode registrar aqui.</Empty>}
+        ) : <Empty title="Nenhum erro registrado">Ao avaliar uma sessão com resultado parcial ou errado, o app oferece registrar o erro. Você também pode usar &quot;Registrar erro&quot; acima.</Empty>}
       </section>
       {list.length > 0 && (
-        <section className="panel">
-          <div className="panel-h"><h2>Erros</h2><span className="lbl">{list.length}</span></div>
-          <div className="list">{list.map((m) => {
+        <details className="panel" open={cat ? true : undefined}>
+          <summary>Histórico de erros ({list.length}{cat ? ` · ${MISTAKE[cat]}` : ""})</summary>
+          <div className="list" style={{ marginTop: 10 }}>{list.map((m) => {
             const s = st.subjects.find((x) => x.id === m.subject_id), tn = topicName(st.topics, m.topic_id);
             const rv = st.reviews.find((r) => r.mistake_id === m.id);
             return (
@@ -352,7 +360,7 @@ function MistakesTab({ open }: { open: Open }) {
               </div>
             );
           })}</div>
-        </section>
+        </details>
       )}
     </>
   );

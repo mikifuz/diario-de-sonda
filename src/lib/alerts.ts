@@ -128,7 +128,7 @@ export function buildAlerts(p: AlertInput): Alert[] {
   }
 
   const late = p.items.filter((i) => i.due < p.today && active.some((s) => s.id === i.subject_id) && itemState(i, p.assessments, p.today).open);
-  if (late.length) out.push({ key: "late", level: late.length >= 5 ? "warn" : "info", text: `${late.length === 1 ? "1 revisão atrasada" : `${late.length} revisões atrasadas`}.`, action: { label: "Ver revisões", href: "/hoje?aba=revisoes" } });
+  if (late.length) out.push({ key: "late", level: late.length >= 5 ? "warn" : "info", text: `${late.length === 1 ? "1 revisão atrasada" : `${late.length} revisões atrasadas`}.`, action: { label: "Ver revisões", href: "/hoje?aba=revisar" } });
 
   const rank: Record<Level, number> = { bad: 0, warn: 1, info: 2 };
   return out.sort((a, b) => rank[a.level] - rank[b.level] || (a.days ?? 99) - (b.days ?? 99));

@@ -1,5 +1,5 @@
 "use client";
-// Formulários do banco de erros, da revisão espaçada e da rotina semanal.
+// Formulários de registro de erro, da revisão espaçada e da rotina semanal.
 import { useState, type FormEvent } from "react";
 import { activeSubjects, useStore } from "@/lib/store";
 import { addDays, parseNum, todayKey, qt } from "@/lib/calc";
@@ -69,7 +69,7 @@ export function MistakeModal({ id, preset, onClose }: { id: string | null; prese
     onClose();
   };
   return (
-    <Modal title={orig ? "Editar erro" : "Registrar erro"} sub="Banco de erros" onClose={onClose}>
+    <Modal title={orig ? "Editar erro" : "Registrar erro"} sub="Revisar" onClose={onClose}>
       <form className="stack" style={{ gap: 14 }} onSubmit={submit}>
         <div className="fgrid">
           <label className="f"><span>Disciplina</span><select value={f.subject_id} onChange={(e) => up({ subject_id: e.target.value, topic_id: "" })} required>{list.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
@@ -110,7 +110,7 @@ export function MistakeModal({ id, preset, onClose }: { id: string | null; prese
             )}
           </div>
         )}
-        {orig && review && <p className="small muted" style={{ margin: 0 }}>Este erro tem uma revisão agendada para {dm(review.due)}. Ela pode ser editada em Hoje → Revisões.</p>}
+        {orig && review && <p className="small muted" style={{ margin: 0 }}>Este erro tem uma revisão agendada para {dm(review.due)}. Ela pode ser editada em Hoje → Revisar.</p>}
         <div className="modal-f">
           {orig && <span style={{ marginRight: "auto" }}><ConfirmButton label={<><Icon d={I.trash} s={15} />Excluir</>} question={review ? "Excluir o erro e a revisão dele?" : "Excluir este erro?"} confirmLabel="Excluir"
             onConfirm={async () => { if (await st.remove("mistakes", orig.id)) { st.toast("Erro excluído."); onClose(); } }} /></span>}

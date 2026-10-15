@@ -87,7 +87,7 @@ export function examAdvice(p: { exam: Assessment; felt: number; assessments: Ass
   }
   const base = { next, due, title };
   if (p.felt <= 2) return { ...base, strong: true, offer: true,
-    text: `Recomendo muito uma revisão: é legal revisar antes de partir para a próxima prova. Refaça as questões em que travou enquanto ainda lembra delas e anote os erros no banco de erros.${nextTxt}` };
+    text: `Recomendo muito uma revisão: é legal revisar antes de partir para a próxima prova. Refaça as questões em que travou enquanto ainda lembra delas e registre os erros em Hoje → Revisar.${nextTxt}` };
   if (p.felt === 3) return { ...base, strong: false, offer: true,
     text: `Vale anotar agora onde travou, enquanto lembra. Uma revisão curta ajuda a não carregar a dúvida para a próxima.${nextTxt}` };
   return { ...base, strong: false, offer: false, text: "Boa! Quando sair a nota, lance em Notas da disciplina." };
