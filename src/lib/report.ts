@@ -1,5 +1,6 @@
 // Relatório semanal (chega no domingo de manhã, como notificação). Função pura e testada.
 // Só fatos do período; confiança e acerto conferido aparecem separados.
+import { mistakeCats } from "./mistakes";
 import { addDays, daysBetween, dkey, fmtMin, keyDate, nf, pct, stats, qt } from "./calc";
 import { itemState } from "./plan";
 import { MISTAKE } from "./constants";
@@ -40,7 +41,7 @@ export function buildReport(p: ReportInput): { title: string; body: string; data
   const by = new Map<string, number>();
   for (const s of ses) by.set(s.subject_id, (by.get(s.subject_id) || 0) + s.duration_min);
   const cats = new Map<string, number>();
-  for (const m of p.mistakes) if (inWeek(m.occurred_on)) cats.set(m.category, (cats.get(m.category) || 0) + 1);
+  for (const m of p.mistakes) if (inWeek(m.occurred_on)) for (const c of mistakeCats(m)) cats.set(c, (cats.get(c) || 0) + 1);
   const active = new Set(p.subjects.filter((s) => !s.archived).map((s) => s.id));
   const data: ReportData = {
     week: p.week, from, to,

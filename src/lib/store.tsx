@@ -63,7 +63,7 @@ const COLS: Record<Table, string> = {
   topics: "id,subject_id,parent_id,name,position,taught_on,assessment_id",
   study_sessions: "id,subject_id,topic_id,activity,started_at,duration_min,questions,correct,notes,confidence,result,autonomy,difficulty,comprehension",
   assessments: "id,subject_id,name,kind,date,time,weight,grade,predicted,sim_c,sim_e,sim_o,priority,status,description,sub_id,felt",
-  events: "id,subject_id,title,type,date,time,priority,status,description",
+  events: "id,subject_id,title,type,date,end_date,time,priority,status,description",
   routine_blocks: "id,weekday,start_time,end_time,kind,subject_id,label",
   mistakes: "id,subject_id,topic_id,session_id,category,description,correction,source,occurred_on",
   review_items: "id,subject_id,topic_id,mistake_id,assessment_id,title,step,due,est_min,active,last_reviewed_at",
@@ -106,6 +106,8 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     let { data: rows, error } = await q;
     // banco ainda sem a coluna "felt" (migration de "Como foi a prova?" não rodada): carrega sem ela
     if (error && t === "assessments" && /felt/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",felt", "")));
+    // banco ainda sem a coluna "end_date" (migration de viagens não rodada): carrega sem ela
+    if (error && t === "events" && /end_date/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",end_date", "")));
     if (error) throw error;
     let list = (rows || []) as unknown as RowOf[typeof t][];
     if (t === "assessments" || t === "events") list = (list as (Assessment | CalEvent)[]).map(normTime) as typeof list;
@@ -336,7 +338,7 @@ export const activeSubjects = (s: Subject[], all = false) => s.filter((x) => all
 export const topicName = (topics: Topic[], id: string | null) => (id ? topics.find((t) => t.id === id)?.name || "" : "");
 
 export interface AgendaItem {
-  id: string; src: "event" | "item"; title: string; type: CalEvent["type"]; subject_id: string | null; date: string; time: string | null;
+  id: string; src: "event" | "item"; title: string; type: CalEvent["type"]; subject_id: string | null; date: string; end_date?: string | null; time: string | null;
   priority: CalEvent["priority"]; status: CalEvent["status"]; description: string; weight?: number; grade?: number | null;
 }
 export function agenda(subjects: Subject[], assessments: Assessment[], events: CalEvent[]): AgendaItem[] {

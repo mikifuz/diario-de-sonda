@@ -8,18 +8,21 @@ import { cleanSteps, dm, firstDue, fromMin, itemState, parseSteps, planDay, type
 import { BLOCK, MISTAKE, PREF, WD_S } from "@/lib/constants";
 import { BAND, masteryCfg } from "@/lib/mastery";
 import { FINAL_MIN, RESERVE, TARGET, reversePlan, todayTasks, type ExamPlan } from "@/lib/reverse";
-import type { Activity, MistakeCategory, ReviewItem, StudyPref } from "@/lib/types";
+import type { Activity, EventType, MistakeCategory, ReviewItem, StudyPref } from "@/lib/types";
 import { Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
 import { BlockModal, MistakeModal, ReviewItemModal, ReviewModal } from "@/components/planning";
 import { ImportSigaModal } from "@/components/importSiga";
 import { DayPrint } from "@/components/dayPrint";
+import { mistakeCats } from "@/lib/mistakes";
 import { WeekPrint } from "@/components/weekPrint";
 import { StartModal, type StartArgs } from "@/components/studyStart";
 import { WeekRoutine } from "@/components/routine";
+import { EventModal } from "@/components/modals";
+import { TripsPanel } from "@/components/trips";
 
 type Tab = "plano" | "provas" | "revisoes" | "erros" | "rotina";
 const TABS: [Tab, string][] = [["plano", "Plano do dia"], ["provas", "Provas"], ["revisoes", "Revisões"], ["erros", "Banco de erros"], ["rotina", "Rotina"]];
-type ModalState = null | { k: "review"; id: string } | { k: "item"; id: string | null } | { k: "mistake"; id: string | null } | { k: "block"; id: string | null; weekday?: number } | { k: "siga" } | { k: "start"; args: StartArgs };
+type ModalState = null | { k: "review"; id: string } | { k: "item"; id: string | null } | { k: "mistake"; id: string | null } | { k: "block"; id: string | null; weekday?: number } | { k: "siga" } | { k: "start"; args: StartArgs } | { k: "event"; id: string | null; type?: EventType };
 type Open = (m: ModalState) => void;
 
 export default function HojePage() {
@@ -46,6 +49,7 @@ function Hoje() {
       {modal?.k === "block" && <BlockModal id={modal.id} weekday={modal.weekday} onClose={close} />}
       {modal?.k === "siga" && <ImportSigaModal onClose={close} />}
       {modal?.k === "start" && <StartModal args={modal.args} onClose={close} />}
+      {modal?.k === "event" && <EventModal id={modal.id} src={modal.id ? "event" : undefined} type={modal.type} onClose={close} />}
     </>
   );
 }
@@ -132,6 +136,16 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
   const dateLabel = keyDate(today).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
   return (
     <>
+      <section className="panel" aria-label="Imprimir ou salvar em PDF">
+        <div className="row" style={{ gap: 6 }}>
+          <b className="grow">Plano em PDF <span className="small muted" style={{ fontWeight: 400 }}>(imprimir ou &quot;Salvar como PDF&quot;)</span></b>
+          <button className="btn sm" onClick={() => setPrint("hoje")}>Plano de hoje</button>
+          <button className="btn sm" onClick={() => setPrint("amanha")}>Plano de amanhã</button>
+          <button className="btn sm pri" onClick={() => setPrint("semana")}>Plano da semana</button>
+        </div>
+      </section>
+      {print === "semana" ? <WeekPrint start={today} onDone={() => setPrint(null)} /> : print && <DayPrint input={printInput} onDone={() => setPrint(null)} />}
+
       <section className="kpis">
         <div className="kpi"><span className="lbl">Tempo livre para estudo</span><span className="v">{fmtMin(plan.capacity)}</span><span className="s">no resto de {dateLabel}</span></div>
         <div className="kpi"><span className="lbl">Tarefas pedem</span><span className="v" style={{ color: plan.need > plan.capacity ? "var(--warn)" : undefined }}>{fmtMin(plan.need)}</span><span className="s">{plan.overflow.length ? `${plan.overflow.length} não couberam` : "tudo cabe"}</span></div>
@@ -145,6 +159,10 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
           <span className="row"><button className="btn sm pri" onClick={goRoutine}>Montar minha rotina</button><button className="btn sm" onClick={() => open({ k: "siga" })}>Importar aulas do SIGA (PDF)</button></span>
         </div>
       )}
+      <TripsPanel onEdit={(id) => open({ k: "event", id })} />
+      <div className="row" style={{ justifyContent: "flex-end" }}>
+        <button className="btn sm ghost" onClick={() => open({ k: "event", id: null, type: "viagem" })}><Icon d={I.plus} s={14} />Vai viajar? Adicionar viagem</button>
+      </div>
       {plan.notes.map((n) => <div key={n} className="callout">{n}</div>)}
       {plans.filter((pl) => pl.missing > 0 && pl.topics.length).map((pl) => (
         <div key={pl.exam.id} className="callout"><b>{pl.exam.name} de {pl.subject.name} em {qt(pl.days, "dia", "dias")}: não cabe tudo.</b> Faltam {pl.missing} min de estudo antes da prova.
@@ -161,13 +179,6 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
         </div>
       ))}
 
-      <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
-        <span className="small muted">Folha para imprimir ou salvar em PDF:</span>
-        <button className="btn sm" onClick={() => setPrint("hoje")}>Plano de hoje</button>
-        <button className="btn sm" onClick={() => setPrint("amanha")}>Plano de amanhã</button>
-        <button className="btn sm" onClick={() => setPrint("semana")}>Plano da semana</button>
-      </div>
-      {print === "semana" ? <WeekPrint start={today} onDone={() => setPrint(null)} /> : print && <DayPrint input={printInput} onDone={() => setPrint(null)} />}
 
       {plan.hasStudyBlocks && (
         <section className="panel">
@@ -292,8 +303,8 @@ function MistakesTab({ open }: { open: Open }) {
   const [sub, setSub] = useState("");
   const [cat, setCat] = useState<MistakeCategory | "">("");
   const bySub = st.mistakes.filter((m) => !sub || m.subject_id === sub);
-  const list = bySub.filter((m) => !cat || m.category === cat).sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
-  const counts = (Object.keys(MISTAKE) as MistakeCategory[]).map((k) => ({ k, n: bySub.filter((m) => m.category === k).length })).filter((x) => x.n).sort((a, b) => b.n - a.n);
+  const list = bySub.filter((m) => !cat || mistakeCats(m).includes(cat)).sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
+  const counts = (Object.keys(MISTAKE) as MistakeCategory[]).map((k) => ({ k, n: bySub.filter((m) => mistakeCats(m).includes(k)).length })).filter((x) => x.n).sort((a, b) => b.n - a.n);
   const max = Math.max(1, ...counts.map((c) => c.n));
   return (
     <>
@@ -331,7 +342,7 @@ function MistakesTab({ open }: { open: Open }) {
                   <div className="m"><span className="row" style={{ gap: 6, display: "inline-flex" }}><Dot c={s?.color || "var(--muted)"} />{s?.name}</span>{tn ? ` · ${tn}` : ""}{m.source ? ` · ${m.source}` : ""}{m.correction ? " · correção anotada" : ""}</div>
                 </div>
                 <div className="row hide-m" style={{ gap: 6 }}>
-                  <span className="chip">{MISTAKE[m.category]}</span>
+                  <span className="chip">{mistakeCats(m).map((c) => MISTAKE[c]).join(" + ")}</span>
                   {rv && <span className="chip acc" title="Revisão deste erro">{rv.active && rv.due >= todayKey() ? `revisão ${dm(rv.due)}` : "revisão"}</span>}
                 </div>
               </div>

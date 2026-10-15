@@ -5,6 +5,7 @@ import { dkey, gradeCalc } from "./calc";
 import { buildAlerts } from "./alerts";
 import { reversePlan, todayTasks } from "./reverse";
 import { planDay } from "./plan";
+import { tripImpacts } from "./trips";
 
 const TODAY = "2026-10-12";
 const { data: d, room } = buildDemo(TODAY);
@@ -29,4 +30,7 @@ test("demonstração: as telas principais têm o que mostrar", () => {
   const day = planDay({ today: TODAY, nowMin: 8 * 60, pref: "depois", blocks: d.blocks, events: d.events, subjects: d.subjects, topics: d.topics, sessions: d.sessions, assessments: d.assessments, items: d.reviews, mistakes: d.mistakes, extra: todayTasks(plans, TODAY) });
   assert.ok(day.slots.some((x) => x.placed.length > 0));
   assert.ok(d.notes.some((n) => n.kind === "relatorio"));
+  const trips = tripImpacts({ today: TODAY, nowMin: 8 * 60, blocks: d.blocks, events: d.events, subjects: d.subjects, topics: d.topics, sessions: d.sessions, assessments: d.assessments, items: d.reviews, logs: d.reviewLogs, mistakes: d.mistakes });
+  assert.equal(trips.length, 1);
+  assert.ok(trips[0].lost > 0 && trips[0].why);
 });

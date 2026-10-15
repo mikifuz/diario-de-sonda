@@ -5,6 +5,7 @@ import { activeSubjects, useStore } from "@/lib/store";
 import { addDays, parseNum, todayKey, qt } from "@/lib/calc";
 import { anchorFor, cleanSteps, dm, firstDue, nextReview, slotRanges, toMin } from "@/lib/plan";
 import { AUTO_OPTS, BLOCK, CLASS_SLOTS, COLORS, CONF_OPTS, MISTAKE, MISTAKE_D, RES_OPTS, WD_S } from "@/lib/constants";
+import { MISTAKE_ORDER, MISTAKE_SOURCES, mistakeCats, mistakeText, mistakeTitle } from "@/lib/mistakes";
 import type { Autonomy, BlockKind, Mistake, MistakeCategory, Result, ReviewItem, ReviewLog, RoutineBlock, Session, Subject } from "@/lib/types";
 import { ConfirmButton, I, Icon, Modal, Seg, Slider } from "./ui";
 import { TopicOptions } from "./modals";
@@ -20,39 +21,47 @@ function ExamOptions({ subjectId }: { subjectId: string }) {
 }
 
 /* ============ Erro ============ */
+// Sem digitar (pedido do dono): disciplina, conteúdo e uma lista para assinalar; o app monta o resto.
 export interface MistakePreset { subject_id?: string; topic_id?: string | null; session_id?: string | null }
+const EST_OPTS: [number, string][] = [[10, "10 min"], [15, "15 min"], [25, "25 min"], [40, "40 min"]];
 export function MistakeModal({ id, preset, onClose }: { id: string | null; preset?: MistakePreset; onClose: () => void }) {
   const st = useStore();
-  const today = todayKey();
+  const today = todayKey(), yesterday = addDays(today, -1);
   const orig = id ? st.mistakes.find((x) => x.id === id) : null;
   const list = activeSubjects(st.subjects, true).filter((x) => !x.archived || x.id === orig?.subject_id);
+  const origCats = orig ? mistakeCats(orig) : [];
   const [f, setF] = useState(() => ({
     subject_id: orig?.subject_id || preset?.subject_id || list[0]?.id || "", topic_id: orig?.topic_id ?? preset?.topic_id ?? "",
-    category: (orig?.category || null) as MistakeCategory | null, description: orig?.description || "", correction: orig?.correction || "",
-    source: orig?.source || "", occurred_on: orig?.occurred_on || today, schedule: !orig, est: "15",
+    cats: origCats, source: orig?.source || "", occurred_on: orig?.occurred_on || today, schedule: !orig, est: 15,
   }));
   const up = (x: Partial<typeof f>) => setF({ ...f, ...x });
+  const toggle = (c: MistakeCategory) => up({ cats: f.cats.includes(c) ? f.cats.filter((x) => x !== c) : [...f.cats, c] });
   const review = orig ? st.reviews.find((r) => r.mistake_id === orig.id) : null;
   const topic = st.topics.find((t) => t.id === f.topic_id);
   const anchor = anchorFor(f.subject_id, topic, st.assessments, today);
   const steps = cleanSteps(st.profile?.review_steps);
+  const text = mistakeText(f.cats);
+  // registro antigo escrito à mão: o texto fica, a menos que a pessoa mude o que está assinalado
+  const sameCats = !!orig && f.cats.length === origCats.length && f.cats.every((c) => origCats.includes(c));
+  const oldNote = orig && orig.description !== mistakeText(origCats)?.description ? orig.description : "";
+  const when = f.occurred_on === today ? "hoje" : f.occurred_on === yesterday ? "ontem" : "outro";
   if (!list.length) return <Modal title="Registrar erro" onClose={onClose}><p>Cadastre uma disciplina primeiro.</p></Modal>;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!f.category) { st.toast("Escolha o tipo de erro."); return; }
-    if (!f.description.trim()) { st.toast("Descreva o erro."); return; }
-    const est = parseNum(f.est);
-    if (f.schedule && (est == null || est < 5 || est > 240)) { st.toast("Tempo de revisão entre 5 e 240 minutos."); return; }
+    if (!text) { st.toast("Assinale pelo menos um item: o que aconteceu?"); return; }
+    const keep = sameCats && orig;
     const row: Mistake = {
       id: orig?.id || crypto.randomUUID(), subject_id: f.subject_id, topic_id: f.topic_id || null, session_id: orig?.session_id ?? preset?.session_id ?? null,
-      category: f.category, description: f.description.trim(), correction: f.correction.trim(), source: f.source.trim(), occurred_on: f.occurred_on || today,
+      category: text.category, description: keep ? orig.description : text.description, correction: keep ? orig.correction : text.correction,
+      source: f.source, occurred_on: f.occurred_on || today,
     };
     if (!(await st.save("mistakes", row))) return;
     if (!orig && f.schedule) {
+      const where = topic?.name || list.find((x) => x.id === f.subject_id)?.name || "";
       const item: ReviewItem = {
         id: crypto.randomUUID(), subject_id: row.subject_id, topic_id: row.topic_id, mistake_id: row.id, assessment_id: anchor?.a.id ?? null,
-        title: short(row.description), step: 0, due: firstDue(steps, today, anchor?.a.date), est_min: Math.round(est!), active: true, last_reviewed_at: null,
+        title: short(mistakeTitle(f.cats, where), 200), step: 0, due: firstDue(steps, today, anchor?.a.date), est_min: f.est, active: true, last_reviewed_at: null,
       };
       if (!(await st.save("review_items", item))) return;
       st.toast(`Erro registrado. Primeira revisão em ${dm(item.due)}.`);
@@ -66,22 +75,34 @@ export function MistakeModal({ id, preset, onClose }: { id: string | null; prese
           <label className="f"><span>Disciplina</span><select value={f.subject_id} onChange={(e) => up({ subject_id: e.target.value, topic_id: "" })} required>{list.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
           <label className="f"><span>Conteúdo</span><select value={f.topic_id} onChange={(e) => up({ topic_id: e.target.value })}><option value="">Geral da disciplina</option><TopicOptions topics={st.topics} subjectId={f.subject_id} /></select></label>
         </div>
-        <div className="qblock"><span className="q">Que tipo de erro foi?</span>
-          <Seg value={f.category} onChange={(x) => up({ category: x })} options={(Object.keys(MISTAKE) as MistakeCategory[]).map((k) => [k, MISTAKE[k]] as [MistakeCategory, string])} />
-          {f.category && <span className="small muted">{MISTAKE_D[f.category]}.</span>}
+        <fieldset className="qblock" style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend className="q">O que aconteceu? <span className="small muted">(assinale tudo o que vale)</span></legend>
+          <div className="stack" style={{ gap: 6, marginTop: 6 }}>
+            {MISTAKE_ORDER.map((c) => (
+              <label key={c} className="check" style={{ alignItems: "flex-start" }}>
+                <input type="checkbox" checked={f.cats.includes(c)} onChange={() => toggle(c)} />
+                <span><b>{MISTAKE[c]}</b> <span className="small muted">· {MISTAKE_D[c]}</span></span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {text && <p className="small" style={{ margin: 0 }}><b>Como evitar:</b> {sameCats && orig?.correction ? orig.correction : text.correction}</p>}
+        {oldNote && <p className="small muted" style={{ margin: 0 }}>Anotação antiga: {oldNote}{sameCats ? "" : " (será trocada pelo que está assinalado)"}</p>}
+        <div className="qblock"><span className="q">De onde veio <span className="small muted">(opcional)</span></span>
+          <Seg value={f.source || null} onChange={(x) => up({ source: x || "" })} options={[...new Set([...MISTAKE_SOURCES, ...(f.source ? [f.source] : [])])].map((x) => [x, x] as [string, string])} />
         </div>
-        <label className="f"><span>O que você errou? *</span><textarea value={f.description} onChange={(e) => up({ description: e.target.value })} required placeholder="Ex.: esqueci o jacobiano ao trocar para coordenadas cilíndricas" /></label>
-        <label className="f"><span>Qual é o certo / como evitar</span><textarea value={f.correction} onChange={(e) => up({ correction: e.target.value })} placeholder="Ex.: dV = r dr dθ dz; conferir o fator r antes de integrar" /></label>
-        <div className="fgrid">
-          <label className="f"><span>De onde veio</span><input type="text" value={f.source} maxLength={200} onChange={(e) => up({ source: e.target.value })} placeholder="Ex.: Lista 3, questão 5" /></label>
-          <label className="f"><span>Data</span><input type="date" value={f.occurred_on} onChange={(e) => up({ occurred_on: e.target.value })} required /></label>
+        <div className="qblock"><span className="q">Quando</span>
+          <div className="row" style={{ gap: 8 }}>
+            <Seg required value={when} onChange={(x) => up({ occurred_on: x === "hoje" ? today : x === "ontem" ? yesterday : addDays(today, -2) })} options={[["hoje", "Hoje"], ["ontem", "Ontem"], ["outro", "Outro dia"]]} />
+            {when === "outro" && <input type="date" value={f.occurred_on} max={today} onChange={(e) => up({ occurred_on: e.target.value || today })} aria-label="Data do erro" />}
+          </div>
         </div>
         {!orig && (
           <div className="stack" style={{ gap: 8 }}>
             <label className="check"><input type="checkbox" checked={f.schedule} onChange={(e) => up({ schedule: e.target.checked })} />Agendar revisão deste erro</label>
             {f.schedule && (
-              <div className="row small" style={{ gap: 8 }}>
-                <label className="row" style={{ gap: 6 }}>Tempo estimado <input type="number" min={5} max={240} value={f.est} onChange={(e) => up({ est: e.target.value })} style={{ width: 72 }} /> min</label>
+              <div className="stack small" style={{ gap: 6 }}>
+                <div className="row" style={{ gap: 8 }}><span>Tempo para revisar</span><Seg required value={f.est} onChange={(x) => up({ est: x ?? 15 })} options={EST_OPTS} /></div>
                 <span className="muted">{anchor
                   ? `Até ${anchor.a.name}${anchor.a.date ? ` (${dm(anchor.a.date)})` : ""}, porque ${anchor.why}. Primeira revisão em ${dm(firstDue(steps, today, anchor.a.date))}.`
                   : `Sem prova futura cadastrada nesta disciplina: intervalos limitados a 14 dias. Primeira revisão em ${dm(firstDue(steps, today, null))}.`}</span>

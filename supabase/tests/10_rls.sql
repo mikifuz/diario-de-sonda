@@ -496,6 +496,17 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a
 insert into public.events (title, type, date) values ('Recesso', 'sem_aula', current_date + 3);
 delete from public.events where type = 'sem_aula';
 
+-- ============ Viagens ============
+insert into public.events (title, type, date, end_date) values ('Casa dos pais', 'viagem', current_date + 5, current_date + 7);
+do $$ begin
+  begin
+    insert into public.events (title, type, date, end_date) values ('Volta antes da ida', 'viagem', current_date + 5, current_date + 2);
+    raise exception 'FALHOU: viagem com volta antes da ida';
+  exception when check_violation then null;
+  end;
+end $$;
+delete from public.events where type = 'viagem';
+
 -- ============ Exercício físico e hábitos ============
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
 insert into public.routine_blocks (weekday, start_time, end_time, kind) values (2, '18:00', '19:00', 'exercicio');

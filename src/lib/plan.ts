@@ -60,6 +60,17 @@ export function noClass(day: string, events: CalEvent[]): NoClass {
   }
   return { all, subjects };
 }
+/* ============ Viagens ============ */
+/** O item do calendário ocupa este dia? (viagem vai de `date` até `end_date`) */
+export const evOn = (e: CalEvent, day: string) => e.date <= day && day <= (e.end_date && e.end_date > e.date ? e.end_date : e.date);
+/** Viagem neste dia: até que horário dá para contar com a rotina (minutos desde 0h).
+ *  Dia da ida com horário de saída: o que termina antes da saída continua; nos outros dias, nada. */
+export function tripOn(day: string, events: CalEvent[]): { trip: CalEvent; until: number } | null {
+  const trip = events.find((e) => e.type === "viagem" && e.status !== "cancelado" && evOn(e, day));
+  if (!trip) return null;
+  return { trip, until: trip.time && day === trip.date ? toMin(trip.time) : 0 };
+}
+
 /** Motivo de não haver aula desta disciplina no dia (null = tem aula) */
 export const classOff = (nc: NoClass, subjectId: string | null) => nc.all ?? (subjectId ? nc.subjects.get(subjectId) ?? null : null);
 
@@ -228,6 +239,15 @@ export function freeStudy(blocks: RoutineBlock[], events: CalEvent[], day: strin
   const wd = keyDate(day).getDay();
   let list = blocks.filter((b) => b.kind === "estudo" && b.weekday === wd);
   const notes: string[] = [];
+  // viagem: os blocos de estudo da rotina não contam (no dia da ida, só os que acabam antes da saída)
+  const trip = tripOn(day, events);
+  if (trip) {
+    const kept = list.filter((b) => toMin(b.end_time) <= trip.until);
+    if (list.length > kept.length) notes.push(trip.until
+      ? `Viagem (${trip.trip.title}) com saída às ${fromMin(trip.until)}: só contam os blocos de estudo antes disso.`
+      : `Viagem (${trip.trip.title}): os blocos de estudo da rotina neste dia não contam.`);
+    return { blocks: kept.sort((a, b) => a.start_time.localeCompare(b.start_time)), notes };
+  }
   // dia sem aula: os horários de aula viram tempo de estudo
   const nc = noClass(day, events);
   const off = blocks.filter((b) => b.kind === "aula" && b.weekday === wd && classOff(nc, b.subject_id));
@@ -286,7 +306,8 @@ export function dayTasks(p: PlanInput): Task[] {
   // aulas do dia (sem as de feriado ou de dia marcado "sem aula")
   const classes = (day: string) => {
     const nc = noClass(day, p.events), w = keyDate(day).getDay();
-    return p.blocks.filter((b) => b.kind === "aula" && b.weekday === w && b.subject_id && active.has(b.subject_id) && !classOff(nc, b.subject_id))
+    const trip = tripOn(day, p.events);
+    return p.blocks.filter((b) => b.kind === "aula" && b.weekday === w && b.subject_id && active.has(b.subject_id) && !classOff(nc, b.subject_id) && (!trip || toMin(b.start_time) < trip.until))
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   };
   // dia de prova não tem aula de conteúdo: a aula daquele dia é a prova

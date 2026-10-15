@@ -47,6 +47,21 @@ export function examTopics(exam: Assessment, topics: Topic[], assessments: Asses
   return topicsForExam(exam, topics, assessments, next?.id).filter((t) => !parents.has(t.id));
 }
 
+/** O que estudar primeiro num conteúdo, com o motivo e o que fazer */
+export function priorityOf(t: TopicNeed): Priority {
+  const why = [
+    t.score == null ? "ainda sem resultado conferido" : `domínio ${t.score} (${BAND[t.band!][0].toLowerCase()})`,
+    t.mistakes ? qt(t.mistakes, "erro registrado", "erros registrados") : "",
+    t.conf != null && t.conf <= 2.5 ? `confiança baixa (${nf(t.conf)}/5)` : "",
+    t.done === 0 ? "nada estudado ainda para esta prova" : "",
+  ].filter(Boolean).join(", ");
+  const how = t.mistakes ? "refaça os exercícios em que errou e depois questões novas do mesmo tipo"
+    : t.conf != null && t.conf <= 2.5 ? "resolva exercícios e confira as respostas: é o que mostra se a insegurança tem fundamento"
+    : t.score == null ? "faça uma lista curta e anote quantas acertou"
+    : "exercícios do básico ao nível de prova";
+  return { topic: t.topic, why, how };
+}
+
 export function reversePlan(p: RevInput): ExamPlan[] {
   const active = new Map(p.subjects.filter((s) => !s.archived).map((s) => [s.id, s]));
   const exams = p.assessments
@@ -122,19 +137,7 @@ export function reversePlan(p: RevInput): ExamPlan[] {
       }
     }
     missing += pending.reduce((a, x) => a + x.m, 0);
-    const priority: Priority[] = missing > 0 ? topics.filter((t) => t.need > 0).slice(0, 3).map((t) => {
-      const why = [
-        t.score == null ? "ainda sem resultado conferido" : `domínio ${t.score} (${BAND[t.band!][0].toLowerCase()})`,
-        t.mistakes ? qt(t.mistakes, "erro registrado", "erros registrados") : "",
-        t.conf != null && t.conf <= 2.5 ? `confiança baixa (${nf(t.conf)}/5)` : "",
-        t.done === 0 ? "nada estudado ainda para esta prova" : "",
-      ].filter(Boolean).join(", ");
-      const how = t.mistakes ? "refaça os exercícios em que errou e depois questões novas do mesmo tipo"
-        : t.conf != null && t.conf <= 2.5 ? "resolva exercícios e confira as respostas: é o que mostra se a insegurança tem fundamento"
-        : t.score == null ? "faça uma lista curta e anote quantas acertou"
-        : "exercícios do básico ao nível de prova";
-      return { topic: t.topic, why, how };
-    }) : [];
+    const priority: Priority[] = missing > 0 ? topics.filter((t) => t.need > 0).slice(0, 3).map(priorityOf) : [];
     if (missing > 0 && topics.length) notes.push(`Faltam ${missing} min de estudo antes da ${exam.name}: não couberam nos blocos de estudo até ${dm(eve)} (depois das provas anteriores e de ${Math.round(RESERVE * 100)}% reservado para revisões e aulas).`);
     if (topics.some((t) => t.available)) notes.push("Conteúdos que ainda não foram dados entram no plano a partir da data da aula.");
     out.push({ exam, subject, days, topics, chunks: chunks.sort((a, b) => a.day.localeCompare(b.day)), missing, priority, notes });
