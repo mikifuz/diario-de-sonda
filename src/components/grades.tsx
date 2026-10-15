@@ -64,8 +64,13 @@ export function GradesPanel({ s }: { s: Subject }) {
   const subs = items.filter((i) => i.kind === "sub");
   const subCol = s.recovery === "sub" && subs.length > 0;
   // primeira SUB: vale para todas as provas que ainda não têm SUB (dá para desmarcar)
+  // o botão aparece em toda disciplina: o professor pode criar uma SUB que não estava no cronograma
   const addSub = async () => {
     const row = blank({ name: subs.length ? `SUB ${subs.length + 1}` : "SUB", kind: "sub" });
+    if (s.recovery !== "sub") {
+      if (!(await setSub({ recovery: "sub", exam_enabled: false }))) return;
+      if (s.recovery === "exame") st.toast("Esta disciplina passou de exame para SUB. Dá para voltar em \"Regras de média\".");
+    }
     if (!(await st.save("assessments", row))) return;
     if (!subs.length) await st.saveMany("assessments", items.filter((i) => i.kind === "prova" && !i.sub_id).map((i) => ({ ...i, sub_id: row.id })));
   };
@@ -102,7 +107,7 @@ export function GradesPanel({ s }: { s: Subject }) {
 
       <div className="row" style={{ marginTop: 10, gap: 6 }}>
         <button className="btn sm" onClick={() => st.save("assessments", blank({ name: `P${nProvas + 1}` }))}><Icon d={I.plus} s={14} />Avaliação</button>
-        {s.recovery === "sub" && <button className="btn sm" onClick={addSub}><Icon d={I.plus} s={14} />{subs.length ? "Outra SUB" : "SUB"}</button>}
+        <button className="btn sm" onClick={addSub} title="Adicionar uma SUB (prova substitutiva), mesmo que não esteja no cronograma"><Icon d={I.plus} s={14} />{subs.length ? "Outra SUB" : "SUB"}</button>
         {r.nRem > 0 && r.needed != null && r.needed > 0 && r.needed <= 10 && (
           <button className="btn sm ghost" onClick={() => { const n = Math.round((r.needed ?? 0) * 10) / 10; st.saveMany("assessments", items.filter((i) => i.grade == null && i.kind !== "sub").map((i) => ({ ...i, [simKey(sc)]: n }))); }}>Simular {nf(r.needed)} nas restantes</button>
         )}
@@ -118,7 +123,7 @@ export function GradesPanel({ s }: { s: Subject }) {
           </div>
           {r.subs.map((x) => <div key={x.id}><span className="chip acc">{x.name}</span> {subLine(r, sc, x)}</div>)}
           {r.subs.length > 1 && r.subFinal != null && <div>Com todas as SUBs: média {r.subOfficial ? "final" : "projetada"} <b className="num">{nf(r.subFinal)}</b>.</div>}
-          {s.recovery === "sub" && !subs.length && <div className="muted">Esta disciplina tem SUB? Use o botão &quot;+ SUB&quot; e depois marque em cada prova se ela tem SUB.</div>}
+          {s.recovery !== "exame" && !subs.length && <div className="muted">Esta disciplina tem SUB (mesmo que o professor tenha avisado por fora)? Use o botão &quot;+ SUB&quot; e depois marque em cada prova se ela tem SUB.</div>}
           {ex && ex.need != null && <div>Exame: {ex.eligible === false ? `média ${nf(ex.base)} abaixo do mínimo para fazer exame (${nf(ex.minTake)}).` : `precisaria de ${nf(Math.max(0, ex.need))} no exame${ex.need > 10 ? " (não alcançável)" : ""}.`}</div>}
           <span className="muted">Simulação é estimativa e não entra na média atual. Média = Σ(peso × nota) ÷ Σ(pesos).</span>
         </div>
