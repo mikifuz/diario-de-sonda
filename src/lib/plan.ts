@@ -4,7 +4,7 @@ import { addDays, daysBetween, keyDate, pad } from "./calc";
 import { mastery, topicFamily, type MasteryCfg } from "./mastery";
 import { DEFAULT_STEPS } from "./constants";
 import { holidayOf } from "./holidays";
-import { effortOf, scaleMin } from "./effort";
+import { effortOf, isTrivial, scaleMin } from "./effort";
 import type { Assessment, Autonomy, CalEvent, Mistake, Result, ReviewItem, ReviewLog, RoutineBlock, Session, StudyPref, Subject, Topic } from "./types";
 
 /* ============ Horas ============ */
@@ -307,7 +307,7 @@ export function dayTasks(p: PlanInput): Task[] {
   const classes = (day: string) => {
     const nc = noClass(day, p.events), w = keyDate(day).getDay();
     const trip = tripOn(day, p.events);
-    return p.blocks.filter((b) => b.kind === "aula" && b.weekday === w && b.subject_id && active.has(b.subject_id) && !classOff(nc, b.subject_id) && (!trip || toMin(b.start_time) < trip.until))
+    return p.blocks.filter((b) => b.kind === "aula" && b.weekday === w && b.subject_id && active.has(b.subject_id) && !isTrivial(active.get(b.subject_id)) && !classOff(nc, b.subject_id) && (!trip || toMin(b.start_time) < trip.until))
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   };
   // dia de prova não tem aula de conteúdo: a aula daquele dia é a prova
