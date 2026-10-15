@@ -11,9 +11,6 @@ import { EventModal, SubjectModal } from "@/components/modals";
 import { AlertsPanel, TodoPanel, VerdictCard } from "@/components/dashboard";
 import { HabitsPanel } from "@/components/habits";
 import { GettingStarted } from "@/components/onboarding";
-import { WeekRoutine } from "@/components/routine";
-import { BlockModal } from "@/components/planning";
-import { ImportSigaModal } from "@/components/importSiga";
 import { TripsPanel } from "@/components/trips";
 import { WeekPrint } from "@/components/weekPrint";
 
@@ -22,12 +19,10 @@ export default function Painel() {
   const router = useRouter();
   const [per, setPer] = useState<Period>("mes");
   const [print, setPrint] = useState(false);
-  const [modal, setModal] = useState<null | { k: "subject" } | { k: "event"; id: string | null; src?: "event" | "item" } | { k: "block"; id: string | null; weekday?: number } | { k: "siga" }>(null);
+  const [modal, setModal] = useState<null | { k: "subject" } | { k: "event"; id: string | null; src?: "event" | "item" }>(null);
   const all = st.sessions, t = todayKey(), list = activeSubjects(st.subjects);
   const close = () => setModal(null);
   const modals = modal && (modal.k === "subject" ? <SubjectModal id={null} onClose={close} />
-    : modal.k === "block" ? <BlockModal id={modal.id} weekday={modal.weekday} onClose={close} />
-    : modal.k === "siga" ? <ImportSigaModal onClose={close} />
     : <EventModal id={modal.id} src={modal.src} onClose={close} />);
 
   if (!list.length && !all.length) {
@@ -79,12 +74,6 @@ export default function Painel() {
 
   return (
     <>
-      <WeekRoutine title="Sua rotina semanal" onBlock={(id, weekday) => setModal({ k: "block", id, weekday })} onSiga={() => setModal({ k: "siga" })}>
-        <div className="row" style={{ margin: "0 0 12px", gap: 8 }}>
-          <p className="small muted grow" style={{ margin: 0 }}>Toque num bloco para mudar. Preferências do plano e intervalos de revisão ficam em <Link href="/hoje?aba=rotina">Hoje → Rotina</Link>.</p>
-          <button className="btn sm" onClick={() => setPrint(true)}>Plano da semana (PDF)</button>
-        </div>
-      </WeekRoutine>
       <GettingStarted />
       {print && <WeekPrint start={t} onDone={() => setPrint(false)} />}
       <VerdictCard />
@@ -108,7 +97,7 @@ export default function Painel() {
           <div className="legend" style={{ marginTop: 8 }}>{list.map((s) => <span key={s.id}><i style={{ background: s.color }} />{s.name}</span>)}</div>
         </div>
         <div className="panel">
-          <div className="panel-h"><h2>Próximas avaliações</h2><span className="lbl">{qt(pend, "pendente", "pendentes")}</span></div>
+          <div className="panel-h"><h2>Próximas avaliações</h2><span className="lbl">{qt(pend, "pendente", "pendentes")}</span><button className="btn sm" onClick={() => setPrint(true)}>Plano da semana (PDF)</button></div>
           {up.length ? (
             <div className="list">{up.map((e) => {
               const s = list.find((x) => x.id === e.subject_id), dd = daysBetween(t, e.date), gc = s && e.src === "item" ? gradeCalc(s, itemsOf(s.id)) : null;
