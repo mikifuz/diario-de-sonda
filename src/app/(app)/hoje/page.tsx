@@ -13,6 +13,7 @@ import { Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
 import { BlockModal, MistakeModal, ReviewItemModal, ReviewModal } from "@/components/planning";
 import { ImportSigaModal } from "@/components/importSiga";
 import { DayPrint } from "@/components/dayPrint";
+import { mistakeCats } from "@/lib/mistakes";
 import { WeekPrint } from "@/components/weekPrint";
 import { StartModal, type StartArgs } from "@/components/studyStart";
 import { WeekRoutine } from "@/components/routine";
@@ -302,8 +303,8 @@ function MistakesTab({ open }: { open: Open }) {
   const [sub, setSub] = useState("");
   const [cat, setCat] = useState<MistakeCategory | "">("");
   const bySub = st.mistakes.filter((m) => !sub || m.subject_id === sub);
-  const list = bySub.filter((m) => !cat || m.category === cat).sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
-  const counts = (Object.keys(MISTAKE) as MistakeCategory[]).map((k) => ({ k, n: bySub.filter((m) => m.category === k).length })).filter((x) => x.n).sort((a, b) => b.n - a.n);
+  const list = bySub.filter((m) => !cat || mistakeCats(m).includes(cat)).sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
+  const counts = (Object.keys(MISTAKE) as MistakeCategory[]).map((k) => ({ k, n: bySub.filter((m) => mistakeCats(m).includes(k)).length })).filter((x) => x.n).sort((a, b) => b.n - a.n);
   const max = Math.max(1, ...counts.map((c) => c.n));
   return (
     <>
@@ -341,7 +342,7 @@ function MistakesTab({ open }: { open: Open }) {
                   <div className="m"><span className="row" style={{ gap: 6, display: "inline-flex" }}><Dot c={s?.color || "var(--muted)"} />{s?.name}</span>{tn ? ` · ${tn}` : ""}{m.source ? ` · ${m.source}` : ""}{m.correction ? " · correção anotada" : ""}</div>
                 </div>
                 <div className="row hide-m" style={{ gap: 6 }}>
-                  <span className="chip">{MISTAKE[m.category]}</span>
+                  <span className="chip">{mistakeCats(m).map((c) => MISTAKE[c]).join(" + ")}</span>
                   {rv && <span className="chip acc" title="Revisão deste erro">{rv.active && rv.due >= todayKey() ? `revisão ${dm(rv.due)}` : "revisão"}</span>}
                 </div>
               </div>

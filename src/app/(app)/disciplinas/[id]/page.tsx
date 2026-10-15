@@ -1,4 +1,5 @@
 "use client";
+import { mistakeCats } from "@/lib/mistakes";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -149,7 +150,7 @@ export default function Disciplina() {
           <div className="list">{mistakes.slice(0, 6).map((m) => (
             <div key={m.id} className="li clickable" onClick={() => setModal({ k: "mistake", id: m.id })}>
               <span className="cdays">{dm(m.occurred_on)}</span>
-              <div className="grow"><div className="t">{m.description}</div><div className="m">{MISTAKE[m.category]}{m.topic_id ? ` · ${st.topics.find((t) => t.id === m.topic_id)?.name || ""}` : ""}{m.source ? ` · ${m.source}` : ""}</div></div>
+              <div className="grow"><div className="t">{m.description}</div><div className="m">{mistakeCats(m).map((c) => MISTAKE[c]).join(" + ")}{m.topic_id ? ` · ${st.topics.find((t) => t.id === m.topic_id)?.name || ""}` : ""}{m.source ? ` · ${m.source}` : ""}</div></div>
             </div>
           ))}</div>
         ) : <p className="small muted" style={{ margin: 0 }}>Nenhum erro registrado nesta disciplina.</p>}
