@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { agenda, useStore } from "@/lib/store";
 import { daysBetween, fmtMin, keyDate, qt } from "@/lib/calc";
 import { BLOCK, EVT } from "@/lib/constants";
-import { classOff, dm, fromMin, noClass, planDay, toMin, type PlanInput, type Task } from "@/lib/plan";
+import { classOff, dm, evOn, fromMin, noClass, planDay, toMin, type PlanInput, type Task } from "@/lib/plan";
 
 const label = (t: Task) => (t.kind === "revisao" ? `Revisão: ${t.title}` : t.title);
 
@@ -38,8 +38,8 @@ export function DayPrint({ input, onDone }: { input: PlanInput; onDone: () => vo
     if (off) { lines.push({ at: toMin(b.start_time), end: toMin(b.end_time), text: `Sem aula de ${subName(b.subject_id) || "disciplina"}`, sub: off, box: false }); continue; }
     lines.push({ at: toMin(b.start_time), end: toMin(b.end_time), text: b.kind === "aula" ? `Aula de ${subName(b.subject_id) || "disciplina"}` : BLOCK[b.kind], sub: b.label || undefined, box: b.kind === "exercicio" });
   }
-  const cal = agenda(st.subjects, st.assessments, st.events).filter((e) => e.date === day && e.status !== "cancelado" && e.status !== "concluido");
-  for (const e of cal) lines.push({ at: e.time ? toMin(e.time) : null, end: null, text: `${EVT[e.type] ?? ""}${e.title && e.title !== EVT[e.type] ? `: ${e.title}` : ""}`, sub: subName(e.subject_id) || undefined, box: true });
+  const cal = agenda(st.subjects, st.assessments, st.events).filter((e) => evOn(e, day) && e.status !== "cancelado" && e.status !== "concluido");
+  for (const e of cal) lines.push({ at: e.time && e.date === day ? toMin(e.time) : null, end: null, text: `${EVT[e.type] ?? ""}${e.title && e.title !== EVT[e.type] ? `: ${e.title}` : ""}`, sub: subName(e.subject_id) || undefined, box: true });
   for (const s of plan.slots) {
     if (!s.placed.length) lines.push({ at: s.start, end: s.end, text: "Estudo livre", sub: s.block.label || undefined, box: false });
     for (const p of s.placed) lines.push({ at: p.start, end: p.end, text: label(p.task), sub: subName(p.task.subject_id), box: true });

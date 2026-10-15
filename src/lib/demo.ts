@@ -155,7 +155,13 @@ export function buildDemo(today = todayKey()): { data: DemoData; room: DemoRoom 
   blocks.push({ id: "d-w0", weekday: 5, start_time: "14:00", end_time: "18:00", kind: "trabalho", subject_id: null, label: "Estágio" });
   [2, 4].forEach((wd, k) => blocks.push({ id: `d-x${k}`, weekday: wd, start_time: "17:30", end_time: "18:30", kind: "exercicio", subject_id: null, label: "Academia" }));
 
-  const events: CalEvent[] = [{ id: "d-ev0", subject_id: null, title: "Consulta médica", type: "pessoal", date: addDays(today, 3), time: "19:30", priority: "media", status: "pendente", description: "" }];
+  // viagem no fim de semana que vem (sai sexta à tarde, volta domingo)
+  let toSat = (6 - keyDate(today).getDay() + 7) % 7;
+  if (toSat < 2) toSat += 7;
+  const events: CalEvent[] = [
+    { id: "d-ev0", subject_id: null, title: "Consulta médica", type: "pessoal", date: addDays(today, 3), time: "19:30", priority: "media", status: "pendente", description: "" },
+    { id: "d-ev1", subject_id: null, title: "Casa dos pais", type: "viagem", date: addDays(today, toSat - 1), end_date: addDays(today, toSat + 1), time: "13:00", priority: "media", status: "pendente", description: "" },
+  ];
   const todos: Todo[] = [
     { id: "d-td0", title: "Entregar lista 4 de Cálculo", subject_id: "d-s0", due: addDays(today, 2), done: false, done_at: null },
     { id: "d-td1", title: "Imprimir resumo de Estática", subject_id: "d-s2", due: addDays(today, 1), done: false, done_at: null },

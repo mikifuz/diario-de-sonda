@@ -26,6 +26,7 @@ export function friendlyError(e: { message?: string; code?: string } | null | un
   if (/Password should be at least/i.test(m)) return "A senha precisa ter pelo menos 8 caracteres.";
   if (/Password is known to be weak|pwned|leaked/i.test(m)) return "Essa senha já apareceu em vazamentos na internet. Escolha outra.";
   if (/rate limit/i.test(m)) return "Muitas tentativas seguidas. Aguarde alguns minutos.";
+  if (/events_type_check/.test(m) || (/end_date/.test(m) && /exist|find|schema/i.test(m))) return "Para salvar viagens, rode no Supabase (SQL Editor) a migration 20261023000000_viagens.sql.";
   if (e.code === "23514" && /_len|_size|friend_code/.test(m)) return "Texto grande demais para este campo. Encurte e tente de novo.";
   if (e.code === "23514") return "Algum valor está fora do permitido (ex.: nota acima de 10).";
   if (e.code === "23503") return "Este registro depende de outro que não existe mais. Recarregue a página.";

@@ -7,7 +7,7 @@ import { agenda, useStore } from "@/lib/store";
 import { addDays, fmtMin, keyDate, nf, pct, qt, todayKey } from "@/lib/calc";
 import { EVT, WD_S } from "@/lib/constants";
 import { masteryCfg } from "@/lib/mastery";
-import { classOff, dm, fromMin, noClass, planWeek, type PlanInput, type Task } from "@/lib/plan";
+import { classOff, dm, evOn, fromMin, noClass, planWeek, type PlanInput, type Task } from "@/lib/plan";
 import { reversePlan, todayTasks } from "@/lib/reverse";
 import { buildReport, reportWeek } from "@/lib/report";
 
@@ -67,11 +67,13 @@ export function WeekPrint({ start, onDone }: { start: string; onDone: () => void
           const nc = noClass(d, st.events);
           const classes = st.blocks.filter((b) => b.kind === "aula" && b.weekday === wd && !classOff(nc, b.subject_id) && !st.subjects.find((s) => s.id === b.subject_id)?.archived)
             .sort((a, b) => a.start_time.localeCompare(b.start_time));
-          const items = ag.filter((e) => e.date === d && e.type !== "sem_aula");
+          const items = ag.filter((e) => evOn(e, d) && e.type !== "sem_aula" && e.type !== "viagem");
+          const trip = ag.find((e) => e.type === "viagem" && e.status !== "cancelado" && evOn(e, d));
           const tasks = p ? p.slots.flatMap((s) => s.placed) : [];
           return (
             <div key={d} className="ps-day">
               <div className="ps-dh">{WD_S[wd]} {dm(d)}</div>
+              {trip && <div className="ps-tag">Viagem: {trip.title}</div>}
               {nc.all && <div className="ps-tag">Sem aula: {nc.all}</div>}
               {items.filter((e) => EXAM.has(e.type)).map((e) => <div key={e.id} className="ps-exam">{EVT[e.type]}: {e.title} · {subName(e.subject_id)}</div>)}
               {classes.map((b) => <div key={b.id} className="ps-cl">{b.start_time.slice(0, 5)} Aula · {subName(b.subject_id)}</div>)}

@@ -10,7 +10,7 @@ export type StudyPref = "antes" | "depois" | "ambos";
 export type Recovery = "nenhuma" | "sub" | "exame";
 export type BlockKind = "aula" | "estudo" | "exercicio" | "trabalho" | "deslocamento" | "pessoal" | "descanso";
 export type MistakeCategory = "conceitual" | "algebrico" | "aritmetico" | "interpretacao" | "unidade" | "sinal" | "formula" | "metodo" | "atencao" | "tempo";
-export type EventType = AssessmentKind | "aula" | "atividade" | "simulado" | "estudo" | "revisao" | "pessoal" | "indisponivel" | "sem_aula";
+export type EventType = AssessmentKind | "aula" | "atividade" | "simulado" | "estudo" | "revisao" | "pessoal" | "indisponivel" | "sem_aula" | "viagem";
 export type Scenario = "c" | "e" | "o";
 
 export interface Timer {
@@ -147,6 +147,8 @@ export interface CalEvent {
   title: string;
   type: EventType;
   date: string;
+  /** último dia (viagem); null = um dia só */
+  end_date?: string | null;
   time: string | null;
   priority: Priority;
   status: Status;

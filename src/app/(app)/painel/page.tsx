@@ -14,11 +14,14 @@ import { GettingStarted } from "@/components/onboarding";
 import { WeekRoutine } from "@/components/routine";
 import { BlockModal } from "@/components/planning";
 import { ImportSigaModal } from "@/components/importSiga";
+import { TripsPanel } from "@/components/trips";
+import { WeekPrint } from "@/components/weekPrint";
 
 export default function Painel() {
   const st = useStore();
   const router = useRouter();
   const [per, setPer] = useState<Period>("mes");
+  const [print, setPrint] = useState(false);
   const [modal, setModal] = useState<null | { k: "subject" } | { k: "event"; id: string | null; src?: "event" | "item" } | { k: "block"; id: string | null; weekday?: number } | { k: "siga" }>(null);
   const all = st.sessions, t = todayKey(), list = activeSubjects(st.subjects);
   const close = () => setModal(null);
@@ -77,10 +80,15 @@ export default function Painel() {
   return (
     <>
       <WeekRoutine title="Sua rotina semanal" onBlock={(id, weekday) => setModal({ k: "block", id, weekday })} onSiga={() => setModal({ k: "siga" })}>
-        <p className="small muted" style={{ margin: "0 0 12px" }}>Toque num bloco para mudar. Preferências do plano e intervalos de revisão ficam em <Link href="/hoje?aba=rotina">Hoje → Rotina</Link>.</p>
+        <div className="row" style={{ margin: "0 0 12px", gap: 8 }}>
+          <p className="small muted grow" style={{ margin: 0 }}>Toque num bloco para mudar. Preferências do plano e intervalos de revisão ficam em <Link href="/hoje?aba=rotina">Hoje → Rotina</Link>.</p>
+          <button className="btn sm" onClick={() => setPrint(true)}>Plano da semana (PDF)</button>
+        </div>
       </WeekRoutine>
       <GettingStarted />
+      {print && <WeekPrint start={t} onDone={() => setPrint(false)} />}
       <VerdictCard />
+      <TripsPanel onEdit={(id) => setModal({ k: "event", id, src: "event" })} />
       <section className="kpis" aria-label="Resumo">
         <div className="kpi"><span className="lbl">Hoje</span><span className="v">{fmtMin(mToday)}</span><span className="s">{qt(all.filter((s) => dkey(s.started_at) === t).length, "sessão", "sessões")}</span></div>
         <div className="kpi"><span className="lbl">Esta semana</span><span className="v">{fmtMin(mWeek)}</span>

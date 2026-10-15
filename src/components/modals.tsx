@@ -280,16 +280,17 @@ export function TopicModal({ id, onClose }: { id: string; onClose: () => void })
 }
 
 /* ============ Item do calendário ============ */
-interface EvForm { title: string; type: EventType; subject_id: string; date: string; time: string; priority: Priority; status: Status; description: string; counted: boolean; weight: string }
-export function EventModal({ id, src, date, onClose }: { id: string | null; src?: "event" | "item"; date?: string; onClose: () => void }) {
+interface EvForm { title: string; type: EventType; subject_id: string; date: string; end: string; time: string; priority: Priority; status: Status; description: string; counted: boolean; weight: string }
+export function EventModal({ id, src, date, type, onClose }: { id: string | null; src?: "event" | "item"; date?: string; type?: EventType; onClose: () => void }) {
   const st = useStore();
   const list = activeSubjects(st.subjects);
   const item = id && src === "item" ? st.assessments.find((a) => a.id === id) : null;
   const ev = id && src === "event" ? st.events.find((e) => e.id === id) : null;
   const [f, setF] = useState<EvForm>(() => item
-    ? { title: item.name, type: item.kind as EventType, subject_id: item.subject_id, date: item.date || todayKey(), time: item.time || "", priority: item.priority, status: item.status, description: item.description, counted: true, weight: String(item.weight).replace(".", ",") }
-    : ev ? { title: ev.title, type: ev.type, subject_id: ev.subject_id || "", date: ev.date, time: ev.time || "", priority: ev.priority, status: ev.status, description: ev.description, counted: false, weight: "1" }
-      : { title: "", type: "prova", subject_id: list[0]?.id || "", date: date || todayKey(), time: "", priority: "alta", status: "pendente", description: "", counted: true, weight: "1" });
+    ? { title: item.name, type: item.kind as EventType, subject_id: item.subject_id, date: item.date || todayKey(), end: "", time: item.time || "", priority: item.priority, status: item.status, description: item.description, counted: true, weight: String(item.weight).replace(".", ",") }
+    : ev ? { title: ev.title, type: ev.type, subject_id: ev.subject_id || "", date: ev.date, end: ev.end_date || "", time: ev.time || "", priority: ev.priority, status: ev.status, description: ev.description, counted: false, weight: "1" }
+      : type === "viagem" ? { title: "", type, subject_id: "", date: date || todayKey(), end: "", time: "", priority: "media", status: "pendente", description: "", counted: false, weight: "1" }
+      : { title: "", type: "prova", subject_id: list[0]?.id || "", date: date || todayKey(), end: "", time: "", priority: "alta", status: "pendente", description: "", counted: true, weight: "1" });
   const up = (x: Partial<EvForm>) => setF({ ...f, ...x });
   const canCount = GRADED.includes(f.type) && !!f.subject_id;
   const submit = async (e: FormEvent) => {
@@ -299,6 +300,8 @@ export function EventModal({ id, src, date, onClose }: { id: string | null; src?
     const w = parseNum(f.weight);
     if (counted && (w == null || w <= 0)) { st.toast("Informe um peso maior que zero."); return; }
     const time = f.time || null;
+    const trip = f.type === "viagem";
+    if (trip && f.end && f.end < f.date) { st.toast("A volta precisa ser no mesmo dia ou depois da ida."); return; }
     if (counted) {
       const base: Assessment = item ? { ...item } : { id: crypto.randomUUID(), subject_id: f.subject_id, name: "", kind: "prova", date: null, time: null, weight: 1, grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "",
         // prova nova: se a disciplina tem uma única SUB, ela vale para esta prova
@@ -308,24 +311,33 @@ export function EventModal({ id, src, date, onClose }: { id: string | null; src?
       if (item && item.id !== row.id) await st.remove("assessments", item.id);
       if (ev) await st.remove("events", ev.id);
     } else {
-      const row: CalEvent = { id: ev?.id || crypto.randomUUID(), subject_id: f.subject_id || null, title: f.title.trim(), type: f.type, date: f.date, time, priority: f.priority, status: f.status, description: f.description.trim() };
+      const row: CalEvent = { id: ev?.id || crypto.randomUUID(), subject_id: trip ? null : f.subject_id || null, title: f.title.trim(), type: f.type, date: f.date, time, priority: f.priority, status: f.status, description: f.description.trim(),
+        // só manda a volta quando há uma (assim o resto do calendário funciona mesmo antes da migration de viagens)
+        ...(trip ? { end_date: f.end && f.end > f.date ? f.end : null } : ev?.end_date ? { end_date: null } : {}) };
       if (!(await st.save("events", row))) return;
       if (item) await st.remove("assessments", item.id);
     }
-    st.toast("Salvo no calendário.");
+    st.toast(trip ? "Viagem salva: o plano de estudo já foi refeito em volta dela." : "Salvo no calendário.");
     onClose();
   };
   return (
-    <Modal title={id ? "Editar item" : "Novo item"} sub="Calendário" onClose={onClose}>
+    <Modal title={id ? (f.type === "viagem" ? "Editar viagem" : "Editar item") : f.type === "viagem" ? "Nova viagem" : "Novo item"} sub="Calendário" onClose={onClose}>
       <form className="stack" style={{ gap: 14 }} onSubmit={submit}>
         <div className="fgrid">
-          <label className="f full"><span>Título *</span><input type="text" value={f.title} onChange={(e) => up({ title: e.target.value })} required placeholder="Ex.: Prova 2" /></label>
+          <label className="f full"><span>{f.type === "viagem" ? "Para onde? *" : "Título *"}</span><input type="text" value={f.title} onChange={(e) => up({ title: e.target.value })} required placeholder={f.type === "viagem" ? "Ex.: Casa dos pais" : "Ex.: Prova 2"} /></label>
           <label className="f"><span>Tipo</span><select value={f.type} onChange={(e) => up({ type: e.target.value as EventType })}>{Object.entries(EVT).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
+          {f.type === "viagem" ? <>
+            <label className="f"><span>Ida *</span><input type="date" value={f.date} onChange={(e) => up({ date: e.target.value, end: f.end && f.end < e.target.value ? e.target.value : f.end })} required /></label>
+            <label className="f"><span>Volta</span><input type="date" value={f.end} min={f.date} onChange={(e) => up({ end: e.target.value })} /></label>
+            <label className="f"><span>Horário de saída</span><input type="time" value={f.time} onChange={(e) => up({ time: e.target.value })} /></label>
+            <p className="small full" style={{ margin: 0 }}>Nos dias da viagem (da ida até a volta) os blocos de estudo da sua rotina não contam. Com horário de saída, no dia da ida contam só os blocos que terminam antes. O app refaz o plano das provas em volta da viagem e avisa se você vai precisar estudar mais nos outros dias, e o quê.</p>
+          </> : <>
           <label className="f"><span>Disciplina</span><select value={f.subject_id} onChange={(e) => up({ subject_id: e.target.value })}><option value="">Nenhuma</option>{list.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           {f.type === "sem_aula" && <p className="small full" style={{ margin: 0 }}>Sem disciplina: não há aula de nenhuma matéria neste dia (feriado, recesso). Com disciplina: só a aula dela não acontece. No plano, os horários dessas aulas viram tempo de estudo. Feriados nacionais o app já conhece.</p>}
           <label className="f"><span>Data *</span><input type="date" value={f.date} onChange={(e) => up({ date: e.target.value })} required /></label>
           <label className="f"><span>Horário</span><input type="time" value={f.time} onChange={(e) => up({ time: e.target.value })} /></label>
-          <label className="f"><span>Prioridade</span><select value={f.priority} onChange={(e) => up({ priority: e.target.value as Priority })}>{Object.entries(PRIO).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
+          </>}
+          {f.type !== "viagem" && <label className="f"><span>Prioridade</span><select value={f.priority} onChange={(e) => up({ priority: e.target.value as Priority })}>{Object.entries(PRIO).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>}
           <label className="f"><span>Status</span><select value={f.status} onChange={(e) => up({ status: e.target.value as Status })}>{Object.entries(STATUS).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
           {canCount && <div className="full row"><label className="check"><input type="checkbox" checked={f.counted} onChange={(e) => up({ counted: e.target.checked })} />{f.type === "sub" ? "Lançar em Notas (substitui a menor nota de prova)" : "Conta na média da disciplina"}</label>
             {f.counted && f.type !== "sub" && <label className="row small" style={{ gap: 6 }}>Peso <input type="text" inputMode="decimal" value={f.weight} onChange={(e) => up({ weight: e.target.value })} style={{ width: 70 }} /></label>}</div>}

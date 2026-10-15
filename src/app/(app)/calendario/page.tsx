@@ -6,6 +6,11 @@ import { addDays, daysBetween, dkey, fmtMin, keyDate, nf, todayKey, qt } from "@
 import { EVT, GRADED } from "@/lib/constants";
 import { Dot, I, Icon } from "@/components/ui";
 import { EventModal } from "@/components/modals";
+import { TripsPanel } from "@/components/trips";
+import { WeekPrint } from "@/components/weekPrint";
+import { evOn } from "@/lib/plan";
+import { tripRange } from "@/lib/trips";
+import type { CalEvent, EventType } from "@/lib/types";
 
 const fmtDL = (k: string) => keyDate(k).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
@@ -14,17 +19,22 @@ export default function Calendario() {
   const t = todayKey();
   const [month, setMonth] = useState(t.slice(0, 7));
   const [sel, setSel] = useState(t);
-  const [modal, setModal] = useState<null | { id: string | null; src?: "event" | "item"; date?: string }>(null);
+  const [modal, setModal] = useState<null | { id: string | null; src?: "event" | "item"; date?: string; type?: EventType }>(null);
+  const [print, setPrint] = useState(false);
 
   const [y, m] = month.split("-").map(Number);
   const first = new Date(y, m - 1, 1);
   const start = addDays(dkey(first), -((first.getDay() + 6) % 7));
   const ag = agenda(st.subjects, st.assessments, st.events);
   const byDay: Record<string, AgendaItem[]> = {};
-  for (const e of ag) (byDay[e.date] ||= []).push(e);
+  for (const e of ag) {
+    // viagem aparece em todos os dias, da ida até a volta
+    if (e.type === "viagem" && e.end_date && e.end_date > e.date) for (let d = e.date; d <= e.end_date; d = addDays(d, 1)) (byDay[d] ||= []).push(e);
+    else (byDay[e.date] ||= []).push(e);
+  }
   const color = (e: AgendaItem) => {
     const s = st.subjects.find((x) => x.id === e.subject_id);
-    return e.type === "indisponivel" || e.type === "pessoal" ? "var(--muted)" : s ? s.color : "var(--accent)";
+    return e.type === "viagem" ? "var(--warn)" : e.type === "indisponivel" || e.type === "pessoal" ? "var(--muted)" : s ? s.color : "var(--accent)";
   };
   const cells: string[] = [];
   for (let i = 0; i < 42; i++) {
@@ -37,6 +47,7 @@ export default function Calendario() {
   const done = (e: AgendaItem) => e.status === "concluido" || e.status === "cancelado";
   const up = ag.filter((e) => e.date >= t && e.date <= addDays(t, 30) && e.status === "pendente");
   const dayEv = byDay[sel] || [];
+  const selTrip = st.events.find((e) => e.type === "viagem" && e.status !== "cancelado" && evOn(e, sel));
   // tempo estudado (sessões registradas) por dia
   const studied: Record<string, number> = {};
   for (const x of st.sessions) studied[dkey(x.started_at)] = (studied[dkey(x.started_at)] || 0) + x.duration_min;
@@ -52,7 +63,7 @@ export default function Calendario() {
         <Dot c={color(e)} />
         <div className="grow">
           <div className="t" style={done(e) ? { textDecoration: "line-through", opacity: 0.7 } : undefined}>{e.title}</div>
-          <div className="m">{EVT[e.type]}{s ? " · " + s.name : ""}{e.time ? " · " + e.time : ""}{e.src === "item" ? `${e.type === "sub" ? "" : ` · peso ${nf(e.weight ?? 0, 0)}`}${e.grade != null ? ` · nota ${nf(e.grade)}` : ""}` : ""}</div>
+          <div className="m">{EVT[e.type]}{e.type === "viagem" ? ` · ${tripRange(e as CalEvent)}${e.time ? `, saída ${e.time}` : ""}` : ""}{s ? " · " + s.name : ""}{e.time && e.type !== "viagem" ? " · " + e.time : ""}{e.src === "item" ? `${e.type === "sub" ? "" : ` · peso ${nf(e.weight ?? 0, 0)}`}${e.grade != null ? ` · nota ${nf(e.grade)}` : ""}` : ""}</div>
         </div>
         {e.priority === "alta" && e.status === "pendente" && <span className="chip bad">alta</span>}
       </div>
@@ -70,7 +81,11 @@ export default function Calendario() {
               <button className="btn icon ghost" onClick={() => go(1)} aria-label="Próximo mês"><Icon d={I.chev} s={16} /></button>
               <button className="btn sm ghost" onClick={() => { setMonth(t.slice(0, 7)); setSel(t); }}>Hoje</button>
             </div>
-            <button className="btn pri" onClick={() => setModal({ id: null, date: sel })}><Icon d={I.plus} s={16} />Novo item</button>
+            <div className="row" style={{ gap: 6 }}>
+              <button className="btn sm" onClick={() => setPrint(true)}>Plano da semana (PDF)</button>
+              <button className="btn" onClick={() => setModal({ id: null, date: sel > t ? sel : t, type: "viagem" })}><Icon d={I.plus} s={16} />Viagem</button>
+              <button className="btn pri" onClick={() => setModal({ id: null, date: sel })}><Icon d={I.plus} s={16} />Novo item</button>
+            </div>
           </div>
           <div className="cal">
             {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((d) => <div key={d} className="wd">{d}</div>)}
@@ -117,7 +132,9 @@ export default function Calendario() {
           </div>
         </div>
       </section>
-      {modal && <EventModal id={modal.id} src={modal.src} date={modal.date} onClose={() => setModal(null)} />}
+      {selTrip && <TripsPanel only={selTrip.id} onEdit={(id) => setModal({ id, src: "event" })} />}
+      {print && <WeekPrint start={t} onDone={() => setPrint(false)} />}
+      {modal && <EventModal id={modal.id} src={modal.src} date={modal.date} type={modal.type} onClose={() => setModal(null)} />}
     </>
   );
 }
