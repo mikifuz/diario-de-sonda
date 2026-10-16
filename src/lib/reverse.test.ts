@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { reversePlan, todayTasks, type RevInput } from "./reverse";
+import { NO_BLOCKS_NOTE, reversePlan, todayTasks, type RevInput } from "./reverse";
 import { planDay } from "./plan";
 import type { Assessment, RoutineBlock, Session, Subject, Topic } from "./types";
 
@@ -120,4 +120,19 @@ test("preparar a prova vem antes de consolidar/adiantar aulas de outras matéria
   assert.deepEqual(placed.slice(0, 2).map((t) => t.kind), ["preparar", "preparar"]);
   assert.ok(placed.every((t) => t.kind !== "preparar" || t.subject_id === "q"));
   assert.ok(plan.overflow.every((t) => t.kind !== "preparar"));
+});
+
+// Caso real (mesma amiga, depois da correção anterior): sem horários de estudo na rotina, o plano não
+// sugeria nada para a prova; só um aviso de quanto faltava.
+test("sem nenhum bloco de estudo na rotina, o plano supõe 2 h por dia e avisa", () => {
+  const aula: RoutineBlock = { id: "a", weekday: 1, start_time: "08:20", end_time: "10:00", kind: "aula", subject_id: "s", label: "" };
+  const trip = { id: "v", subject_id: null, title: "Viagem", type: "viagem" as const, date: "2026-10-13", end_date: "2026-10-13", time: null, priority: "media" as const, status: "pendente" as const, description: "" };
+  const [pl] = reversePlan(inp({ blocks: [aula], nowMin: 18 * 60, events: [trip], topics: [T({}), T({ id: "u", name: "Green" })] }));
+  assert.equal(pl.notes[0], NO_BLOCKS_NOTE);
+  assert.equal(pl.chunks.filter((c) => c.day === TODAY && !c.final).length, 2);
+  assert.equal(pl.chunks.filter((c) => c.day === "2026-10-13").length, 0); // viagem
+  assert.equal(pl.missing, 0);
+  const plan = planDay({ ...inp({ blocks: [aula], nowMin: 18 * 60 }), pref: "depois", extra: todayTasks([pl], TODAY) });
+  assert.equal(plan.hasStudyBlocks, false);
+  assert.equal(plan.overflow[0].kind, "preparar");
 });

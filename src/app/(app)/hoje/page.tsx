@@ -83,7 +83,7 @@ function TodayTiles({ cards, open }: { cards: DayCard[]; open: Open }) {
   const st = useStore();
   const color = (c: DayCard) => (c.kind === "rotina" ? "var(--line)" : c.kind === "livre" ? "var(--accent)" : c.kind === "tarefa" ? "var(--warn)" : st.subjects.find((s) => s.id === c.subject_id)?.color || "var(--accent)");
   const done = (t: NonNullable<DayCard["todo"]>) => st.save("tasks", { ...t, done: true, done_at: new Date().toISOString() });
-  const when = (c: DayCard) => (c.at == null ? (c.kind === "nao_coube" ? "não coube nos blocos" : c.kind === "calendario" ? "sem horário" : "") : `${fromMin(c.at)}${c.end != null ? `–${fromMin(c.end)}` : ""}`);
+  const when = (c: DayCard) => (c.at == null ? (c.kind === "nao_coube" ? "não coube nos blocos" : c.kind === "calendario" || c.kind === "estudo" ? "sem horário" : "") : `${fromMin(c.at)}${c.end != null ? `–${fromMin(c.end)}` : ""}`);
   return (
     <section className="panel">
       <div className="panel-h"><h2>O que você vai fazer hoje</h2><span className="lbl">{qt(cards.filter((c) => !c.past).length, "item", "itens")}</span></div>
@@ -107,6 +107,29 @@ function TodayTiles({ cards, open }: { cards: DayCard[]; open: Open }) {
         ))}</div>
       ) : <Empty title="Nada marcado para hoje">Monte sua rotina semanal (aulas e blocos de estudo) no Calendário: o app encaixa as revisões e as aulas para estudar.<Link className="btn sm pri" href="/calendario#rotina">Montar minha rotina</Link></Empty>}
       {cards.some((c) => c.task) && <p className="small muted" style={{ margin: "10px 0 0" }}>Passe o mouse numa tarefa de estudo para ver por que ela entrou hoje. O motivo de cada uma também fica na lista logo abaixo.</p>}
+    </section>
+  );
+}
+
+/** Sem tarefa de estudo hoje (blocos já passaram, fim de semana sem bloco): o próximo do plano das provas,
+ *  para quem quiser adiantar. Antes a tela ficava vazia mesmo com prova chegando. */
+function NextUp({ plans, today, free, open }: { plans: ExamPlan[]; today: string; free: number; open: Open }) {
+  const st = useStore();
+  const next = plans.flatMap((pl) => pl.chunks.filter((c) => c.day > today).map((c) => ({ c, pl })))
+    .sort((a, b) => a.c.day.localeCompare(b.c.day) || a.pl.days - b.pl.days).slice(0, 3);
+  if (!next.length) return null;
+  return (
+    <section className="panel">
+      <div className="panel-h"><h2>Quer adiantar?</h2><span className="lbl">o próximo do plano das provas</span></div>
+      <p className="small muted" style={{ margin: "0 0 8px" }}>{free ? "O plano das provas não marcou estudo para hoje." : "Hoje não sobrou horário de estudo na sua rotina."} Se quiser estudar agora, é isto que vem a seguir:</p>
+      <div className="list">{next.map(({ c, pl }) => (
+        <div key={c.key} className="li" style={{ alignItems: "flex-start" }}>
+          <span className="cdays">{WD_S[keyDate(c.day).getDay()]} {dm(c.day)}</span>
+          <div className="grow"><div className="t">{c.final ? c.title : c.whole ? `Estudar ${pl.subject.name} para a ${pl.exam.name}` : `Estudar ${c.title} para a ${pl.exam.name}`}</div>
+            <div className="m"><span className="row" style={{ gap: 6, display: "inline-flex" }}><Dot c={pl.subject.color} />{pl.subject.name}</span> · {c.minutes} min · {pl.exam.name} em {dm(pl.exam.date!)}</div></div>
+          <button className="btn sm" disabled={!!st.profile?.timer} onClick={() => open({ k: "start", args: { subject_id: c.subjectId, topic_id: c.topicId, activity: c.final ? "revisao" : "exercicios" } })}><Icon d={I.play} s={13} />Começar</button>
+        </div>
+      ))}</div>
     </section>
   );
 }
@@ -195,6 +218,7 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
   return (
     <>
       <TodayTiles cards={cards} open={open} />
+      {!cards.some((c) => c.task?.kind === "preparar" && !c.past) && <NextUp plans={plans} today={today} free={plan.capacity} open={open} />}
       <section className="panel" aria-label="Imprimir ou salvar em PDF">
         <div className="row" style={{ gap: 6 }}>
           <b className="grow">Plano em PDF <span className="small muted" style={{ fontWeight: 400 }}>(imprimir ou &quot;Salvar como PDF&quot;)</span></b>
