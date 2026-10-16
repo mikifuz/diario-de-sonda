@@ -270,7 +270,7 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
             return (
               <div key={pl.exam.id} className="li"><span className={"cdays " + (pl.missing ? "bad" : pl.days <= 7 ? "warn" : "")}>{pl.days} d</span>
                 <div className="grow"><div className="t">{pl.exam.name} · {pl.subject.name}</div>
-                  <div className="m">{pl.topics.length ? `${qt(pl.topics.length, "conteúdo", "conteúdos")} · estudado ${done} de ${goal} min da meta${pl.missing ? ` · faltam ${pl.missing} min que não cabem` : ""}` : "sem conteúdos ligados"}</div></div></div>
+                  <div className="m">{pl.topics.length ? `${qt(pl.topics.length, "conteúdo", "conteúdos")} · estudado ${done} de ${goal} min da meta${pl.missing ? ` · faltam ${pl.missing} min que não cabem` : ""}` : `sem conteúdos cadastrados: tempo para a matéria toda${pl.missing ? ` · faltam ${pl.missing} min que não cabem` : ""}`}</div></div></div>
             );
           })}</div> : <p className="small muted" style={{ margin: 0 }}>Nenhuma prova nos próximos 30 dias.</p>}
         </div>
@@ -281,7 +281,7 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
         <ol className="muted" style={{ margin: ".5em 0 0", paddingLeft: "1.2em" }}>
           <li>Usa só os blocos de <b>estudo</b> da sua rotina para o dia da semana, a partir de agora. Compromissos e dias &quot;Indisponível&quot; do calendário tiram blocos.</li>
           <li>Entram as revisões com data até hoje (cuja prova ainda não passou) e as aulas: <b>consolidar</b> a de hoje (depois do fim da aula) ou <b>adiantar</b> a de amanhã, conforme a sua preferência ({PREF[st.profile?.study_pref || "depois"].toLowerCase()} por padrão; cada disciplina pode ter a sua).</li>
-          <li>Ordem: revisões de provas em até 3 dias; depois as aulas; depois as demais revisões pela prova mais próxima, atraso, peso da prova, menor índice de domínio do conteúdo e mais erros registrados.</li>
+          <li>Ordem: revisões e estudo de provas em até 3 dias; depois o estudo das provas que o planejamento reverso (aba Provas) marcou para hoje; depois as aulas; depois as demais revisões pela prova mais próxima, atraso, peso da prova, menor índice de domínio do conteúdo e mais erros registrados.</li>
           <li>Cada tarefa entra inteira no primeiro bloco onde cabe. O que não couber aparece nos quadrados como &quot;não coube nos blocos&quot;, sem ser escondido.</li>
         </ol>
       </details>
@@ -457,7 +457,7 @@ function ExamsTab({ open }: { open: Open }) {
       <details className="small">
         <summary>Como o planejamento reverso é montado</summary>
         <ol className="muted" style={{ margin: ".5em 0 0", paddingLeft: "1.2em" }}>
-          <li>Entram as provas dos próximos 30 dias e os conteúdos ligados a cada uma (ou, para a próxima prova, os conteúdos sem prova marcada).</li>
+          <li>Entram as provas dos próximos 30 dias (também as cadastradas só no calendário) e os conteúdos ligados a cada uma (ou, para a próxima prova, os conteúdos sem prova marcada). Prova sem nenhum conteúdo cadastrado recebe tempo para a matéria toda: 4 h, ajustadas pela dificuldade da matéria para você.</li>
           <li>Meta de estudo por conteúdo, pelo índice de domínio: sem dados ou frágil {TARGET.sem} min; em construção {TARGET.construcao} min; dominado {TARGET.dominado} min. Desconta o que você já estudou do conteúdo nas últimas semanas.</li>
           <li>O tempo vem dos seus blocos de estudo, deixando {Math.round(RESERVE * 100)}% de cada dia para revisões espaçadas e aulas. A prova mais próxima usa o tempo primeiro.</li>
           <li>Pedaços de até 45 min, no máximo um por conteúdo por dia (estudo espaçado rende mais que maratona). Conteúdo ainda não dado só entra a partir da aula.</li>
