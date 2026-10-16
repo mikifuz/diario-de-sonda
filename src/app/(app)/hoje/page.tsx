@@ -18,6 +18,7 @@ import { easyReminders } from "@/lib/effort";
 import { WeekPrint } from "@/components/weekPrint";
 import { StartModal, type StartArgs } from "@/components/studyStart";
 import { EventModal } from "@/components/modals";
+import { GettingStarted } from "@/components/onboarding";
 import { dayCards, firstName, greeting, motto, type DayCard } from "@/lib/today";
 import { TripsPanel } from "@/components/trips";
 
@@ -47,6 +48,7 @@ function Hoje() {
   return (
     <>
       <Greeting />
+      <GettingStarted />
       <Tabs value={tab} onChange={setTab} label="Seções" options={TABS} />
       {tab === "plano" && <PlanTab open={setModal} goRoutine={() => router.push("/calendario#rotina")} goExams={() => setTab("provas")} />}
       {tab === "revisar" && <><ReviewsTab open={setModal} /><MistakesTab open={setModal} /></>}

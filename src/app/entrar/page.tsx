@@ -23,7 +23,7 @@ export default function Entrar() {
     try { sessionStorage.removeItem(DEMO_FLAG); } catch { /* sem armazenamento */ }
     if (new URLSearchParams(window.location.search).get("conta") === "excluida") setMsg({ ok: true, t: "Sua conta e todos os seus dados foram excluídos." });
     if (!configured) return;
-    sb().auth.getSession().then(({ data }) => { if (data.session) router.replace("/painel"); });
+    sb().auth.getSession().then(({ data }) => { if (data.session) router.replace("/hoje"); });
   }, [router]);
 
   if (!configured) return <NotConfigured />;
@@ -36,12 +36,12 @@ export default function Entrar() {
       if (mode === "entrar") {
         const { error } = await auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
-        router.replace("/painel");
+        router.replace("/hoje");
       } else if (mode === "criar") {
         if (password.length < 8) { setMsg({ ok: false, t: "A senha precisa ter pelo menos 8 caracteres." }); return; }
-        const { data, error } = await auth.signUp({ email: email.trim(), password, options: { data: { name: name.trim() }, emailRedirectTo: `${location.origin}/painel` } });
+        const { data, error } = await auth.signUp({ email: email.trim(), password, options: { data: { name: name.trim() }, emailRedirectTo: `${location.origin}/hoje` } });
         if (error) throw error;
-        if (data.session) router.replace("/painel");
+        if (data.session) router.replace("/hoje");
         else setMsg({ ok: true, t: "Conta criada. Enviamos um link de confirmação para o seu e-mail; abra-o e depois entre aqui." });
       } else {
         const { error } = await auth.resetPasswordForEmail(email.trim(), { redirectTo: `${location.origin}/redefinir-senha` });

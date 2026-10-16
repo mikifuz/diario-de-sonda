@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Fundo do Poço",
     description: "Acompanhamento de estudos com plano do dia, revisões, provas e sala de estudos.",
     lang: "pt-BR",
-    start_url: "/painel",
+    start_url: "/hoje",
     scope: "/",
     display: "standalone",
     background_color: "#fbecd9",

@@ -26,7 +26,7 @@ export default function RedefinirSenha() {
     if (password.length < 8) { setMsg("A senha precisa ter pelo menos 8 caracteres."); return; }
     const { error } = await sb().auth.updateUser({ password });
     if (error) { setMsg(friendlyError(error)); return; }
-    router.replace("/painel");
+    router.replace("/hoje");
   };
 
   return (
