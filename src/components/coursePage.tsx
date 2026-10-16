@@ -1,4 +1,5 @@
 "use client";
+// Fluxograma de disciplinas (antigo "Meu curso"): aba dentro de Disciplinas.
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { friendlyError, sb } from "@/lib/supabase";
@@ -7,7 +8,7 @@ import { forecast, summary } from "@/lib/curriculum";
 import { CourseDetail, CourseList, CourseModal, Flowchart, ForecastPanel, Legend, OptativesPanel, SetupGrade } from "@/components/curriculum";
 import { ConfirmButton, I, Icon } from "@/components/ui";
 
-export default function Curso() {
+export function CoursePage() {
   const st = useStore();
   const [sel, setSel] = useState<string | null>(null);
   const [edit, setEdit] = useState<string | null | undefined>(undefined);

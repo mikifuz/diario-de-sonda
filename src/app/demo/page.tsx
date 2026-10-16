@@ -8,7 +8,7 @@ export default function Demo() {
   const router = useRouter();
   useEffect(() => {
     try { sessionStorage.setItem(DEMO_FLAG, "1"); } catch { /* sem armazenamento: a demonstração não abre */ }
-    router.replace("/painel");
+    router.replace("/hoje");
   }, [router]);
   return <div className="auth-wrap"><div className="empty"><b>Abrindo a demonstração…</b></div></div>;
 }

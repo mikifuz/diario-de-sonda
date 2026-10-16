@@ -1,13 +1,34 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { activeSubjects, useStore } from "@/lib/store";
 import { daysBetween, fmtMin, gradeCalc, nf, pct, stats, todayKey } from "@/lib/calc";
 import { Dot, Empty, I, Icon, Tabs } from "@/components/ui";
 import { SubjectModal } from "@/components/modals";
 import { Calibration, subLine, verdict } from "@/components/grades";
+import { CoursePage } from "@/components/coursePage";
 
-export default function Disciplinas() {
+type Aba = "lista" | "fluxograma";
+
+export default function DisciplinasPage() {
+  return <Suspense fallback={null}><Disciplinas /></Suspense>;
+}
+
+/** Duas abas: as disciplinas do semestre e o fluxograma do curso (antigo "Meu curso") */
+function Disciplinas() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const [aba, setAba] = useState<Aba>(params.get("aba") === "fluxograma" ? "fluxograma" : "lista");
+  const go = (a: Aba) => { setAba(a); router.replace(a === "fluxograma" ? "/disciplinas?aba=fluxograma" : "/disciplinas", { scroll: false }); };
+  return (
+    <>
+      <Tabs value={aba} onChange={go} label="Seções" options={[["lista", "Minhas disciplinas"], ["fluxograma", "Fluxograma de disciplinas"]]} />
+      {aba === "lista" ? <SubjectList /> : <CoursePage />}
+    </>
+  );
+}
+
+function SubjectList() {
   const st = useStore();
   const router = useRouter();
   const [arch, setArch] = useState<"0" | "1">("0");
@@ -49,7 +70,7 @@ export default function Disciplinas() {
           <p className="small muted" style={{ margin: "10px 0 0" }}>Clique numa disciplina para lançar notas, ver conteúdos e sessões. &quot;Média atual&quot; considera só as notas oficiais já lançadas.</p>
         </section>
       ) : arch === "1" ? <Empty title="Nenhuma disciplina arquivada" /> : (
-        <Empty title="Nenhuma disciplina cadastrada">Comece pelas matérias deste semestre (ou importe do comprovante do SIGA em Hoje → Rotina). Os conteúdos de cada uma podem ser adicionados depois.<button className="btn pri sm" onClick={() => setModal(true)}><Icon d={I.plus} s={14} />Nova disciplina</button></Empty>
+        <Empty title="Nenhuma disciplina cadastrada">Comece pelas matérias deste semestre (ou importe do comprovante do SIGA em Calendário → Rotina semanal). Os conteúdos de cada uma podem ser adicionados depois.<button className="btn pri sm" onClick={() => setModal(true)}><Icon d={I.plus} s={14} />Nova disciplina</button></Empty>
       )}
       {arch === "0" && list.length > 0 && (
         <details className="panel">

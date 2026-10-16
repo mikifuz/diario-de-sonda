@@ -8,7 +8,8 @@ import { activeSubjects, useStore } from "@/lib/store";
 import { EFFORT } from "@/lib/effort";
 import type { Activity, Assessment, AssessmentKind, Autonomy, CalEvent, Comprehension, EventType, Priority, Result, Session, Status, StudyPref, Subject, Topic, Traits, Effort } from "@/lib/types";
 import { MistakeModal } from "./planning";
-import { pushLessons } from "@/lib/plan";
+import { dm, pushLessons } from "@/lib/plan";
+import { REPEAT, defaultUntil, repeatDates, type Repeat } from "@/lib/repeat";
 
 /* ============ Conteúdos em árvore ============ */
 export function TopicOptions({ topics, subjectId, exclude }: { topics: Topic[]; subjectId: string | null; exclude?: Set<string> }) {
@@ -191,7 +192,7 @@ export function SubjectModal({ id, onClose }: { id: string | null; onClose: () =
           <label className="f"><span>Créditos</span><input type="number" min={0} value={f.credits} onChange={(e) => up({ credits: e.target.value })} /></label>
           <label className="f"><span>Carga horária (h)</span><input type="number" min={0} value={f.hours} onChange={(e) => up({ hours: e.target.value })} /></label>
           <label className="f full"><span>Horários de aula (anotação)</span><input type="text" value={f.schedule} onChange={(e) => up({ schedule: e.target.value })} placeholder="Ex.: Seg e Qua 08:20–10:00" />
-            <span className="small">Para o plano do dia usar as aulas, cadastre-as em Hoje → Rotina.</span></label>
+            <span className="small">Para o plano do dia usar as aulas, cadastre-as na Rotina semanal (embaixo do Calendário).</span></label>
           <label className="f full"><span>Como prefere estudar esta disciplina</span><select value={f.study_pref} onChange={(e) => up({ study_pref: e.target.value as StudyPref | "" })}>
             <option value="">Segue o padrão ({PREF[st.profile?.study_pref || "depois"].toLowerCase()})</option>{Object.entries(PREF).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
           <label className="f full"><span>Para você, esta matéria é</span><select value={f.esforco} onChange={(e) => up({ esforco: e.target.value as Effort | "" })}>
@@ -293,6 +294,18 @@ export function EventModal({ id, src, date, type, onClose }: { id: string | null
       : { title: "", type: "prova", subject_id: list[0]?.id || "", date: date || todayKey(), end: "", time: "", priority: "alta", status: "pendente", description: "", counted: true, weight: "1" });
   const up = (x: Partial<EvForm>) => setF({ ...f, ...x });
   const canCount = GRADED.includes(f.type) && !!f.subject_id;
+  // repetir: só item novo do calendário (não viagem nem algo que conta na média); cada repetição vira um item próprio
+  const [rep, setRep] = useState<Repeat>("");
+  const [until, setUntil] = useState("");
+  const canRepeat = !id && f.type !== "viagem" && !(canCount && f.counted);
+  const dates = canRepeat && rep ? repeatDates(f.date, rep, until || defaultUntil(f.date)) : [f.date];
+  // os próximos iguais (mesmo título, tipo, disciplina e horário), para excluir uma série de uma vez
+  const later = ev ? st.events.filter((e) => e.id !== ev.id && e.date > ev.date && e.title === ev.title && e.type === ev.type && e.subject_id === ev.subject_id && e.time === ev.time) : [];
+  const removeLater = async () => {
+    for (const e of [ev!, ...later]) if (!(await st.remove("events", e.id))) return;
+    st.toast(`${qt(later.length + 1, "item excluído", "itens excluídos")} do calendário.`);
+    onClose();
+  };
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!f.title.trim() || !f.date) { st.toast("Preencha título e data."); return; }
@@ -314,10 +327,11 @@ export function EventModal({ id, src, date, type, onClose }: { id: string | null
       const row: CalEvent = { id: ev?.id || crypto.randomUUID(), subject_id: trip ? null : f.subject_id || null, title: f.title.trim(), type: f.type, date: f.date, time, priority: f.priority, status: f.status, description: f.description.trim(),
         // só manda a volta quando há uma (assim o resto do calendário funciona mesmo antes da migration de viagens)
         ...(trip ? { end_date: f.end && f.end > f.date ? f.end : null } : ev?.end_date ? { end_date: null } : {}) };
-      if (!(await st.save("events", row))) return;
+      const rows = dates.map((d, i) => (i === 0 ? row : { ...row, id: crypto.randomUUID(), date: d }));
+      if (!(await st.saveMany("events", rows))) return;
       if (item) await st.remove("assessments", item.id);
     }
-    st.toast(trip ? "Viagem salva: o plano de estudo já foi refeito em volta dela." : "Salvo no calendário.");
+    st.toast(trip ? "Viagem salva: o plano de estudo já foi refeito em volta dela." : dates.length > 1 ? `Salvo no calendário: ${qt(dates.length, "data", "datas")}, até ${dm(dates[dates.length - 1])}.` : "Salvo no calendário.");
     onClose();
   };
   return (
@@ -341,9 +355,17 @@ export function EventModal({ id, src, date, type, onClose }: { id: string | null
           <label className="f"><span>Status</span><select value={f.status} onChange={(e) => up({ status: e.target.value as Status })}>{Object.entries(STATUS).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
           {canCount && <div className="full row"><label className="check"><input type="checkbox" checked={f.counted} onChange={(e) => up({ counted: e.target.checked })} />{f.type === "sub" ? "Lançar em Notas (substitui a menor nota de prova)" : "Conta na média da disciplina"}</label>
             {f.counted && f.type !== "sub" && <label className="row small" style={{ gap: 6 }}>Peso <input type="text" inputMode="decimal" value={f.weight} onChange={(e) => up({ weight: e.target.value })} style={{ width: 70 }} /></label>}</div>}
+          {canRepeat && <>
+            <label className="f"><span>Repetir</span>
+              <select value={rep} onChange={(e) => setRep(e.target.value as Repeat)}><option value="">Não repete</option>{Object.entries(REPEAT).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
+            {rep && <label className="f"><span>Até</span><input type="date" value={until || defaultUntil(f.date)} min={f.date} onChange={(e) => setUntil(e.target.value)} /></label>}
+            {rep && <p className="small full" style={{ margin: 0 }}>{dates.length > 1 ? `Vai ser marcado em ${qt(dates.length, "data", "datas")}: ${dates.slice(0, 4).map(dm).join(", ")}${dates.length > 4 ? ` … até ${dm(dates[dates.length - 1])}` : ""}.` : "Só cabe uma data até o fim escolhido."} Cada data vira um item: dá para mudar uma sem mexer nas outras{rep === "mes" ? "; em mês sem esse dia (ex.: 31), fica no último dia do mês" : ""}.</p>}
+          </>}
+          {!id && canCount && f.counted && <p className="small full muted" style={{ margin: 0 }}>Para repetir, desmarque &quot;Conta na média&quot; (provas e trabalhos com nota são cadastrados um a um).</p>}
           <label className="f full"><span>Descrição</span><textarea value={f.description} onChange={(e) => up({ description: e.target.value })} /></label>
         </div>
         <div className="modal-f">
+          {ev && later.length > 0 && <ConfirmButton label="Excluir este e os próximos" question={`${later.length === 1 ? "Excluir este e o próximo igual" : `Excluir este e os ${later.length} próximos iguais`} (mesmo título, tipo e horário)?`} confirmLabel="Excluir todos" onConfirm={removeLater} />}
           {id && <span style={{ marginRight: "auto" }}><ConfirmButton label={<><Icon d={I.trash} s={15} />Excluir</>} question={item ? "Excluir? A nota lançada também será removida." : "Excluir?"} confirmLabel="Excluir"
             onConfirm={async () => { if (await st.remove(item ? "assessments" : "events", id)) onClose(); }} /></span>}
           <button type="button" className="btn ghost" onClick={onClose}>Cancelar</button><button className="btn pri">Salvar</button>

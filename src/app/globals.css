@@ -425,3 +425,18 @@ ul.plain{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:co
 .alert-f summary{font-weight:400;cursor:pointer;color:var(--muted)}
 .alert-f details[open]{flex-basis:100%}
 @media (max-width:760px){.alert-f .btn{width:100%;justify-content:center}}
+
+/* Tela Hoje: saudação e quadrados do dia */
+.hello{margin:0 0 4px}
+.hello-t{margin:0;font-size:calc(1.6em * var(--display-scale))}
+.hello-m{margin:.35em 0 0;font-size:1.05em}
+.hello-d{margin:.25em 0 0;color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.tile{display:flex;flex-direction:column;gap:3px;min-height:128px;padding:12px;border:1px solid var(--line);border-top:4px solid var(--c,var(--accent));border-radius:var(--radius);background:var(--panel2);min-width:0}
+.tile.past{opacity:.55}
+.tile.off .tile-t{text-decoration:line-through}
+.tile-w{font-family:var(--f-mono);font-size:.82em;color:var(--muted)}
+.tile-k{font-size:.78em;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.tile-t{line-height:1.25;overflow-wrap:anywhere}
+.tile-s{font-size:.85em;color:var(--muted);overflow-wrap:anywhere}
+@media (max-width:520px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}

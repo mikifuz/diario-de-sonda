@@ -1,5 +1,5 @@
 "use client";
-// Meu curso: fluxograma interativo da matriz, detalhes de cada disciplina, edição e montagem inicial.
+// Fluxograma de disciplinas (antigo Meu curso): fluxograma interativo da matriz, detalhes de cada disciplina, edição e montagem inicial.
 import Link from "next/link";
 import { useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useStore } from "@/lib/store";
@@ -245,7 +245,7 @@ export function CourseModal({ id, onClose }: { id: string | null; onClose: () =>
   const shown = others.filter((c) => !filter.trim() || c.name.toLowerCase().includes(filter.trim().toLowerCase()) || has(c.id));
 
   return (
-    <Modal title={orig ? "Editar disciplina" : "Nova disciplina na grade"} sub="Meu curso" onClose={onClose}>
+    <Modal title={orig ? "Editar disciplina" : "Nova disciplina na grade"} sub="Fluxograma de disciplinas" onClose={onClose}>
       <form onSubmit={submit}>
         <div className="fgrid">
           <label className="f full"><span>Nome</span><input type="text" value={f.name} onChange={(e) => up({ name: e.target.value })} maxLength={200} /></label>
@@ -302,7 +302,7 @@ export function SetupGrade() {
   return (
     <section className="panel" style={{ padding: 24 }}>
       <div className="stack" style={{ gap: 14, maxWidth: 720 }}>
-        <span className="lbl">Meu curso</span>
+        <span className="lbl">Fluxograma de disciplinas</span>
         <h2>Monte a grade do seu curso</h2>
         <p style={{ margin: 0 }}>Com a matriz, o app mostra o fluxograma das disciplinas, o que cada uma exige e libera, o que você pode cursar no próximo semestre e quanto falta para formar.</p>
         <div className="fgrid">
@@ -450,7 +450,7 @@ function OptativeModal({ id, onClose }: { id: string | null; onClose: () => void
   };
   const undo = async () => { if (orig && (await st.save("curriculum", { ...orig, status: "pendente", term: "", grade: null }))) onClose(); };
   return (
-    <Modal title={orig && orig.status !== "pendente" ? "Editar optativa" : "Adicionar optativa"} sub="Meu curso" onClose={onClose}>
+    <Modal title={orig && orig.status !== "pendente" ? "Editar optativa" : "Adicionar optativa"} sub="Fluxograma de disciplinas" onClose={onClose}>
       <form onSubmit={submit}>
         <div className="fgrid">
           <label className="f full"><span>Optativa</span>

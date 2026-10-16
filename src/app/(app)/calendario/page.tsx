@@ -1,6 +1,7 @@
 "use client";
 import { holidayOf } from "@/lib/holidays";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { agenda, useStore, type AgendaItem } from "@/lib/store";
 import { addDays, daysBetween, dkey, fmtMin, keyDate, nf, todayKey, qt } from "@/lib/calc";
 import { EVT, GRADED } from "@/lib/constants";
@@ -8,14 +9,20 @@ import { Dot, I, Icon } from "@/components/ui";
 import { EventModal } from "@/components/modals";
 import { TripsPanel } from "@/components/trips";
 import { WeekPrint } from "@/components/weekPrint";
+import { RoutineSection } from "@/components/routine";
 import { evOn } from "@/lib/plan";
 import { tripRange } from "@/lib/trips";
 import type { CalEvent, EventType } from "@/lib/types";
 
 const fmtDL = (k: string) => keyDate(k).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
-export default function Calendario() {
+export default function CalendarioPage() {
+  return <Suspense fallback={null}><Calendario /></Suspense>;
+}
+
+function Calendario() {
   const st = useStore();
+  const params = useSearchParams();
   const t = todayKey();
   const [month, setMonth] = useState(t.slice(0, 7));
   const [sel, setSel] = useState(t);
@@ -133,6 +140,7 @@ export default function Calendario() {
         </div>
       </section>
       {selTrip && <TripsPanel only={selTrip.id} onEdit={(id) => setModal({ id, src: "event" })} />}
+      <RoutineSection openSiga={params.get("abrir") === "siga"} />
       {print && <WeekPrint start={t} onDone={() => setPrint(false)} />}
       {modal && <EventModal id={modal.id} src={modal.src} date={modal.date} type={modal.type} onClose={() => setModal(null)} />}
     </>
