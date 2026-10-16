@@ -84,3 +84,40 @@ test("quando não cabe tudo: recomenda o que priorizar, com o motivo e o que faz
   // com tempo de sobra, não há recomendação
   assert.equal(reversePlan(inp({ topics: topics.slice(0, 1) }))[0].priority.length, 0);
 });
+
+// Caso real (amiga do dono): prova de matéria difícil na semana que vem e o plano do dia só
+// mandava consolidar/adiantar aulas das outras matérias.
+test("prova sem conteúdos cadastrados ganha tempo para a matéria toda, maior se a matéria é difícil", () => {
+  const [pl] = reversePlan(inp({ topics: [], subjects: [SUB({ traits: { esforco: "dificil" } })], assessments: [A({ date: "2026-10-20" })] }));
+  const whole = pl.chunks.filter((c) => c.whole);
+  assert.ok(whole.length > 0);
+  assert.equal(whole[0].day, TODAY);
+  assert.equal(whole.reduce((a, c) => a + c.minutes, 0), 335); // 4 h × 1,4 (difícil)
+  assert.equal(pl.missing, 0);
+  assert.match(pl.notes.join(" "), /Nenhum conteúdo ligado a esta prova: o app reserva 5h35 para a matéria toda/);
+  assert.equal(todayTasks([pl], TODAY)[0].title, "Estudar Cálculo III para a P2");
+});
+
+test("prova cadastrada só no calendário também entra no plano (sem duplicar a que está em Notas)", () => {
+  const ev = { id: "e1", subject_id: "s", title: "P1", type: "prova" as const, date: "2026-10-17", time: null, priority: "alta" as const, status: "pendente" as const, description: "" };
+  const only = reversePlan(inp({ assessments: [], topics: [T({ assessment_id: null })], events: [ev] }));
+  assert.equal(only.length, 1);
+  assert.equal(only[0].exam.id, "e1");
+  assert.equal(only[0].topics.length, 1);
+  assert.equal(reversePlan(inp({ events: [{ ...ev, id: "e2" }] })).length, 1);
+});
+
+test("preparar a prova vem antes de consolidar/adiantar aulas de outras matérias", () => {
+  const subjects = [SUB({ id: "q", name: "Físico-Química", traits: { esforco: "dificil" } }), SUB({ id: "f", name: "Física" }), SUB({ id: "e", name: "Estática" })];
+  const blocks: RoutineBlock[] = [1, 2].flatMap((d) => [
+    { id: `a${d}`, weekday: d, start_time: "08:20", end_time: "10:00", kind: "aula" as const, subject_id: "f", label: "" },
+    { id: `b${d}`, weekday: d, start_time: "10:20", end_time: "12:00", kind: "aula" as const, subject_id: "e", label: "" },
+    B(d, "19:00", "21:00")]);
+  const input = inp({ subjects, blocks, nowMin: 7 * 60, assessments: [A({ id: "q1", subject_id: "q", name: "P1", date: "2026-10-20" })],
+    topics: [T({ subject_id: "q", name: "Gases", assessment_id: "q1" }), T({ id: "u", subject_id: "q", name: "Termoquímica", assessment_id: "q1" })] });
+  const plan = planDay({ ...input, pref: "ambos", extra: todayTasks(reversePlan(input), TODAY) });
+  const placed = plan.slots.flatMap((s) => s.placed.map((x) => x.task));
+  assert.deepEqual(placed.slice(0, 2).map((t) => t.kind), ["preparar", "preparar"]);
+  assert.ok(placed.every((t) => t.kind !== "preparar" || t.subject_id === "q"));
+  assert.ok(plan.overflow.every((t) => t.kind !== "preparar"));
+});
