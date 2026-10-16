@@ -4,7 +4,7 @@
 import { addDays, daysBetween, dkey, nf, qt } from "./calc";
 import { BAND, mastery, type Band, type MasteryCfg } from "./mastery";
 import { effortOf, isTrivial, scaleMin } from "./effort";
-import { dm, freeStudy, toMin, topicsForExam, type Task } from "./plan";
+import { dm, freeStudy, toMin, topicsForExam, tripOn, type Task } from "./plan";
 import type { Assessment, CalEvent, Mistake, ReviewItem, ReviewLog, RoutineBlock, Session, Subject, Topic } from "./types";
 
 /** Minutos de estudo que cada conteúdo deve receber antes da prova, pela faixa do índice */
@@ -15,6 +15,9 @@ export const FINAL_MIN = 60;
 export const RESERVE = 0.2;
 /** Prova sem nenhum conteúdo cadastrado: tempo para a matéria toda (antes da dificuldade) */
 export const NO_TOPICS_MIN = 240;
+/** Sem nenhum bloco de estudo na rotina: minutos de estudo por dia que o plano supõe (sem horário marcado) */
+export const NO_BLOCKS_DAY_MIN = 120;
+export const NO_BLOCKS_NOTE = `Você ainda não marcou horários de estudo na rotina: o app conta ${NO_BLOCKS_DAY_MIN / 60} h de estudo por dia, sem horário. Marque seus horários em Calendário → Rotina semanal para o plano encaixar o estudo no seu dia.`;
 const CHUNK = 45, MIN_CHUNK = 15;
 const HORIZON = 30;
 
@@ -80,11 +83,15 @@ export function reversePlan(p0: RevInput): ExamPlan[] {
   const exams = p.assessments
     .filter((a) => a.kind === "prova" && active.has(a.subject_id) && !isTrivial(active.get(a.subject_id)) && a.grade == null && a.status !== "cancelado" && a.date && a.date > p.today && daysBetween(p.today, a.date) <= HORIZON)
     .sort((a, b) => a.date!.localeCompare(b.date!) || Number(b.weight) - Number(a.weight));
-  // capacidade de cada dia (minutos de estudo livres, menos a reserva)
+  // capacidade de cada dia (minutos de estudo livres, menos a reserva). Sem nenhum bloco de estudo na rotina,
+  // supõe 2 h por dia (menos viagem e dia indisponível): antes, sem blocos, nenhuma prova recebia estudo.
+  const noBlocks = !p.blocks.some((b) => b.kind === "estudo");
   const cap = new Map<string, number>();
   const capOf = (d: string) => {
     if (!cap.has(d)) {
-      const free = freeStudy(p.blocks, p.events, d).blocks.reduce((x, b) => x + Math.max(0, toMin(b.end_time) - Math.max(toMin(b.start_time), d === p.today ? p.nowMin : 0)), 0);
+      const off = tripOn(d, p.events) || p.events.some((e) => e.date === d && e.type === "indisponivel" && !e.time && e.status !== "cancelado");
+      const free = noBlocks ? (off ? 0 : NO_BLOCKS_DAY_MIN)
+        : freeStudy(p.blocks, p.events, d).blocks.reduce((x, b) => x + Math.max(0, toMin(b.end_time) - Math.max(toMin(b.start_time), d === p.today ? p.nowMin : 0)), 0);
       cap.set(d, Math.floor(free * (1 - RESERVE)));
     }
     return cap.get(d)!;
@@ -98,7 +105,7 @@ export function reversePlan(p0: RevInput): ExamPlan[] {
     const days = daysBetween(p.today, exam.date!);
     const eve = addDays(exam.date!, -1);
     const from = addDays(exam.date!, -45);
-    const notes: string[] = [];
+    const notes: string[] = noBlocks ? [NO_BLOCKS_NOTE] : [];
     const eff = effortOf(subject, p.sessions);
     if (eff.why) notes.push(eff.why);
     const topics: TopicNeed[] = examTopics(exam, p.topics, p.assessments, p.today).map((t) => {

@@ -90,9 +90,10 @@ export function dayCards(p: DayCardsInput): DayCard[] {
     if (!s.placed.length) out.push({ key: "l" + s.block.id, kind: "livre", at: s.start, end: s.end, tag: "Estudo livre", title: s.block.label || "Bloco de estudo sem tarefa", subject_id: null, past: s.end <= p.nowMin });
     for (const x of s.placed) out.push({ key: "t" + x.task.key, kind: "estudo", at: x.start, end: x.end, tag: TASK_TAG[x.task.kind], title: x.task.title, sub: name(x.task.subject_id), subject_id: x.task.subject_id, task: x.task, past: x.end <= p.nowMin });
   }
-  for (const t of p.plan.overflow) out.push({ key: "o" + t.key, kind: "nao_coube", at: null, end: null, tag: TASK_TAG[t.kind], title: t.title, sub: name(t.subject_id), subject_id: t.subject_id, task: t, past: false });
+  // sem blocos de estudo na rotina, nada "deixou de caber": são as tarefas do dia, sem horário
+  for (const t of p.plan.overflow) out.push({ key: "o" + t.key, kind: p.plan.hasStudyBlocks ? "nao_coube" : "estudo", at: null, end: null, tag: TASK_TAG[t.kind], title: t.title, sub: name(t.subject_id), subject_id: t.subject_id, task: t, past: false });
   for (const t of p.todos.filter((x) => !x.done && x.due && x.due <= p.day)) out.push({ key: "d" + t.id, kind: "tarefa", at: null, end: null, tag: t.due === p.day ? "Tarefa · prazo hoje" : "Tarefa atrasada", title: t.title, sub: name(t.subject_id) || undefined, subject_id: t.subject_id, todo: t, past: false });
-  const order: CardKind[] = ["calendario", "tarefa", "nao_coube"];
+  const order: CardKind[] = ["calendario", "tarefa", "estudo", "nao_coube"];
   return out.sort((a, b) => {
     if (a.at != null && b.at != null) return a.at - b.at || (a.end ?? 0) - (b.end ?? 0);
     if (a.at != null) return -1;

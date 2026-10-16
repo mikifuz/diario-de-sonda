@@ -46,3 +46,11 @@ test("quadrados de hoje: aula cancelada aparece como sem aula", () => {
   const cards = dayCards({ day, nowMin: 0, blocks: [B({ weekday: 1, subject_id: "c" })], events: off, agenda: [], subjects: [S("c", "Cálculo III")], plan, todos: [] });
   assert.equal(cards[0].kind, "sem_aula");
 });
+
+test("sem blocos de estudo na rotina, as tarefas viram quadrados sem horário (não 'não coube')", () => {
+  const plan: DayPlan = { slots: [], overflow: [task], capacity: 0, need: 30, notes: [], hasStudyBlocks: false };
+  const [c] = dayCards({ day: "2026-10-16", nowMin: 18 * 60, blocks: [], events: [], agenda: [], subjects: [S("c", "Cálculo III")], plan, todos: [] });
+  assert.equal(c.kind, "estudo");
+  assert.equal(c.at, null);
+  assert.equal(c.task?.key, "k1");
+});
