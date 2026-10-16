@@ -102,7 +102,7 @@ export default function Disciplina() {
             <div className="row" style={{ gap: 8 }}><Dot c={s.color} size={12} /><span>{s.professor || "Professor não informado"}</span></div>
             {classes.length > 0
               ? <span className="small muted">Aulas na rotina: {classes.map((b) => `${WD_S[b.weekday]} ${b.start_time}–${b.end_time}`).join(", ")}</span>
-              : s.schedule && <span className="small muted">Aulas: {s.schedule} · <Link href="/hoje?aba=rotina">colocar na rotina</Link></span>}
+              : s.schedule && <span className="small muted">Aulas: {s.schedule} · <Link href="/calendario#rotina">colocar na rotina</Link></span>}
             {s.notes && <span className="small" style={{ maxWidth: "65ch", whiteSpace: "pre-wrap" }}>{s.notes}</span>}
             <EffortControl s={s} />
             {traitList.length > 0 && <div className="row" style={{ gap: 6, marginTop: 6 }}>{traitList.map((x) => <span key={x} className="chip">{x}</span>)}</div>}

@@ -53,7 +53,7 @@ export function TripCard({ r, onEdit }: { r: TripImpact; onEdit?: (id: string) =
         </div>
       )}
       <div className="row" style={{ gap: 6 }}>
-        {r.level === "apertado" && <Link className="btn sm pri" href="/hoje?aba=rotina">Pôr mais estudo na rotina</Link>}
+        {r.level === "apertado" && <Link className="btn sm pri" href="/calendario#rotina">Pôr mais estudo na rotina</Link>}
         {r.exams.length > 0 && <Link className="btn sm" href="/hoje?aba=provas">Ver o plano das provas</Link>}
         {onEdit && <button className="btn sm ghost" onClick={() => onEdit(r.trip.id)}>Editar viagem</button>}
       </div>

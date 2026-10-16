@@ -19,7 +19,7 @@ export function useGuide() {
       text: "No SIGA, baixe o Comprovante de matrícula (PDF) e envie aqui: o app cria suas disciplinas e coloca os horários de aula na rotina. O arquivo não sai do seu aparelho.",
       done: st.blocks.some((b) => b.kind === "aula"),
       doneText: "Aulas na rotina.",
-      action: { label: "Importar do SIGA", href: "/hoje?aba=rotina&abrir=siga" },
+      action: { label: "Importar do SIGA", href: "/calendario?abrir=siga#rotina" },
       extra: subs.length ? undefined : { label: "Prefiro cadastrar as disciplinas à mão", href: "/disciplinas" },
     },
     {
@@ -34,7 +34,7 @@ export function useGuide() {
       text: "Na Rotina, adicione seus blocos de estudo (só eles recebem tarefas), trabalho, estágio e outros compromissos, e escolha se prefere adiantar a matéria antes da aula ou revisar depois.",
       done: st.blocks.some((b) => b.kind === "estudo"),
       doneText: "Blocos de estudo na rotina.",
-      action: { label: "Ajustar minha rotina", href: "/hoje?aba=rotina" },
+      action: { label: "Ajustar minha rotina", href: "/calendario#rotina" },
     },
     {
       title: "Comece a estudar",

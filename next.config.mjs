@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   eslint: { ignoreDuringBuilds: true },
-  // Sessões viraram parte da Sala; Notas, parte de Disciplinas
+  // Sessões viraram parte da Sala; Notas e o Fluxograma (antigo Meu curso), parte de Disciplinas
   // proteções básicas: ninguém abre o app dentro de outro site (clickjacking), o navegador não
   // "adivinha" tipos de arquivo e os links externos não recebem o endereço completo das páginas
   async headers() {
@@ -25,6 +25,7 @@ const nextConfig = {
     return [
       { source: "/sessoes", destination: "/sala", permanent: false },
       { source: "/notas", destination: "/disciplinas", permanent: false },
+      { source: "/curso", destination: "/disciplinas?aba=fluxograma", permanent: false },
     ];
   },
 };

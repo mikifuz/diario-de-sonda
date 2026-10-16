@@ -1,31 +1,31 @@
 "use client";
 import Link from "next/link";
-import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { activeSubjects, topicName, useStore } from "@/lib/store";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { activeSubjects, agenda, topicName, useStore } from "@/lib/store";
 import { addDays, daysBetween, fmtMin, gradeCalc, keyDate, nf, todayKey, qt } from "@/lib/calc";
-import { cleanSteps, dm, firstDue, fromMin, itemState, parseSteps, planDay, type PlanInput, type Task } from "@/lib/plan";
-import { BLOCK, MISTAKE, PREF, WD_S } from "@/lib/constants";
+import { cleanSteps, dm, firstDue, fromMin, itemState, planDay, type PlanInput, type Task } from "@/lib/plan";
+import { MISTAKE, PREF, WD_S } from "@/lib/constants";
 import { BAND, masteryCfg } from "@/lib/mastery";
 import { FINAL_MIN, RESERVE, TARGET, reversePlan, todayTasks, type ExamPlan } from "@/lib/reverse";
-import type { Activity, EventType, MistakeCategory, ReviewItem, StudyPref } from "@/lib/types";
+import type { Activity, EventType, MistakeCategory, ReviewItem } from "@/lib/types";
 import { Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
-import { BlockModal, MistakeModal, ReviewItemModal, ReviewModal } from "@/components/planning";
+import { MistakeModal, ReviewItemModal, ReviewModal } from "@/components/planning";
 import { ImportSigaModal } from "@/components/importSiga";
 import { DayPrint } from "@/components/dayPrint";
 import { mistakeCats } from "@/lib/mistakes";
 import { easyReminders } from "@/lib/effort";
 import { WeekPrint } from "@/components/weekPrint";
 import { StartModal, type StartArgs } from "@/components/studyStart";
-import { WeekRoutine } from "@/components/routine";
 import { EventModal } from "@/components/modals";
+import { dayCards, firstName, greeting, motto, type DayCard } from "@/lib/today";
 import { TripsPanel } from "@/components/trips";
 
-type Tab = "plano" | "provas" | "revisar" | "rotina";
-const TABS: [Tab, string][] = [["plano", "Plano do dia"], ["provas", "Provas"], ["revisar", "Revisar"], ["rotina", "Rotina"]];
-// links antigos (?aba=revisoes, ?aba=erros) abrem a aba nova
+type Tab = "plano" | "provas" | "revisar";
+const TABS: [Tab, string][] = [["plano", "Plano do dia"], ["provas", "Provas"], ["revisar", "Revisar"]];
+// links antigos (?aba=revisoes, ?aba=erros) abrem a aba Revisar
 const OLD: Record<string, Tab> = { revisoes: "revisar", erros: "revisar" };
-type ModalState = null | { k: "review"; id: string } | { k: "item"; id: string | null } | { k: "mistake"; id: string | null } | { k: "block"; id: string | null; weekday?: number } | { k: "siga" } | { k: "start"; args: StartArgs } | { k: "event"; id: string | null; type?: EventType };
+type ModalState = null | { k: "review"; id: string } | { k: "item"; id: string | null } | { k: "mistake"; id: string | null } | { k: "siga" } | { k: "start"; args: StartArgs } | { k: "event"; id: string | null; type?: EventType };
 type Open = (m: ModalState) => void;
 
 export default function HojePage() {
@@ -34,26 +34,78 @@ export default function HojePage() {
 
 function Hoje() {
   const params = useSearchParams();
+  const router = useRouter();
   const aba = params.get("aba") || "";
   const pre = (OLD[aba] || aba) as Tab;
   const [tab, setTab] = useState<Tab>(TABS.some(([k]) => k === pre) ? pre : "plano");
-  const [modal, setModal] = useState<ModalState>(params.get("abrir") === "siga" ? { k: "siga" } : null);
+  const [modal, setModal] = useState<ModalState>(null);
+  // a rotina semanal mudou para o Calendário: links antigos (?aba=rotina, &abrir=siga) vão para lá
+  const toRoutine = aba === "rotina" || params.get("abrir") === "siga";
+  useEffect(() => { if (toRoutine) router.replace(params.get("abrir") === "siga" ? "/calendario?abrir=siga#rotina" : "/calendario#rotina"); }, [toRoutine]); // eslint-disable-line react-hooks/exhaustive-deps
   const close = () => setModal(null);
+  if (toRoutine) return null;
   return (
     <>
+      <Greeting />
       <Tabs value={tab} onChange={setTab} label="Seções" options={TABS} />
-      {tab === "plano" && <PlanTab open={setModal} goRoutine={() => setTab("rotina")} goExams={() => setTab("provas")} />}
+      {tab === "plano" && <PlanTab open={setModal} goRoutine={() => router.push("/calendario#rotina")} goExams={() => setTab("provas")} />}
       {tab === "revisar" && <><ReviewsTab open={setModal} /><MistakesTab open={setModal} /></>}
-      {tab === "rotina" && <RoutineTab open={setModal} />}
       {tab === "provas" && <ExamsTab open={setModal} />}
       {modal?.k === "review" && <ReviewModal id={modal.id} onClose={close} />}
       {modal?.k === "item" && <ReviewItemModal id={modal.id} onClose={close} />}
       {modal?.k === "mistake" && <MistakeModal id={modal.id} onClose={close} />}
-      {modal?.k === "block" && <BlockModal id={modal.id} weekday={modal.weekday} onClose={close} />}
       {modal?.k === "siga" && <ImportSigaModal onClose={close} />}
       {modal?.k === "start" && <StartModal args={modal.args} onClose={close} />}
       {modal?.k === "event" && <EventModal id={modal.id} src={modal.id ? "event" : undefined} type={modal.type} onClose={close} />}
     </>
+  );
+}
+
+/* ============ Saudação e quadrados do dia ============ */
+function Greeting() {
+  const st = useStore();
+  const now = new Date(useNow(60_000));
+  const today = todayKey();
+  const nm = firstName(st.profile?.name);
+  const date = keyDate(today).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+  return (
+    <section className="hello" aria-label="Saudação">
+      <h2 className="hello-t">{greeting(now.getHours())}{nm ? `, ${nm}` : ""}!</h2>
+      <p className="hello-m">{motto(today)}</p>
+      <p className="hello-d">Hoje é {date}.</p>
+    </section>
+  );
+}
+
+function TodayTiles({ cards, open }: { cards: DayCard[]; open: Open }) {
+  const st = useStore();
+  const color = (c: DayCard) => (c.kind === "rotina" ? "var(--line)" : c.kind === "livre" ? "var(--accent)" : c.kind === "tarefa" ? "var(--warn)" : st.subjects.find((s) => s.id === c.subject_id)?.color || "var(--accent)");
+  const done = (t: NonNullable<DayCard["todo"]>) => st.save("tasks", { ...t, done: true, done_at: new Date().toISOString() });
+  const when = (c: DayCard) => (c.at == null ? (c.kind === "nao_coube" ? "não coube nos blocos" : c.kind === "calendario" ? "sem horário" : "") : `${fromMin(c.at)}${c.end != null ? `–${fromMin(c.end)}` : ""}`);
+  return (
+    <section className="panel">
+      <div className="panel-h"><h2>O que você vai fazer hoje</h2><span className="lbl">{qt(cards.filter((c) => !c.past).length, "item", "itens")}</span></div>
+      {cards.length ? (
+        <div className="tiles">{cards.map((c) => (
+          <div key={c.key} className={"tile" + (c.past ? " past" : "") + (c.kind === "sem_aula" ? " off" : "")} style={{ ["--c" as string]: color(c) }} title={c.task?.why}>
+            <span className="tile-w">{when(c)}{c.past ? " · já passou" : ""}</span>
+            <span className="tile-k">{c.tag}</span>
+            <b className="tile-t">{c.title}</b>
+            {c.sub && <span className="tile-s">{c.sub}</span>}
+            {c.task && <span className="tile-s">{c.task.minutes} min</span>}
+            {c.task && !c.past && (
+              <span className="row" style={{ gap: 6, marginTop: "auto", paddingTop: 6 }}>
+                <button className="btn sm" disabled={!!st.profile?.timer} title={st.profile?.timer ? "Já existe uma sessão em andamento" : undefined}
+                  onClick={() => open({ k: "start", args: { subject_id: c.task!.subject_id, topic_id: c.task!.topic_id, activity: ACT_OF[c.task!.kind] } })}><Icon d={I.play} s={13} />Começar</button>
+                {c.task.item_id && <button className="btn sm pri" onClick={() => open({ k: "review", id: c.task!.item_id! })}>Revisei</button>}
+              </span>
+            )}
+            {c.todo && <span style={{ marginTop: "auto", paddingTop: 6 }}><button className="btn sm" onClick={() => done(c.todo!)}>Feito</button></span>}
+          </div>
+        ))}</div>
+      ) : <Empty title="Nada marcado para hoje">Monte sua rotina semanal (aulas e blocos de estudo) no Calendário: o app encaixa as revisões e as aulas para estudar.<Link className="btn sm pri" href="/calendario#rotina">Montar minha rotina</Link></Empty>}
+      {cards.some((c) => c.task) && <p className="small muted" style={{ margin: "10px 0 0" }}>Passe o mouse numa tarefa de estudo para ver por que ela entrou hoje. O motivo de cada uma também fica na lista logo abaixo.</p>}
+    </section>
   );
 }
 
@@ -137,8 +189,10 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
   };
 
   const dateLabel = keyDate(today).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+  const cards = dayCards({ day: today, nowMin, blocks: st.blocks, events: st.events, agenda: agenda(st.subjects, st.assessments, st.events), subjects: st.subjects, plan, todos: st.todos });
   return (
     <>
+      <TodayTiles cards={cards} open={open} />
       <section className="panel" aria-label="Imprimir ou salvar em PDF">
         <div className="row" style={{ gap: 6 }}>
           <b className="grow">Plano em PDF <span className="small muted" style={{ fontWeight: 400 }}>(imprimir ou &quot;Salvar como PDF&quot;)</span></b>
@@ -186,31 +240,17 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
       ))}
 
 
-      {plan.hasStudyBlocks && (
-        <section className="panel">
-          <div className="panel-h"><h2>Agenda de estudo</h2><span className="lbl">{qt(plan.slots.length, "bloco restante", "blocos restantes")} hoje</span></div>
-          {plan.slots.length ? plan.slots.map((s) => (
-            <div key={s.block.id} style={{ marginBottom: 14 }}>
-              <div className="lbl" style={{ marginBottom: 4 }}>{fromMin(s.start)}–{s.block.end_time} · {BLOCK.estudo}{s.block.label ? ` · ${s.block.label}` : ""}</div>
-              {s.placed.length
-                ? <div className="list">{s.placed.map((p) => <TaskRow key={p.task.key} t={p.task} at={fromMin(p.start)} open={open} />)}</div>
-                : <p className="small muted" style={{ margin: 0 }}>Livre: nada pendente para este bloco.</p>}
-            </div>
-          )) : <Empty>Não há mais blocos de estudo hoje na sua rotina.</Empty>}
-          {plan.slots.length > 0 && !plan.slots.some((s) => s.placed.length) && !plan.overflow.length && (
-            <p className="small muted" style={{ margin: 0 }}>Nenhuma revisão vencida e nenhuma aula para consolidar ou adiantar hoje.</p>
-          )}
-        </section>
-      )}
-
-      {plan.overflow.length > 0 && (
-        <section className="panel">
-          <div className="panel-h"><h2>Não coube hoje</h2><span className="lbl">{fmtMin(plan.overflow.reduce((a, t) => a + t.minutes, 0))}</span></div>
-          <p className="small muted" style={{ margin: "0 0 8px" }}>
-            {plan.hasStudyBlocks ? "Estas tarefas não couberam nos blocos de estudo que sobram hoje. As revisões continuam vencidas e voltam amanhã, na frente das novas, se ainda forem as mais urgentes." : "Sem blocos de estudo na rotina, estas são as tarefas de hoje em ordem de prioridade."}
-          </p>
-          <div className="list">{plan.overflow.map((t) => <TaskRow key={t.key} t={t} open={open} />)}</div>
-        </section>
+      {(plan.slots.some((x) => x.placed.length) || plan.overflow.length > 0) && (
+        <details className="panel">
+          <summary>Tarefas de estudo de hoje, com o motivo de cada uma</summary>
+          <div className="list" style={{ marginTop: 10 }}>
+            {plan.slots.flatMap((x) => x.placed).map((p) => <TaskRow key={p.task.key} t={p.task} at={fromMin(p.start)} open={open} />)}
+            {plan.overflow.map((t) => <TaskRow key={t.key} t={t} at="não coube" open={open} />)}
+          </div>
+          {plan.overflow.length > 0 && <p className="small muted" style={{ margin: "8px 0 0" }}>
+            {plan.hasStudyBlocks ? "As que não couberam nos blocos de estudo que sobram hoje continuam valendo: as revisões voltam amanhã, na frente das novas, se ainda forem as mais urgentes." : "Sem blocos de estudo na rotina, estas são as tarefas de hoje em ordem de prioridade."}
+          </p>}
+        </details>
       )}
 
       <section className="grid g2">
@@ -240,7 +280,7 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
           <li>Usa só os blocos de <b>estudo</b> da sua rotina para o dia da semana, a partir de agora. Compromissos e dias &quot;Indisponível&quot; do calendário tiram blocos.</li>
           <li>Entram as revisões com data até hoje (cuja prova ainda não passou) e as aulas: <b>consolidar</b> a de hoje (depois do fim da aula) ou <b>adiantar</b> a de amanhã, conforme a sua preferência ({PREF[st.profile?.study_pref || "depois"].toLowerCase()} por padrão; cada disciplina pode ter a sua).</li>
           <li>Ordem: revisões de provas em até 3 dias; depois as aulas; depois as demais revisões pela prova mais próxima, atraso, peso da prova, menor índice de domínio do conteúdo e mais erros registrados.</li>
-          <li>Cada tarefa entra inteira no primeiro bloco onde cabe. O que não couber aparece em &quot;Não coube hoje&quot;, sem ser escondido.</li>
+          <li>Cada tarefa entra inteira no primeiro bloco onde cabe. O que não couber aparece nos quadrados como &quot;não coube nos blocos&quot;, sem ser escondido.</li>
         </ol>
       </details>
     </>
@@ -299,7 +339,7 @@ function ReviewsTab({ open }: { open: Open }) {
       <details className="small">
         <summary>Como as datas são calculadas</summary>
         <div className="muted stack" style={{ marginTop: 6, gap: 6 }}>
-          <span>Intervalos atuais: {steps.join(", ")} dias (mude em Rotina). Quem decide é o <b>resultado conferido</b> e a <b>autonomia</b>; a confiança fica registrada mas não muda a data.</span>
+          <span>Intervalos atuais: {steps.join(", ")} dias (mude em Calendário → Rotina semanal). Quem decide é o <b>resultado conferido</b> e a <b>autonomia</b>; a confiança fica registrada mas não muda a data.</span>
           <span>Resolveu sozinho: sobe um intervalo. Com consulta ou ajuda: mantém. Viu a resolução ou resolveu parcialmente: desce um. Não conseguiu: volta ao primeiro. &quot;Ainda não conferi&quot;: não muda.</span>
           <span>Nenhuma data passa da véspera da prova ligada à revisão. Depois que a prova acontece, a revisão se encerra sozinha. Sem prova, o intervalo máximo é 14 dias.</span>
         </div>
@@ -362,38 +402,6 @@ function MistakesTab({ open }: { open: Open }) {
           })}</div>
         </details>
       )}
-    </>
-  );
-}
-
-/* ============ Rotina ============ */
-function RoutineTab({ open }: { open: Open }) {
-  const st = useStore();
-  const p = st.profile!;
-  const [stepsTxt, setStepsTxt] = useState(cleanSteps(p.review_steps).join(", "));
-  const saveSteps = async () => {
-    const r = parseSteps(stepsTxt);
-    if (typeof r === "string") { st.toast(r); return; }
-    if (await st.updateProfile({ review_steps: r })) { setStepsTxt(r.join(", ")); st.toast("Intervalos salvos."); }
-  };
-  return (
-    <>
-      <WeekRoutine onBlock={(id, weekday) => open({ k: "block", id, weekday })} onSiga={() => open({ k: "siga" })}>
-        <p className="small muted" style={{ margin: "0 0 12px" }}>Cadastre aulas, blocos de estudo e o que mais ocupa sua semana (trabalho, deslocamento, descanso). Só os blocos de <b>estudo</b> recebem tarefas; os outros servem para você enxergar a semana. Exceções do dia a dia vão no calendário como &quot;Indisponível&quot; ou &quot;Compromisso pessoal&quot;. A mesma semana aparece no topo do Painel.</p>
-      </WeekRoutine>
-      <section className="panel">
-        <div className="panel-h"><h2>Preferências do plano</h2></div>
-        <div className="fgrid">
-          <label className="f"><span>Como você prefere acompanhar as aulas (padrão)</span>
-            <select value={p.study_pref} onChange={(e) => st.updateProfile({ study_pref: e.target.value as StudyPref })}>{Object.entries(PREF).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select>
-            <span className="small">Cada disciplina pode ter a sua preferência (Disciplinas → Editar).</span></label>
-          <label className="f"><span>Intervalos da revisão espaçada (dias)</span>
-            <span className="row" style={{ flexWrap: "nowrap" }}><input type="text" value={stepsTxt} onChange={(e) => setStepsTxt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveSteps(); }} aria-label="Intervalos em dias" />
-              <button type="button" className="btn sm" onClick={saveSteps}>Salvar</button></span>
-            <span className="small">Separados por vírgula, crescentes. Nenhum intervalo passa da véspera da prova.</span></label>
-        </div>
-        <p className="small muted" style={{ margin: "10px 0 0" }}>Nada aqui é compartilhado: a sala de estudos continua vendo só apelido, presença e minutos por dia. <Link href="/sala">Ir para a sala</Link>.</p>
-      </section>
     </>
   );
 }
