@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { activeSubjects, useStore } from "@/lib/store";
 import { fmtMin, nf, qt } from "@/lib/calc";
-import { cleanSteps, parseSteps, toMin, weekCapacity } from "@/lib/plan";
+import { toMin, weekCapacity } from "@/lib/plan";
 import { BLOCK, PREF, WEEKDAYS } from "@/lib/constants";
 import type { StudyPref } from "@/lib/types";
 import { I, Icon } from "@/components/ui";
@@ -59,17 +59,11 @@ export function RoutineSection({ openSiga = false }: { openSiga?: boolean }) {
   const st = useStore();
   const p = st.profile!;
   const [modal, setModal] = useState<null | { k: "block"; id: string | null; weekday?: number } | { k: "siga" }>(openSiga ? { k: "siga" } : null);
-  const [stepsTxt, setStepsTxt] = useState(cleanSteps(p.review_steps).join(", "));
   useEffect(() => {
     if (location.hash !== "#rotina" && !openSiga) return;
     const t = setTimeout(() => document.getElementById("rotina")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
     return () => clearTimeout(t);
   }, [openSiga]);
-  const saveSteps = async () => {
-    const r = parseSteps(stepsTxt);
-    if (typeof r === "string") { st.toast(r); return; }
-    if (await st.updateProfile({ review_steps: r })) { setStepsTxt(r.join(", ")); st.toast("Intervalos salvos."); }
-  };
   const close = () => setModal(null);
   return (
     <div id="rotina" className="stack" style={{ gap: 16, scrollMarginTop: 16 }}>
@@ -77,15 +71,11 @@ export function RoutineSection({ openSiga = false }: { openSiga?: boolean }) {
         <p className="small muted" style={{ margin: "0 0 12px" }}>Cadastre aulas, blocos de estudo e o que mais ocupa sua semana (trabalho, deslocamento, descanso). Só os blocos de <b>estudo</b> recebem tarefas; os outros servem para você enxergar a semana. Exceções do dia a dia vão no calendário acima, como &quot;Indisponível&quot; ou &quot;Compromisso pessoal&quot;.</p>
       </WeekRoutine>
       <details className="panel">
-        <summary>Preferências do plano e intervalos de revisão</summary>
+        <summary>Preferências do plano</summary>
         <div className="fgrid" style={{ marginTop: 12 }}>
           <label className="f"><span>Como você prefere acompanhar as aulas (padrão)</span>
             <select value={p.study_pref} onChange={(e) => st.updateProfile({ study_pref: e.target.value as StudyPref })}>{Object.entries(PREF).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select>
             <span className="small">Cada disciplina pode ter a sua preferência (Disciplinas → Editar).</span></label>
-          <label className="f"><span>Intervalos da revisão espaçada (dias)</span>
-            <span className="row" style={{ flexWrap: "nowrap" }}><input type="text" value={stepsTxt} onChange={(e) => setStepsTxt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveSteps(); }} aria-label="Intervalos em dias" />
-              <button type="button" className="btn sm" onClick={saveSteps}>Salvar</button></span>
-            <span className="small">Separados por vírgula, crescentes. Nenhum intervalo passa da véspera da prova.</span></label>
         </div>
         <p className="small muted" style={{ margin: "10px 0 0" }}>Nada aqui é compartilhado: a sala de estudos continua vendo só apelido, presença e minutos por dia.</p>
       </details>

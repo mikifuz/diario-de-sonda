@@ -8,7 +8,6 @@ import { useRoom } from "@/lib/room";
 import { fmtClock } from "@/lib/calc";
 import { Brand } from "./Brand";
 import { Icon, useNow } from "./ui";
-import { EvalModal } from "./modals";
 import { ExamCheckHost } from "./examCheck";
 import { useWeeklyReport } from "./notifications";
 import { DEMO_FLAG } from "@/lib/demo";
@@ -89,7 +88,6 @@ export function Shell({ children }: { children: ReactNode }) {
             {p.href === "/notificacoes" && unread > 0 && <i className="dot" aria-label={`${unread} não lidas`} style={{ position: "absolute", top: 2, right: 10, background: "var(--warn)" }} />}</Link>
         ))}
       </nav>
-      {st.evalId && <EvalModal id={st.evalId} onClose={() => st.setEvalId(null)} />}
       <ExamCheckHost />
     </div>
   );

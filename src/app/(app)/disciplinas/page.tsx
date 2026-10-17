@@ -2,7 +2,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { activeSubjects, useStore } from "@/lib/store";
-import { daysBetween, fmtMin, gradeCalc, nf, pct, stats, todayKey } from "@/lib/calc";
+import { daysBetween, fmtMin, gradeCalc, nf, stats, todayKey } from "@/lib/calc";
 import { Dot, Empty, I, Icon, Tabs } from "@/components/ui";
 import { SubjectModal } from "@/components/modals";
 import { Calibration, subLine, verdict } from "@/components/grades";
@@ -45,7 +45,7 @@ function SubjectList() {
       {list.length ? (
         <section className="panel">
           <div className="tbl-wrap"><table>
-            <thead><tr><th>Disciplina</th><th className="n">Média atual</th><th className="hide-m">Situação</th><th className="hide-m">Próxima prova</th><th className="n hide-m">Horas</th><th className="n hide-m">Acerto</th></tr></thead>
+            <thead><tr><th>Disciplina</th><th className="n">Média atual</th><th className="hide-m">Situação</th><th className="hide-m">Próxima prova</th><th className="n hide-m">Horas</th></tr></thead>
             <tbody>{list.map((s) => {
               const items = st.assessments.filter((a) => a.subject_id === s.id);
               const r = gradeCalc(s, items), v = verdict(r), x = stats(st.sessions.filter((y) => y.subject_id === s.id));
@@ -62,7 +62,6 @@ function SubjectList() {
                   <td className="small hide-m" style={{ color: v.c }}>{v.t}{sl && <div className="muted">SUB: {sl}</div>}</td>
                   <td className="small hide-m">{next ? <><span className={"cdays " + (dd! <= 3 ? "bad" : dd! <= 7 ? "warn" : "")} style={{ minWidth: 0, marginRight: 6 }}>{dd === 0 ? "hoje" : dd === 1 ? "amanhã" : `${dd} d`}</span>{next.name}</> : <span className="muted">–</span>}</td>
                   <td className="n hide-m">{fmtMin(x.min)}</td>
-                  <td className="n hide-m">{pct(x.acc)}</td>
                 </tr>
               );
             })}</tbody>

@@ -43,7 +43,7 @@ test("só pergunta depois que a prova acabou, até 7 dias, sem nota e sem respos
 
 test("foi mal: recomenda revisão antes da próxima prova, sem passar da véspera", () => {
   const p2 = A({ id: "p2", name: "P2", date: "2026-11-11" });
-  const a = examAdvice({ exam: A({}), felt: 1, assessments: [A({}), p2], subjects: [SUB], steps: [1, 3, 7], today: "2026-10-14" });
+  const a = examAdvice({ exam: A({}), felt: 1, assessments: [A({}), p2], subjects: [SUB], today: "2026-10-14" });
   assert.equal(a.strong, true);
   assert.equal(a.next?.id, "p2");
   assert.equal(a.due, "2026-10-15");
@@ -51,15 +51,15 @@ test("foi mal: recomenda revisão antes da próxima prova, sem passar da vésper
   assert.match(a.text, /A próxima é P2 em 28 dias \(11\/11\)/);
   assert.match(a.title, /Revisar P1 de Estática/);
   // próxima prova amanhã: revisão hoje
-  const perto = examAdvice({ exam: A({}), felt: 2, assessments: [A({}), A({ id: "p2", date: "2026-10-15" })], subjects: [SUB], steps: [1], today: "2026-10-14" });
+  const perto = examAdvice({ exam: A({}), felt: 2, assessments: [A({}), A({ id: "p2", date: "2026-10-15" })], subjects: [SUB], today: "2026-10-14" });
   assert.equal(perto.due, "2026-10-14");
 });
 
 test("mais ou menos oferece sem insistir; bem não oferece revisão", () => {
-  const meio = examAdvice({ exam: A({}), felt: 3, assessments: [A({})], subjects: [SUB], steps: [1], today: "2026-10-14" });
+  const meio = examAdvice({ exam: A({}), felt: 3, assessments: [A({})], subjects: [SUB], today: "2026-10-14" });
   assert.equal(meio.strong, false);
   assert.equal(meio.offer, true);
   assert.equal(meio.next, null);
-  const bem = examAdvice({ exam: A({}), felt: 5, assessments: [A({})], subjects: [SUB], steps: [1], today: "2026-10-14" });
+  const bem = examAdvice({ exam: A({}), felt: 5, assessments: [A({})], subjects: [SUB], today: "2026-10-14" });
   assert.equal(bem.offer, false);
 });

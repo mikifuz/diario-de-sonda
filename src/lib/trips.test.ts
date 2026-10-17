@@ -17,7 +17,7 @@ const V = (p: Partial<CalEvent> = {}): CalEvent => ({ id: "v", subject_id: null,
 const every = [0, 1, 2, 3, 4, 5, 6].map((d) => B(d)); // 2 h por dia
 const inp = (n: number, p: Partial<RevInput> = {}): RevInput => ({
   today: TODAY, nowMin: 8 * 60, blocks: every, events: [V()], subjects: [SUB()], topics: Array.from({ length: n }, (_, i) => T(i)),
-  sessions: [], assessments: [A()], items: [], logs: [], mistakes: [], ...p,
+  sessions: [], assessments: [A()], ...p,
 });
 
 test("nos dias da viagem a rotina não tem estudo; no dia da ida, só o que acaba antes da saída", () => {
@@ -30,7 +30,7 @@ test("nos dias da viagem a rotina não tem estudo; no dia da ida, só o que acab
   // viagem cancelada não tira nada
   assert.equal(freeStudy(blocks, [V({ status: "cancelado" })], "2026-10-17").blocks.length, 1);
   // o plano do dia não sugere nada num dia de viagem
-  const plan = planDay({ today: "2026-10-17", nowMin: 0, pref: "depois", blocks, events: [V()], subjects: [SUB()], topics: [T(0)], sessions: [], assessments: [A()], items: [], mistakes: [] });
+  const plan = planDay({ today: "2026-10-17", nowMin: 0, pref: "depois", blocks, events: [V()], subjects: [SUB()], topics: [T(0)], sessions: [], assessments: [A()] });
   assert.equal(plan.capacity, 0);
 });
 

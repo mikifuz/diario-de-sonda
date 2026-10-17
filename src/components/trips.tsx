@@ -4,7 +4,6 @@
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { fmtMin, todayKey } from "@/lib/calc";
-import { masteryCfg } from "@/lib/mastery";
 import { dm } from "@/lib/plan";
 import { tripImpacts, tripRange, type TripImpact } from "@/lib/trips";
 import type { RevInput } from "@/lib/reverse";
@@ -17,7 +16,7 @@ function useRevInput(): RevInput {
   const now = new Date(useNow(60_000));
   return {
     today: todayKey(), nowMin: now.getHours() * 60 + now.getMinutes(), blocks: st.blocks, events: st.events, subjects: st.subjects, topics: st.topics,
-    sessions: st.sessions, assessments: st.assessments, items: st.reviews, logs: st.reviewLogs, mistakes: st.mistakes, cfg: masteryCfg(st.profile?.mastery_cfg),
+    sessions: st.sessions, assessments: st.assessments,
   };
 }
 
@@ -57,7 +56,7 @@ export function TripCard({ r, onEdit }: { r: TripImpact; onEdit?: (id: string) =
         {r.exams.length > 0 && <Link className="btn sm" href="/hoje?aba=provas">Ver o plano das provas</Link>}
         {onEdit && <button className="btn sm ghost" onClick={() => onEdit(r.trip.id)}>Editar viagem</button>}
       </div>
-      {r.lost > 0 && r.level === "apertado" && <p className="small muted" style={{ margin: 0 }}>{fmtMin(r.lost)} = blocos de estudo da sua rotina nos dias da viagem. O cálculo usa as metas do planejamento reverso (pelo índice de domínio de cada conteúdo) e o que você já estudou.</p>}
+      {r.lost > 0 && r.level === "apertado" && <p className="small muted" style={{ margin: 0 }}>{fmtMin(r.lost)} = blocos de estudo da sua rotina nos dias da viagem. O cálculo usa as metas do planejamento reverso (2 h por conteúdo, ajustadas pela dificuldade da matéria) e o que você já estudou.</p>}
     </div>
   );
 }

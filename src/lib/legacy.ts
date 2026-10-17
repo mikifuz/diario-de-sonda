@@ -1,6 +1,6 @@
 // Converte a cópia (JSON) exportada da primeira versão do Diário de Sonda — a página
 // publicada no Claude — para as linhas das tabelas novas. Função pura, testada.
-import type { Activity, Assessment, AssessmentKind, Autonomy, CalEvent, Comprehension, EventType, Priority, Result, Session, Status, Subject, Topic } from "./types";
+import type { Activity, Assessment, AssessmentKind, CalEvent, EventType, Priority, Session, Status, Subject, Topic } from "./types";
 import { dkey } from "./calc";
 
 type Any = Record<string, any>;
@@ -15,9 +15,6 @@ export interface LegacyRows {
 }
 
 const ACT: Activity[] = ["aula", "leitura", "exercicios", "revisao", "simulado", "resumo", "teorico", "pratico"];
-const RES: Result[] = ["certo", "parcial", "errado", "nao"];
-const AUT: Autonomy[] = ["sozinho", "anotacoes", "ajuda", "resolucao"];
-const COMP: Comprehension[] = ["total", "parcial", "duvidas", "nao"];
 const KIND: AssessmentKind[] = ["prova", "trabalho", "apresentacao", "entrega"];
 const EVT: EventType[] = [...KIND, "aula", "atividade", "simulado", "estudo", "revisao", "pessoal", "indisponivel"];
 const PRIO: Priority[] = ["baixa", "media", "alta"];
@@ -86,17 +83,11 @@ export function convertLegacy(j: Any, newId: () => string = () => crypto.randomU
     const dur = Math.round(Number(s && s.durMin));
     const start = Number(s && s.start);
     if (!sid || !(dur >= 1) || !(start > 0)) { out.skipped++; continue; }
-    const ev = s.ev || {};
-    let q = num(s.questions), c = num(s.correct);
-    if (q != null && q < 0) q = null;
-    if (c != null && (c < 0 || (q != null && c > q))) c = null;
-    const conf = num(ev.conf), diff = num(ev.diff);
+    // a autoavaliação da primeira versão (confiança, resultado, questões) não é mais usada
     out.sessions.push({
       id: newId(), subject_id: sid, topic_id: s.topicId && topMap.get(String(s.topicId)) || null,
       activity: pick(s.activity, ACT, "exercicios")!, started_at: new Date(start).toISOString(), duration_min: Math.min(dur, 1440),
-      questions: q, correct: c, notes: str(s.notes), confidence: conf != null && conf >= 1 && conf <= 5 ? Math.round(conf) : null,
-      result: pick(ev.result, RES, null), autonomy: pick(ev.auto, AUT, null),
-      difficulty: diff != null && diff >= 0 && diff <= 4 ? Math.round(diff) : null, comprehension: pick(ev.comp, COMP, null),
+      notes: str(s.notes),
     });
   }
 

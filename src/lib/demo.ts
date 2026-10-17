@@ -4,7 +4,7 @@ import { addDays, dkey, keyDate, todayKey } from "./calc";
 import { buildReport, reportWeek } from "./report";
 import { fromTemplate } from "./curriculum";
 import type { Course, Habit, HabitCheck,
-  AppNotification, Assessment, CalEvent, DailyTotal, Friend, Mistake, Profile, ReviewItem, ReviewLog, RoomMember, RoutineBlock, Session, StudyGroup,
+  AppNotification, Assessment, CalEvent, DailyTotal, Friend, Profile, RoomMember, RoutineBlock, Session, StudyGroup,
   Subject, Todo, Topic, GroupMember,
 } from "./types";
 
@@ -13,7 +13,7 @@ export const DEMO_UID = "demo-voce";
 
 export interface DemoData {
   profile: Profile; subjects: Subject[]; topics: Topic[]; sessions: Session[]; assessments: Assessment[]; events: CalEvent[];
-  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[]; todos: Todo[]; notes: AppNotification[]; courses: Course[]; habits: Habit[]; habitChecks: HabitCheck[];
+  blocks: RoutineBlock[]; todos: Todo[]; notes: AppNotification[]; courses: Course[]; habits: Habit[]; habitChecks: HabitCheck[];
 }
 export interface DemoRoom { members: RoomMember[]; groups: StudyGroup[]; memberships: GroupMember[]; totals: DailyTotal[]; friends: Friend[] }
 
@@ -89,8 +89,7 @@ export function buildDemo(today = todayKey()): { data: DemoData; room: DemoRoom 
     });
   });
 
-  // sessões dos últimos 30 dias, só em conteúdos já dados; alguns padrões de propósito:
-  // Integrais de superfície: confiança alta e acerto baixo; Gravitação: pouca confiança e bom acerto
+  // sessões dos últimos 30 dias, só em conteúdos já dados
   const sessions: Session[] = [];
   let n = 0;
   for (let d = -30; d <= 0; d++) {
@@ -102,45 +101,13 @@ export function buildDemo(today = todayKey()): { data: DemoData; room: DemoRoom 
       const ts = topics.filter((t) => t.subject_id === s.id && t.taught_on && t.taught_on <= day);
       if (!ts.length) continue;
       const t = pick(ts);
-      const hard = t.name === "Integrais de superfície", shy = t.name === "Gravitação";
-      const q = 6 + Math.floor(r() * 7);
-      const c = Math.max(0, Math.min(q, Math.round(q * (hard ? 0.3 : shy ? 0.85 : 0.5 + r() * 0.45))));
-      const conf = hard ? 4 + Math.round(r()) : shy ? 2 : 2 + Math.floor(r() * 3);
-      const hasQ = r() < 0.7;
       sessions.push({
         id: `d-se${n++}`, subject_id: s.id, topic_id: t.id, activity: pick(["exercicios", "exercicios", "leitura", "revisao", "resumo"] as const),
         started_at: at(day, 19 + j, Math.floor(r() * 4) * 10), duration_min: 25 + Math.floor(r() * 7) * 10,
-        questions: hasQ ? q : null, correct: hasQ ? c : null, notes: "", confidence: conf,
-        result: hasQ ? null : c / q >= 0.75 ? "certo" : c / q >= 0.4 ? "parcial" : "errado",
-        autonomy: hard ? pick(["resolucao", "ajuda"] as const) : pick(["sozinho", "sozinho", "anotacoes", "ajuda"] as const),
-        difficulty: null, comprehension: null,
+        notes: "",
       });
     }
   }
-
-  // erros registrados e suas revisões
-  type MistakeCat = Mistake["category"];
-  const M: [number, MistakeCat, string, string, number][] = [
-    [0, "conceitual", "Esqueci o jacobiano ao trocar para coordenadas cilíndricas", "dV = r dr dθ dz", -6],
-    [0, "sinal", "Troquei o sinal da orientação da superfície", "Normal para fora: conferir pela regra da mão direita", -3],
-    [1, "unidade", "Usei g em cm/s² com distância em metros", "Converter tudo para SI antes de substituir", -9],
-    [2, "algebrico", "Errei a soma de momentos em relação ao ponto B", "Escolher o ponto que elimina mais incógnitas", -4],
-    [2, "interpretacao", "Considerei apoio fixo onde era móvel", "Ler o desenho dos vínculos com calma", -11],
-    [3, "atencao", "Laço com condição de parada errada (<= em vez de <)", "Testar com n = 0 e n = 1", -2],
-  ];
-  const mistakes: Mistake[] = M.map(([si, cat, desc, corr, d], k) => {
-    const t = topics.filter((x) => x.subject_id === subjects[si].id && x.taught_on! <= addDays(today, d)).pop() ?? null;
-    return { id: `d-m${k}`, subject_id: subjects[si].id, topic_id: t?.id ?? null, session_id: null, category: cat, description: desc, correction: corr, source: pick(["Lista 3", "Lista 4", "P1", "Exercícios do livro"]), occurred_on: addDays(today, d) };
-  });
-  const reviews: ReviewItem[] = mistakes.map((m, k) => {
-    const t = topics.find((x) => x.id === m.topic_id);
-    return { id: `d-r${k}`, subject_id: m.subject_id, topic_id: m.topic_id, mistake_id: m.id, assessment_id: t?.assessment_id ?? null,
-      title: m.description.slice(0, 80), step: k % 3, due: addDays(today, [-1, 0, 2, 0, 5, 1][k]), est_min: 15, active: true, last_reviewed_at: null };
-  });
-  const reviewLogs: ReviewLog[] = [
-    { id: "d-l0", item_id: "d-r2", reviewed_at: at(addDays(today, -4), 20), result: "parcial", autonomy: "anotacoes", confidence: 3, prev_step: 0, new_step: 0, prev_due: addDays(today, -4), new_due: addDays(today, -3) },
-    { id: "d-l1", item_id: "d-r4", reviewed_at: at(addDays(today, -2), 21), result: "certo", autonomy: "sozinho", confidence: 4, prev_step: 0, new_step: 1, prev_due: addDays(today, -2), new_due: addDays(today, 1) },
-  ];
 
   // rotina: aulas (como no comprovante do SIGA) e blocos de estudo à noite
   const blocks: RoutineBlock[] = [];
@@ -169,14 +136,14 @@ export function buildDemo(today = todayKey()): { data: DemoData; room: DemoRoom 
   ];
   const profile: Profile = {
     id: DEMO_UID, name: "Demonstração", course: "Engenharia de Petróleo", university: "UDESC", current_semester: "2026.2", default_min_avg: 7,
-    weekly_goal_h: 15, skin: "sonda", timer: null, study_pref: "depois", review_steps: [1, 3, 7, 14, 30], mastery_cfg: null,
+    weekly_goal_h: 15, skin: "sonda", timer: null, study_pref: "depois",
   };
 
   const notes: AppNotification[] = [
     { id: "d-n0", kind: "chamado", title: "Bia: Bora estudar?", body: "", data: { msg: "bora" }, from_user: "demo-bia", created_at: at(today, 18, 40), read_at: null },
   ];
   const rw = reportWeek(today, 12);
-  const rep = buildReport({ week: rw.week, sessions, subjects, assessments, mistakes, logs: reviewLogs, items: reviews });
+  const rep = buildReport({ week: rw.week, sessions, subjects, assessments });
   if (rep) notes.push({ id: "d-n1", kind: "relatorio", title: rep.title, body: rep.body, data: rep.data as unknown as Record<string, unknown>, from_user: null, created_at: at(rw.week, 7), read_at: null });
 
   // sala: um grupo com três colegas de exemplo e uma amiga
@@ -185,7 +152,7 @@ export function buildDemo(today = todayKey()): { data: DemoData; room: DemoRoom 
     mk(DEMO_UID, "Você (demo)", { friend_code: "DEMO1234" }),
     mk("demo-bia", "Bia", { studying: true, since: new Date(Date.now() - 34 * 60000).toISOString(), subject: "Física II" }),
     mk("demo-leo", "Leo", { paused: true, accum_ms: 18 * 60000, subject: "", updated_at: new Date(Date.now() - 20 * 60000).toISOString() }),
-    mk("demo-ana", "Ana", { updated_at: new Date(Date.now() - 3 * 3600_000).toISOString() }),
+    mk("demo-ana", "Ana", { updated_at: new Date(Date.now() - 3 * 3600_000).toISOString(), off_day: today }),
   ];
   const totals: DailyTotal[] = [];
   for (let d = -20; d <= 0; d++) {
@@ -211,5 +178,5 @@ export function buildDemo(today = todayKey()): { data: DemoData; room: DemoRoom 
   habits.forEach((h, i) => { for (let d = 1; d <= 9; d++) if (r() < [0.6, 0.75, 0.35][i]) habitChecks.push({ id: `d-hc${i}-${d}`, habit_id: h.id, day: addDays(today, -d) }); });
   // Física II marcada como difícil pelo aluno (o plano reserva mais tempo)
   const subs = subjects.map((s) => (s.name === "Física II" ? { ...s, traits: { ...s.traits, esforco: "dificil" as const } } : s));
-  return { data: { profile, subjects: subs, topics, sessions, assessments, events, blocks, mistakes, reviews, reviewLogs, todos, notes, courses, habits, habitChecks }, room };
+  return { data: { profile, subjects: subs, topics, sessions, assessments, events, blocks, todos, notes, courses, habits, habitChecks }, room };
 }

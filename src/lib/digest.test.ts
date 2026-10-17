@@ -1,16 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { brDay, morningDigest, type DigestInput } from "./digest";
-import type { Assessment, ReviewItem } from "./types";
+import type { Assessment } from "./types";
 
 const A = (p: Partial<Assessment>): Assessment => ({ id: "p", subject_id: "s", name: "P2", kind: "prova", date: "2026-10-13", time: null, weight: 1, grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "", sub_id: null, ...p });
-const R = (p: Partial<ReviewItem>): ReviewItem => ({ id: Math.random().toString(), subject_id: "s", topic_id: null, mistake_id: null, assessment_id: null, title: "Integrais", step: 0, due: "2026-10-12", est_min: 20, active: true, last_reviewed_at: null, ...p });
-const base: DigestInput = { today: "2026-10-12", subjects: [{ id: "s", name: "Cálculo III", archived: false }], assessments: [], items: [], todos: [], lastStudy: "2026-10-11" };
+const base: DigestInput = { today: "2026-10-12", subjects: [{ id: "s", name: "Cálculo III", archived: false }], assessments: [], todos: [], lastStudy: "2026-10-11" };
 
-test("prova perto vira o título; revisões e tarefas vão no texto", () => {
-  const d = morningDigest({ ...base, assessments: [A({}), A({ id: "x", name: "P3", date: "2026-10-20" })], items: [R({}), R({ due: "2026-10-10" }), R({ due: "2026-10-13" })], todos: [{ done: false, due: "2026-10-12" }, { done: true, due: "2026-10-12" }, { done: false, due: null }] })!;
+test("prova perto vira o título; tarefas vão no texto", () => {
+  const d = morningDigest({ ...base, assessments: [A({}), A({ id: "x", name: "P3", date: "2026-10-20" })], todos: [{ done: false, due: "2026-10-12" }, { done: true, due: "2026-10-12" }, { done: false, due: null }] })!;
   assert.equal(d.title, "P2 de Cálculo III amanhã");
-  assert.equal(d.body, "2 revisões para hoje (1 atrasada) · 1 tarefa com prazo até hoje");
+  assert.equal(d.body, "1 tarefa com prazo até hoje");
   assert.equal(d.url, "/hoje?aba=provas");
 });
 
@@ -20,9 +19,8 @@ test("prova em 3 dias mostra a data; mais longe, de outra disciplina arquivada o
   assert.equal(d.body, "Toque para ver o plano do dia.");
 });
 
-test("revisão de prova que já passou não conta", () => {
-  const d = morningDigest({ ...base, assessments: [A({ id: "old", date: "2026-10-10" })], items: [R({ assessment_id: "old", due: "2026-10-09" }), R({ active: false })] });
-  assert.equal(d, null);
+test("prova que já passou não conta", () => {
+  assert.equal(morningDigest({ ...base, assessments: [A({ id: "old", date: "2026-10-10" })] }), null);
 });
 
 test("lembra dias sem estudar só a partir de 3 dias", () => {

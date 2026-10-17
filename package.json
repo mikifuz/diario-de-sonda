@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/lib/calc.test.ts src/lib/plan.test.ts src/lib/siga.test.ts src/lib/mastery.test.ts src/lib/syllabus.test.ts src/lib/reverse.test.ts src/lib/report.test.ts src/lib/effort.test.ts src/lib/habits.test.ts src/lib/verdict.test.ts src/lib/curriculum.test.ts src/lib/demo.test.ts src/lib/legacy.test.ts src/lib/timer.test.ts src/lib/digest.test.ts src/lib/examCheck.test.ts src/lib/trips.test.ts src/lib/mistakes.test.ts src/lib/repeat.test.ts src/lib/today.test.ts"
+    "test": "tsx --test src/lib/calc.test.ts src/lib/plan.test.ts src/lib/siga.test.ts src/lib/syllabus.test.ts src/lib/reverse.test.ts src/lib/report.test.ts src/lib/effort.test.ts src/lib/habits.test.ts src/lib/verdict.test.ts src/lib/curriculum.test.ts src/lib/demo.test.ts src/lib/legacy.test.ts src/lib/timer.test.ts src/lib/digest.test.ts src/lib/examCheck.test.ts src/lib/trips.test.ts src/lib/repeat.test.ts src/lib/today.test.ts src/lib/dayoff.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.57.4",

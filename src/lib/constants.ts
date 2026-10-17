@@ -1,13 +1,7 @@
-import type { Activity, Autonomy, BlockKind, Comprehension, EventType, MistakeCategory, Priority, Recovery, Result, Skin, Status, StudyPref } from "./types";
+import type { Activity, BlockKind, EventType, Priority, Recovery, Skin, Status, StudyPref } from "./types";
 
 export const ACT: Record<Activity, string> = { aula: "Aula", leitura: "Leitura", exercicios: "Exercícios", revisao: "Revisão", simulado: "Simulado", resumo: "Resumo", teorico: "Estudo teórico", pratico: "Estudo prático" };
-export const RES: Record<Result, string> = { certo: "Resolvi corretamente", parcial: "Resolvi parcialmente", errado: "Não consegui resolver", nao: "Ainda não conferi" };
-export const AUTO: Record<Autonomy, string> = { sozinho: "Sozinho", anotacoes: "Consultei fórmulas ou anotações", ajuda: "Precisei de ajuda externa", resolucao: "Consultei a resolução completa" };
-export const AUTO_S: Record<Autonomy, string> = { sozinho: "Sozinho", anotacoes: "Com anotações", ajuda: "Com ajuda", resolucao: "Viu resolução" };
-export const DIFF = ["Muito fácil", "Fácil", "Moderada", "Difícil", "Muito difícil"];
-export const COMP: Record<Comprehension, string> = { total: "Entendi completamente", parcial: "Entendi parcialmente", duvidas: "Ainda tenho dúvidas", nao: "Não entendi o conteúdo" };
-export const CONF = ["Muito inseguro", "Inseguro", "Razoável", "Confiante", "Muito confiante"];
-export const EVT: Record<EventType, string> = { prova: "Prova", trabalho: "Trabalho", apresentacao: "Apresentação", entrega: "Entrega", sub: "Prova substitutiva (SUB)", aula: "Aula", atividade: "Atividade", simulado: "Simulado", estudo: "Estudo planejado", revisao: "Revisão", pessoal: "Compromisso pessoal", indisponivel: "Indisponível", sem_aula: "Sem aula / feriado", viagem: "Viagem" };
+export const EVT: Record<EventType, string> = { prova: "Prova", trabalho: "Trabalho", apresentacao: "Apresentação", entrega: "Entrega", sub: "Prova substitutiva (SUB)", aula: "Aula", atividade: "Atividade", simulado: "Simulado", estudo: "Estudo planejado", revisao: "Revisão", pessoal: "Compromisso pessoal", indisponivel: "Indisponível", sem_aula: "Sem aula / feriado", viagem: "Viagem", folga: "Day off (folga)" };
 export const GRADED: EventType[] = ["prova", "trabalho", "apresentacao", "entrega", "sub"];
 export const PRIO: Record<Priority, string> = { baixa: "Baixa", media: "Média", alta: "Alta" };
 export const STATUS: Record<Status, string> = { pendente: "Pendente", concluido: "Concluído", cancelado: "Cancelado" };
@@ -16,17 +10,6 @@ export const RECOVERY: Record<Recovery, string> = { nenhuma: "Sem recuperação"
 export const BLOCK: Record<BlockKind, string> = { aula: "Aula", estudo: "Estudo", exercicio: "Exercício físico", trabalho: "Trabalho ou estágio", deslocamento: "Deslocamento", pessoal: "Compromisso pessoal", descanso: "Descanso" };
 export const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 export const WD_S = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-export const MISTAKE: Record<MistakeCategory, string> = {
-  conceitual: "Conceitual", algebrico: "Algébrico", aritmetico: "Aritmético", interpretacao: "Interpretação", unidade: "Unidade",
-  sinal: "Sinal", formula: "Fórmula inadequada", metodo: "Método inadequado", atencao: "Falta de atenção", tempo: "Tempo insuficiente",
-};
-export const MISTAKE_D: Record<MistakeCategory, string> = {
-  conceitual: "Não entendeu o conceito ou a teoria por trás", algebrico: "Manipulação algébrica errada", aritmetico: "Conta errada",
-  interpretacao: "Leu ou entendeu o enunciado de outro jeito", unidade: "Unidade trocada, faltando ou sem conversão", sinal: "Sinal trocado",
-  formula: "Usou a fórmula errada para a situação", metodo: "Escolheu um caminho que não resolve ou não é o pedido", atencao: "Sabia, mas se distraiu",
-  tempo: "Não deu tempo de terminar",
-};
-export const DEFAULT_STEPS = [1, 3, 7, 14, 30];
 /** Horários de aula pré-definidos (padrão informado pelo dono; editáveis no bloco) */
 export const CLASS_SLOTS = [
   { n: "1º horário", start: "08:20", end: "10:00" },
@@ -57,9 +40,3 @@ export const PAGES = [
   { href: "/configuracoes", nm: "Ajustes", full: "Configurações", t: "Configurações", ic: "M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M14 4v4M8 10v4M16 16v4" },
 ] as const;
 
-/** Opções das barras de arrastar da autoavaliação, do pior para o melhor.
- *  Confiança é registrada à parte e nunca vira acerto. */
-export const CONF_OPTS = CONF.map((c, i) => [i + 1, c] as [number, string]);
-export const RES_OPTS: [Result, string][] = [["errado", RES.errado], ["parcial", RES.parcial], ["certo", RES.certo]];
-export const AUTO_OPTS: [Autonomy, string][] = (["resolucao", "ajuda", "anotacoes", "sozinho"] as Autonomy[]).map((k) => [k, AUTO[k]]);
-export const COMP_OPTS: [Comprehension, string][] = (["nao", "duvidas", "parcial", "total"] as Comprehension[]).map((k) => [k, COMP[k]]);

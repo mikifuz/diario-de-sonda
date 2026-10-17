@@ -17,8 +17,8 @@ set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
 insert into public.subjects (id, name) values ('10000000-0000-0000-0000-000000000001', 'Cálculo III');
 insert into public.topics (id, subject_id, name) values ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Integrais duplas');
-insert into public.study_sessions (subject_id, topic_id, activity, started_at, duration_min, questions, correct, confidence, result, autonomy)
-  values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'exercicios', now() - interval '1 hour', 50, 10, 7, 4, 'parcial', 'sozinho');
+insert into public.study_sessions (subject_id, topic_id, activity, started_at, duration_min)
+  values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'exercicios', now() - interval '1 hour', 50);
 insert into public.assessments (subject_id, name, weight, grade) values ('10000000-0000-0000-0000-000000000001', 'Prova 1', 3, 6.5);
 insert into public.room_members (nick) values ('Ana');
 
@@ -104,6 +104,31 @@ do $$ begin
   if (select minutes from public.room_daily_totals(35, 'America/Sao_Paulo') where user_id = '00000000-0000-0000-0000-00000000000a') <> 50 then raise exception 'totais do grupo incorretos'; end if;
 end $$;
 
+-- Day off: Ana marca a folga (item do calendário + dia na sala); Bruno, do grupo, vê só o dia e não mexe na folga dela
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.events (title, type, date) values ('Day off', 'folga', current_date);
+update public.room_members set off_day = current_date where user_id = '00000000-0000-0000-0000-00000000000a';
+-- estudo extra no calendário: fim depois do início
+insert into public.events (title, type, date, time, end_time) values ('Estudo extra', 'estudo', current_date + 1, '09:00', '11:00');
+do $$ begin
+  begin
+    insert into public.events (title, type, date, time, end_time) values ('x', 'estudo', current_date, '11:00', '09:00');
+    raise exception 'FALHOU: estudo terminando antes de começar';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into public.events (title, type, date, end_time) values ('x', 'estudo', current_date, '09:00');
+    raise exception 'FALHOU: fim sem início';
+  exception when check_violation then null;
+  end;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+update public.room_members set off_day = null where user_id = '00000000-0000-0000-0000-00000000000a';
+do $$ begin
+  if (select off_day from public.room_members where user_id = '00000000-0000-0000-0000-00000000000a') is distinct from current_date then raise exception 'Bruno não vê a folga de Ana ou mexeu nela'; end if;
+  if (select count(*) from public.events) <> 0 then raise exception 'Bruno vê o calendário de Ana'; end if;
+end $$;
+
 -- Carla, fora do grupo, não vê ninguém e não entra com código errado
 reset role;
 insert into auth.users (id, raw_user_meta_data) values ('00000000-0000-0000-0000-00000000000c', '{"name":"Carla"}');
@@ -144,7 +169,7 @@ do $$ begin
   end;
 end $$;
 
--- ============ Rotina, banco de erros e revisões ============
+-- ============ Rotina ============
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
 insert into public.assessments (id, subject_id, name, weight, date) values ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Prova 2', 3, current_date + 10);
 insert into public.assessments (subject_id, name, kind, weight) values ('10000000-0000-0000-0000-000000000001', 'SUB', 'sub', 1);
@@ -152,9 +177,6 @@ update public.topics set taught_on = current_date, assessment_id = '30000000-000
 update public.subjects set recovery = 'sub' where id = '10000000-0000-0000-0000-000000000001';
 insert into public.routine_blocks (weekday, start_time, end_time, kind, subject_id) values (1, '08:20', '10:00', 'aula', '10000000-0000-0000-0000-000000000001');
 insert into public.routine_blocks (weekday, start_time, end_time, kind) values (1, '14:00', '16:00', 'estudo');
-insert into public.mistakes (id, subject_id, topic_id, category, description) values ('40000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'sinal', 'Troquei o sinal do jacobiano');
-insert into public.review_items (id, subject_id, topic_id, mistake_id, assessment_id, title, due) values ('50000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'Sinal do jacobiano', current_date + 1);
-insert into public.review_logs (item_id, result, autonomy, prev_step, new_step, prev_due, new_due) values ('50000000-0000-0000-0000-000000000001', 'certo', 'sozinho', 0, 1, current_date, current_date + 3);
 
 do $$ begin
   begin
@@ -167,45 +189,15 @@ do $$ begin
     raise exception 'FALHOU: aula sem disciplina';
   exception when check_violation then null;
   end;
-  begin
-    insert into public.mistakes (subject_id, category, description) values ('10000000-0000-0000-0000-000000000001', 'chute', 'x');
-    raise exception 'FALHOU: categoria de erro inválida';
-  exception when check_violation then null;
-  end;
-  begin
-    update public.profiles set review_steps = '{1,0,7}';
-    raise exception 'FALHOU: degrau de revisão com zero dias';
-  exception when check_violation then null;
-  end;
 end $$;
 
--- Bruno não vê nem altera a rotina, os erros e as revisões de Ana
+-- Bruno não vê nem altera a rotina de Ana
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
 do $$ begin
   if (select count(*) from public.routine_blocks) <> 0 then raise exception 'Bruno vê a rotina de Ana'; end if;
-  if (select count(*) from public.mistakes) <> 0 then raise exception 'Bruno vê os erros de Ana'; end if;
-  if (select count(*) from public.review_items) <> 0 then raise exception 'Bruno vê as revisões de Ana'; end if;
-  if (select count(*) from public.review_logs) <> 0 then raise exception 'Bruno vê o histórico de revisões de Ana'; end if;
 end $$;
-update public.mistakes set description = 'hack';
-delete from public.review_items;
 insert into public.subjects (id, name) values ('10000000-0000-0000-0000-00000000000b', 'Física');
 do $$ begin
-  begin
-    insert into public.mistakes (subject_id, category, description) values ('10000000-0000-0000-0000-000000000001', 'sinal', 'invasão');
-    raise exception 'FALHOU: erro ligado à disciplina de outra pessoa';
-  exception when foreign_key_violation then null;
-  end;
-  begin
-    insert into public.review_items (subject_id, mistake_id, title, due) values ('10000000-0000-0000-0000-00000000000b', '40000000-0000-0000-0000-000000000001', 'x', current_date);
-    raise exception 'FALHOU: revisão ligada ao erro de outra pessoa';
-  exception when foreign_key_violation then null;
-  end;
-  begin
-    insert into public.review_logs (item_id, result, prev_step, new_step, prev_due) values ('50000000-0000-0000-0000-000000000001', 'certo', 0, 1, current_date);
-    raise exception 'FALHOU: histórico gravado na revisão de outra pessoa';
-  exception when foreign_key_violation then null;
-  end;
   begin
     insert into public.topics (subject_id, name, assessment_id) values ('10000000-0000-0000-0000-00000000000b', 'x', '30000000-0000-0000-0000-000000000001');
     raise exception 'FALHOU: conteúdo ligado à prova de outra pessoa';
@@ -213,23 +205,17 @@ do $$ begin
   end;
 end $$;
 
--- Ana: dados intactos; apagar a prova solta o conteúdo e a revisão; apagar o erro apaga a revisão dele
+-- Ana: apagar a prova solta o conteúdo
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
-do $$ begin
-  if (select description from public.mistakes) <> 'Troquei o sinal do jacobiano' then raise exception 'Bruno alterou o erro de Ana'; end if;
-  if (select count(*) from public.review_items) <> 1 then raise exception 'Bruno apagou a revisão de Ana'; end if;
-end $$;
 delete from public.assessments where id = '30000000-0000-0000-0000-000000000001';
 do $$ begin
   if (select assessment_id from public.topics where id = '20000000-0000-0000-0000-000000000001') is not null then raise exception 'conteúdo continua ligado à prova apagada'; end if;
-  if (select assessment_id from public.review_items) is not null or (select count(*) from public.review_items) <> 1 then raise exception 'revisão não foi solta da prova apagada'; end if;
 end $$;
 
 -- ============ Tarefas ============
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
 insert into public.tasks (title, subject_id, due) values ('Lista 4 de Cálculo', '10000000-0000-0000-0000-000000000001', current_date + 2);
 insert into public.tasks (title) values ('Comprar calculadora');
-update public.profiles set mastery_cfg = '{"w_acc":60}';
 -- tema rosa aceito; tema inexistente não
 update public.profiles set skin = 'rosa';
 do $$ begin
@@ -243,11 +229,6 @@ do $$ begin
   begin
     insert into public.tasks (title) values ('   ');
     raise exception 'FALHOU: tarefa sem título';
-  exception when check_violation then null;
-  end;
-  begin
-    update public.profiles set mastery_cfg = '[1,2]';
-    raise exception 'FALHOU: configuração do índice que não é objeto';
   exception when check_violation then null;
   end;
 end $$;
@@ -452,11 +433,6 @@ end $$;
 delete from public.topics where id = '20000000-0000-0000-0000-000000000001';
 do $$ begin
   if (select count(*) from public.study_sessions where topic_id is null) <> 1 then raise exception 'sessão perdida ao apagar conteúdo'; end if;
-  if (select count(*) from public.mistakes where topic_id is null) <> 1 then raise exception 'erro perdido ao apagar conteúdo'; end if;
-end $$;
-delete from public.mistakes;
-do $$ begin
-  if (select count(*) from public.review_items) <> 0 or (select count(*) from public.review_logs) <> 0 then raise exception 'revisão do erro apagado continuou'; end if;
 end $$;
 -- ============ Meu curso ============
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);

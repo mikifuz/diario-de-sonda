@@ -1,8 +1,8 @@
 /* "Como foi a prova?": depois do horário da prova, o app pergunta como a pessoa se sentiu.
  * A resposta (assessments.felt, 1–5; 0 = não perguntar) é só uma impressão: não é nota,
- * não entra em média nem em acerto. Indo mal, o app recomenda uma revisão antes da próxima prova. */
-import { daysBetween, dkey, keyDate, pad } from "./calc";
-import { anchorFor, dm, firstDue, toMin } from "./plan";
+ * não entra em média. Indo mal, o app recomenda revisar antes da próxima prova (vira uma tarefa). */
+import { addDays, daysBetween, dkey, keyDate, pad } from "./calc";
+import { anchorFor, dm, toMin } from "./plan";
 import type { Assessment, RoutineBlock, Subject } from "./types";
 
 export const FELT = ["Muito mal", "Mal", "Mais ou menos", "Bem", "Muito bem"];
@@ -64,7 +64,7 @@ export function pendingExamChecks(p: { assessments: Assessment[]; blocks: Routin
 }
 
 export interface ExamAdvice {
-  /** recomenda (e já deixa marcado) anotar uma revisão */
+  /** recomenda (e já deixa marcado) anotar a tarefa de revisar */
   strong: boolean;
   offer: boolean;
   text: string;
@@ -73,12 +73,14 @@ export interface ExamAdvice {
   title: string;
 }
 
-/** O que dizer depois da resposta, com a revisão sugerida (ancorada na próxima prova da disciplina) */
-export function examAdvice(p: { exam: Assessment; felt: number; assessments: Assessment[]; subjects: Subject[]; steps: number[]; today: string }): ExamAdvice {
+/** O que dizer depois da resposta, com a tarefa de revisar sugerida (antes da próxima prova da disciplina) */
+export function examAdvice(p: { exam: Assessment; felt: number; assessments: Assessment[]; subjects: Subject[]; today: string }): ExamAdvice {
   const others = p.assessments.filter((a) => a.id !== p.exam.id && !(a.date && p.exam.date && a.date <= p.exam.date));
   const next = anchorFor(p.exam.subject_id, null, others, p.today)?.a ?? null;
   const subName = p.subjects.find((s) => s.id === p.exam.subject_id)?.name || "";
-  const due = firstDue(p.steps, p.today, next?.date);
+  // prazo da tarefa: amanhã, sem passar da véspera da próxima prova
+  let due = addDays(p.today, 1);
+  if (next?.date) { const eve = addDays(next.date, -1); if (due > eve) due = eve < p.today ? p.today : eve; }
   const title = `Revisar ${p.exam.name}${subName ? ` de ${subName}` : ""}: refazer as questões em que travou`.slice(0, 200);
   let nextTxt = "";
   if (next?.date) {
@@ -87,7 +89,7 @@ export function examAdvice(p: { exam: Assessment; felt: number; assessments: Ass
   }
   const base = { next, due, title };
   if (p.felt <= 2) return { ...base, strong: true, offer: true,
-    text: `Recomendo muito uma revisão: é legal revisar antes de partir para a próxima prova. Refaça as questões em que travou enquanto ainda lembra delas e registre os erros em Hoje → Revisar.${nextTxt}` };
+    text: `Recomendo muito uma revisão: é legal revisar antes de partir para a próxima prova. Refaça as questões em que travou enquanto ainda lembra delas.${nextTxt}` };
   if (p.felt === 3) return { ...base, strong: false, offer: true,
     text: `Vale anotar agora onde travou, enquanto lembra. Uma revisão curta ajuda a não carregar a dúvida para a próxima.${nextTxt}` };
   return { ...base, strong: false, offer: false, text: "Boa! Quando sair a nota, lance em Notas da disciplina." };

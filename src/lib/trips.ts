@@ -80,7 +80,7 @@ export function tripImpact(p: RevInput, trip: CalEvent): TripImpact {
   // o que estudar primeiro: conteúdos mais urgentes das provas apertadas pela viagem
   const focus: TripFocus[] = exams
     .flatMap((x) => x.plan.topics.filter((t) => t.need > 0).map((t) => ({ t, x })))
-    .sort((a, b) => b.t.urgency - a.t.urgency || a.x.plan.exam.date!.localeCompare(b.x.plan.exam.date!))
+    .sort((a, b) => a.t.done / a.t.target - b.t.done / b.t.target || a.x.plan.exam.date!.localeCompare(b.x.plan.exam.date!))
     .slice(0, 4)
     .map(({ t, x }) => ({ subject: x.plan.subject, exam: x.plan.exam, p: priorityOf(t) }));
 

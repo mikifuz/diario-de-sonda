@@ -8,13 +8,15 @@ import { SKINS } from "@/lib/constants";
 import { convertLegacy, isLegacyExport } from "@/lib/legacy";
 import type { Profile, Skin } from "@/lib/types";
 import { ConfirmButton, I, Icon } from "@/components/ui";
-import { DEFAULT_MASTERY, masteryCfg, type MasteryCfg } from "@/lib/mastery";
 import { DEMO_FLAG } from "@/lib/demo";
 import { PushSettings } from "@/components/pushSettings";
 
-// ordem das chaves estrangeiras: conteúdos apontam para provas, erros para sessões, revisões para erros
-const ORDER: Table[] = ["subjects", "assessments", "topics", "study_sessions", "events", "routine_blocks", "mistakes", "review_items", "review_logs", "tasks", "curriculum", "habits", "habit_checks"];
-const NONE = { routine_blocks: [], mistakes: [], review_items: [], review_logs: [], tasks: [], notifications: [], curriculum: [], habits: [], habit_checks: [] };
+// ordem das chaves estrangeiras: conteúdos apontam para provas
+const ORDER: Table[] = ["subjects", "assessments", "topics", "study_sessions", "events", "routine_blocks", "tasks", "curriculum", "habits", "habit_checks"];
+const NONE = { routine_blocks: [], tasks: [], notifications: [], curriculum: [], habits: [], habit_checks: [] };
+// cópias antigas trazem a autoavaliação, os erros e as revisões, que o app não usa mais: ficam de fora
+const SESSION_KEYS = ["id", "subject_id", "topic_id", "activity", "started_at", "duration_min", "notes"];
+const pickKeys = (x: Record<string, unknown>, keys: string[]) => Object.fromEntries(keys.filter((k) => k in x).map((k) => [k, x[k]]));
 
 export default function Configuracoes() {
   const st = useStore();
@@ -35,7 +37,7 @@ export default function Configuracoes() {
 
   const exportData = () => {
     const payload = { app: "diario-de-sonda", version: 2, exportedAt: new Date().toISOString(), profile: { ...p, timer: null }, subjects: st.subjects, topics: st.topics, sessions: st.sessions, assessments: st.assessments, events: st.events,
-      routine_blocks: st.blocks, mistakes: st.mistakes, review_items: st.reviews, review_logs: st.reviewLogs, tasks: st.todos, curriculum: st.courses, habits: st.habits, habit_checks: st.habitChecks };
+      routine_blocks: st.blocks, tasks: st.todos, curriculum: st.courses, habits: st.habits, habit_checks: st.habitChecks };
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 1)], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url; a.download = `fundo-do-poco-${todayKey()}.json`;
@@ -58,11 +60,11 @@ export default function Configuracoes() {
         // cópias anteriores a esta versão não têm o modo de recuperação: o exame ligado vira "exame"
         const subjects = (j.subjects || []).map((x: Record<string, unknown>) => (x.recovery ? x : { ...x, recovery: x.exam_enabled ? "exame" : "nenhuma" }));
         rows = {
-          subjects, topics: j.topics || [], assessments: j.assessments || [], study_sessions: j.sessions || [], events: j.events || [],
-          routine_blocks: j.routine_blocks || [], mistakes: j.mistakes || [], review_items: j.review_items || [], review_logs: j.review_logs || [], tasks: j.tasks || [], notifications: [], curriculum: j.curriculum || [], habits: j.habits || [], habit_checks: j.habit_checks || [],
+          subjects, topics: j.topics || [], assessments: j.assessments || [], study_sessions: (j.sessions || []).map((x: Record<string, unknown>) => pickKeys(x, SESSION_KEYS)), events: j.events || [],
+          routine_blocks: j.routine_blocks || [], tasks: j.tasks || [], notifications: [], curriculum: j.curriculum || [], habits: j.habits || [], habit_checks: j.habit_checks || [],
         };
-        const { id: _id, timer: _t, ...rest } = j.profile || {};
-        void _id; void _t;
+        const { id: _id, timer: _t, review_steps: _r, mastery_cfg: _m, ...rest } = j.profile || {};
+        void _id; void _t; void _r; void _m;
         prof = rest;
       } else {
         st.toast("Este arquivo não é uma cópia do Fundo do Poço (nem do antigo Diário de Sonda).");
@@ -131,7 +133,6 @@ export default function Configuracoes() {
         </form>
       </section>
       <PushSettings />
-      <MasterySettings />
       <section className="panel">
         <div className="panel-h"><h2>Seus dados</h2><span className="lbl">{st.subjects.length} disciplinas, {st.sessions.length} sessões, {st.assessments.length + st.events.length} itens de calendário</span></div>
         <div className="stack">
@@ -145,7 +146,7 @@ export default function Configuracoes() {
           <p className="small muted" style={{ margin: 0 }}>A importação aceita a cópia exportada desta versão e a da primeira versão (a página publicada no Claude, em Configurações → Exportar cópia). Importar duas vezes a cópia antiga duplica os registros.</p>
           {st.demo && <p className="small" style={{ margin: 0 }}>Na demonstração, importar e apagar ficam desligados: os dados são de exemplo e já somem ao sair.</p>}
           {!st.demo && <div className="row" style={{ borderTop: "1px solid var(--line)", paddingTop: 12, marginTop: 4 }}>
-            <ConfirmButton small label="Apagar todos os meus dados" question="Isto apaga disciplinas, sessões, notas, eventos, rotina, erros, revisões, tarefas, hábitos e a grade do curso. Exporte uma cópia antes se quiser guardar." confirmLabel="Apagar tudo" onConfirm={wipe} />
+            <ConfirmButton small label="Apagar todos os meus dados" question="Isto apaga disciplinas, sessões, notas, eventos, rotina, tarefas, hábitos e a grade do curso. Exporte uma cópia antes se quiser guardar." confirmLabel="Apagar tudo" onConfirm={wipe} />
           </div>}
         </div>
       </section>
@@ -162,7 +163,7 @@ export default function Configuracoes() {
       <section className="panel">
         <div className="panel-h"><h2>Próximas etapas</h2><span className="lbl">ainda não disponíveis</span></div>
         <div className="grid g2 small">
-          <div><b>Análise de desempenho</b><p className="muted" style={{ margin: ".3em 0 0" }}>Relatórios mais completos. O registro de erros com revisão espaçada, o plano do dia, o planejamento reverso das provas, o índice de domínio e os alertas já estão disponíveis.</p></div>
+          <div><b>Análise de desempenho</b><p className="muted" style={{ margin: ".3em 0 0" }}>Relatórios mais completos. O plano do dia, o planejamento reverso das provas e os alertas já estão disponíveis.</p></div>
           <div><b>Inteligência artificial</b><p className="muted" style={{ margin: ".3em 0 0" }}>Gerador de simulados com gabarito e resolução, correção assistida de resoluções enviadas por foto e assistente que consulta seus dados.</p></div>
           <div><b>Engenharia de Petróleo</b><p className="muted" style={{ margin: ".3em 0 0" }}>Biblioteca de fórmulas com unidades, conversor SI ↔ unidades de campo (bbl, psi, ft, mD, cP, °API), verificação dimensional e histórico da graduação.</p></div>
           <div><b>Biblioteca de materiais</b><p className="muted" style={{ margin: ".3em 0 0" }}>Planos de ensino, listas e provas antigas por disciplina, que depois servirão de base para os simulados.</p></div>
@@ -195,7 +196,7 @@ function DeleteAccount() {
   );
   return (
     <form className="stack" style={{ gap: 8, borderTop: "1px solid var(--line)", paddingTop: 12, marginTop: 12 }} onSubmit={run}>
-      <p className="small" style={{ margin: 0 }}><b>Isto não tem volta.</b> A conta ({st.email}) e tudo o que é dela são apagados para sempre: disciplinas, sessões, notas, calendário, rotina, erros, revisões, tarefas, hábitos, grade do curso, notificações, amizades e a presença na sala. Os grupos que você criou continuam para os colegas, sem você. Se quiser guardar seus dados, use “Exportar cópia” antes.</p>
+      <p className="small" style={{ margin: 0 }}><b>Isto não tem volta.</b> A conta ({st.email}) e tudo o que é dela são apagados para sempre: disciplinas, sessões, notas, calendário, rotina, tarefas, hábitos, grade do curso, notificações, amizades e a presença na sala. Os grupos que você criou continuam para os colegas, sem você. Se quiser guardar seus dados, use “Exportar cópia” antes.</p>
       <label className="f"><span>Para confirmar, digite EXCLUIR</span><input type="text" value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" /></label>
       <div className="row">
         <button className="btn danger" disabled={busy || word.trim().toUpperCase() !== "EXCLUIR"}>{busy ? "Excluindo…" : "Excluir minha conta para sempre"}</button>
@@ -205,40 +206,3 @@ function DeleteAccount() {
   );
 }
 
-const MFIELDS: [keyof MasteryCfg, string, number, number][] = [
-  ["w_acc", "Peso do acerto conferido", 0, 100], ["w_auto", "Peso da autonomia", 0, 100], ["w_rec", "Peso da prática recente", 0, 100], ["w_err", "Peso dos erros em aberto", 0, 100],
-  ["decay_days", "Dias sem praticar até a prática zerar", 7, 180], ["min_n", "Registros conferidos mínimos para dar nota", 1, 20],
-];
-function MasterySettings() {
-  const st = useStore();
-  const cur = masteryCfg(st.profile?.mastery_cfg);
-  const [f, setF] = useState<Record<string, string>>(() => Object.fromEntries(MFIELDS.map(([k]) => [k, String(cur[k])])));
-  const save = async (e: FormEvent) => {
-    e.preventDefault();
-    const out: Record<string, number> = {};
-    for (const [k, label, min, max] of MFIELDS) {
-      const v = parseNum(f[k]);
-      if (v == null || v < min || v > max || ((k === "decay_days" || k === "min_n") && !Number.isInteger(v))) { st.toast(`${label}: use um número entre ${min} e ${max}.`); return; }
-      out[k] = v;
-    }
-    if (out.w_acc + out.w_auto + out.w_rec + out.w_err <= 0) { st.toast("Pelo menos um peso precisa ser maior que zero."); return; }
-    if (await st.updateProfile({ mastery_cfg: out })) st.toast("Índice de domínio atualizado.");
-  };
-  const reset = async () => {
-    setF(Object.fromEntries(MFIELDS.map(([k]) => [k, String(DEFAULT_MASTERY[k])])));
-    if (await st.updateProfile({ mastery_cfg: null })) st.toast("Índice de domínio de volta ao padrão.");
-  };
-  const W = ["w_acc", "w_auto", "w_rec", "w_err"].reduce((a, k) => a + (parseNum(f[k]) || 0), 0);
-  return (
-    <section className="panel">
-      <div className="panel-h"><h2>Índice de domínio</h2><span className="lbl">como a nota de 0 a 100 de cada conteúdo é calculada</span></div>
-      <form className="stack" style={{ gap: 12 }} onSubmit={save}>
-        <div className="fgrid">{MFIELDS.map(([k, label, min, max]) => (
-          <label key={k} className="f"><span>{label}</span><input type="number" min={min} max={max} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} /></label>
-        ))}</div>
-        <p className="small muted" style={{ margin: 0 }}>Os pesos não precisam somar 100: a conta divide pela soma (hoje {W}). A confiança nunca entra no índice. Padrão: acerto 50, autonomia 25, prática 15, erros 10; 30 dias; 3 registros.</p>
-        <div className="row"><button className="btn pri">Salvar</button><button type="button" className="btn ghost" onClick={reset}>Restaurar padrão</button></div>
-      </form>
-    </section>
-  );
-}

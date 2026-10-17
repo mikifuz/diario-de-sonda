@@ -1,16 +1,12 @@
 export type Skin = "sonda" | "caderno" | "blueprint" | "terminal" | "moderno" | "rosa" | "musgo";
 export type Activity = "aula" | "leitura" | "exercicios" | "revisao" | "simulado" | "resumo" | "teorico" | "pratico";
-export type Result = "certo" | "parcial" | "errado" | "nao";
-export type Autonomy = "sozinho" | "anotacoes" | "ajuda" | "resolucao";
-export type Comprehension = "total" | "parcial" | "duvidas" | "nao";
 export type Priority = "baixa" | "media" | "alta";
 export type Status = "pendente" | "concluido" | "cancelado";
 export type AssessmentKind = "prova" | "trabalho" | "apresentacao" | "entrega" | "sub";
 export type StudyPref = "antes" | "depois" | "ambos";
 export type Recovery = "nenhuma" | "sub" | "exame";
 export type BlockKind = "aula" | "estudo" | "exercicio" | "trabalho" | "deslocamento" | "pessoal" | "descanso";
-export type MistakeCategory = "conceitual" | "algebrico" | "aritmetico" | "interpretacao" | "unidade" | "sinal" | "formula" | "metodo" | "atencao" | "tempo";
-export type EventType = AssessmentKind | "aula" | "atividade" | "simulado" | "estudo" | "revisao" | "pessoal" | "indisponivel" | "sem_aula" | "viagem";
+export type EventType = AssessmentKind | "aula" | "atividade" | "simulado" | "estudo" | "revisao" | "pessoal" | "indisponivel" | "sem_aula" | "viagem" | "folga";
 export type Scenario = "c" | "e" | "o";
 
 export interface Timer {
@@ -44,10 +40,6 @@ export interface Profile {
   skin: Skin;
   timer: Timer | null;
   study_pref: StudyPref;
-  /** degraus da revisão espaçada, em dias */
-  review_steps: number[];
-  /** pesos do índice de domínio (null = padrão) */
-  mastery_cfg: Record<string, number> | null;
 }
 
 export interface Traits {
@@ -109,14 +101,7 @@ export interface Session {
   activity: Activity;
   started_at: string;
   duration_min: number;
-  questions: number | null;
-  correct: number | null;
   notes: string;
-  confidence: number | null;
-  result: Result | null;
-  autonomy: Autonomy | null;
-  difficulty: number | null;
-  comprehension: Comprehension | null;
 }
 
 export interface Assessment {
@@ -150,6 +135,8 @@ export interface CalEvent {
   /** último dia (viagem); null = um dia só */
   end_date?: string | null;
   time: string | null;
+  /** fim (estudo extra marcado no calendário: conta como horário de estudo naquele dia) */
+  end_time?: string | null;
   priority: Priority;
   status: Status;
   description: string;
@@ -168,6 +155,8 @@ export interface RoomMember {
   /** código para adicionar como amigo */
   friend_code?: string;
   accept_nudges?: boolean;
+  /** dia (aaaa-mm-dd) em que a pessoa tirou day off; o grupo vê "de folga hoje" */
+  off_day?: string | null;
 }
 
 export interface StudyGroup {
@@ -196,46 +185,6 @@ export interface RoutineBlock {
   kind: BlockKind;
   subject_id: string | null;
   label: string;
-}
-
-export interface Mistake {
-  id: string;
-  subject_id: string;
-  topic_id: string | null;
-  session_id: string | null;
-  category: MistakeCategory;
-  description: string;
-  correction: string;
-  source: string;
-  occurred_on: string;
-}
-
-export interface ReviewItem {
-  id: string;
-  subject_id: string;
-  topic_id: string | null;
-  mistake_id: string | null;
-  /** prova em que a revisão se encerra */
-  assessment_id: string | null;
-  title: string;
-  step: number;
-  due: string;
-  est_min: number;
-  active: boolean;
-  last_reviewed_at: string | null;
-}
-
-export interface ReviewLog {
-  id: string;
-  item_id: string;
-  reviewed_at: string;
-  result: Result;
-  autonomy: Autonomy | null;
-  confidence: number | null;
-  prev_step: number;
-  new_step: number;
-  prev_due: string;
-  new_due: string | null;
 }
 
 /** Tarefa da lista de tarefas (to-do) */

@@ -4,14 +4,13 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { agenda, useStore } from "@/lib/store";
-import { addDays, fmtMin, keyDate, nf, pct, qt, todayKey } from "@/lib/calc";
+import { addDays, fmtMin, keyDate, qt, todayKey } from "@/lib/calc";
 import { EVT, WD_S } from "@/lib/constants";
-import { masteryCfg } from "@/lib/mastery";
 import { classOff, dm, evOn, fromMin, noClass, planWeek, type PlanInput, type Task } from "@/lib/plan";
 import { reversePlan, todayTasks } from "@/lib/reverse";
 import { buildReport, reportWeek } from "@/lib/report";
 
-const label = (t: Task) => (t.kind === "revisao" ? `Revisão: ${t.title}` : t.title);
+const label = (t: Task) => t.title;
 const EXAM = new Set(["prova", "sub", "trabalho", "entrega", "apresentacao"]);
 
 export function WeekPrint({ start, onDone }: { start: string; onDone: () => void }) {
@@ -20,13 +19,12 @@ export function WeekPrint({ start, onDone }: { start: string; onDone: () => void
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  const cfg = masteryCfg(st.profile?.mastery_cfg);
   const plans = reversePlan({ today, nowMin, blocks: st.blocks, events: st.events, subjects: st.subjects, topics: st.topics, sessions: st.sessions,
-    assessments: st.assessments, items: st.reviews, logs: st.reviewLogs, mistakes: st.mistakes, cfg });
+    assessments: st.assessments });
   const base: PlanInput = { today, nowMin, pref: st.profile?.study_pref || "depois", blocks: st.blocks, events: st.events, subjects: st.subjects, topics: st.topics,
-    sessions: st.sessions, assessments: st.assessments, items: st.reviews, mistakes: st.mistakes, logs: st.reviewLogs, cfg };
+    sessions: st.sessions, assessments: st.assessments };
   const week = planWeek(base, days.filter((d) => d >= today), (d) => todayTasks(plans, d));
-  const rep = buildReport({ week: reportWeek(today, now.getHours()).week, sessions: st.sessions, subjects: st.subjects, assessments: st.assessments, mistakes: st.mistakes, logs: st.reviewLogs, items: st.reviews });
+  const rep = buildReport({ week: reportWeek(today, now.getHours()).week, sessions: st.sessions, subjects: st.subjects, assessments: st.assessments });
   const subName = (id: string | null) => (id ? st.subjects.find((s) => s.id === id)?.name ?? "" : "");
   const ag = agenda(st.subjects, st.assessments, st.events).filter((e) => e.status === "pendente");
   const habits = st.habits.filter((h) => h.active).sort((a, b) => a.position - b.position);
@@ -54,9 +52,7 @@ export function WeekPrint({ start, onDone }: { start: string; onDone: () => void
         <section className="ps-box">
           <b>A semana que passou ({dm(r.from)} a {dm(r.to)}):</b> {fmtMin(r.minutes)} de estudo em {qt(r.sessions, "sessão", "sessões")}, {qt(r.days, "dia", "dias")}
           {r.prevMinutes && r.minutes !== r.prevMinutes ? ` (${r.minutes >= r.prevMinutes ? "+" : "−"}${fmtMin(Math.abs(r.minutes - r.prevMinutes))} que a anterior)` : ""}
-          {" · "}acerto conferido {pct(r.acc)}{r.accN ? ` (${r.accN})` : ""} · confiança {r.conf == null ? "–" : `${nf(r.conf)}/5`} · {qt(r.reviews, "revisão feita", "revisões feitas")}
           {r.bySubject.length > 0 && <> · {r.bySubject.slice(0, 5).map((x) => `${x.name} ${fmtMin(x.minutes)}`).join(", ")}</>}
-          {r.mistakes.length > 0 && <> · erros mais comuns: {r.mistakes.slice(0, 3).map((m) => m.cat).join(", ")}</>}
         </section>
       )}
 

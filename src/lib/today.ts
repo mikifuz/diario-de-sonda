@@ -1,7 +1,7 @@
 // Tela Hoje: saudação, frase do dia e os "quadrados" com o que a pessoa vai fazer hoje
 // (aulas e outros blocos da rotina, itens do calendário, tarefas de estudo do plano e tarefas com prazo).
 import { BLOCK, EVT } from "./constants";
-import { classOff, evOn, noClass, toMin, type DayPlan, type Task } from "./plan";
+import { classOff, evOn, noClass, toMin, type DayPlan, type Moved, type Task } from "./plan";
 import type { AgendaItem } from "./store";
 import type { CalEvent, RoutineBlock, Subject, Todo } from "./types";
 
@@ -49,12 +49,14 @@ export interface DayCard {
   sub?: string;
   subject_id: string | null;
   task?: Task;
+  /** não coube hoje: para onde vai (null = sem horário livre nos próximos dias) */
+  moved?: Moved | null;
   todo?: Todo;
   /** já terminou (só para itens com horário) */
   past: boolean;
 }
 
-const TASK_TAG: Record<Task["kind"], string> = { revisao: "Revisão", consolidar: "Consolidar aula", adiantar: "Adiantar aula", preparar: "Preparar prova" };
+const TASK_TAG: Record<Task["kind"], string> = { consolidar: "Consolidar aula", adiantar: "Adiantar aula", preparar: "Preparar prova" };
 
 export interface DayCardsInput {
   day: string;
@@ -66,6 +68,10 @@ export interface DayCardsInput {
   subjects: Subject[];
   plan: DayPlan;
   todos: Todo[];
+  /** tarefas que não couberam e a pessoa escolheu fazer hoje mesmo assim (viram quadrados sem horário) */
+  forced?: Set<string>;
+  /** para onde vai cada tarefa que não coube (whereNext) */
+  moved?: Map<string, Moved | null>;
 }
 
 export function dayCards(p: DayCardsInput): DayCard[] {
@@ -91,7 +97,10 @@ export function dayCards(p: DayCardsInput): DayCard[] {
     for (const x of s.placed) out.push({ key: "t" + x.task.key, kind: "estudo", at: x.start, end: x.end, tag: TASK_TAG[x.task.kind], title: x.task.title, sub: name(x.task.subject_id), subject_id: x.task.subject_id, task: x.task, past: x.end <= p.nowMin });
   }
   // sem blocos de estudo na rotina, nada "deixou de caber": são as tarefas do dia, sem horário
-  for (const t of p.plan.overflow) out.push({ key: "o" + t.key, kind: p.plan.hasStudyBlocks ? "nao_coube" : "estudo", at: null, end: null, tag: TASK_TAG[t.kind], title: t.title, sub: name(t.subject_id), subject_id: t.subject_id, task: t, past: false });
+  for (const t of p.plan.overflow) {
+    const late = p.plan.hasStudyBlocks && !p.forced?.has(t.key);
+    out.push({ key: "o" + t.key, kind: late ? "nao_coube" : "estudo", at: null, end: null, tag: TASK_TAG[t.kind], title: t.title, sub: name(t.subject_id), subject_id: t.subject_id, task: t, past: false, ...(late && p.moved ? { moved: p.moved.get(t.key) ?? null } : {}) });
+  }
   for (const t of p.todos.filter((x) => !x.done && x.due && x.due <= p.day)) out.push({ key: "d" + t.id, kind: "tarefa", at: null, end: null, tag: t.due === p.day ? "Tarefa · prazo hoje" : "Tarefa atrasada", title: t.title, sub: name(t.subject_id) || undefined, subject_id: t.subject_id, todo: t, past: false });
   const order: CardKind[] = ["calendario", "tarefa", "estudo", "nao_coube"];
   return out.sort((a, b) => {
