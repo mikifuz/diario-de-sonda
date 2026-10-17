@@ -1,8 +1,8 @@
 // Resumo da manhã enviado como aviso no celular. Função pura e testada: só fatos dos dados
-// (provas marcadas, revisões vencidas, tarefas com prazo, dias sem sessão). Sem nada a dizer, não manda.
+// (provas marcadas, tarefas com prazo, dias sem sessão). Sem nada a dizer, não manda.
 import { addDays, daysBetween, qt } from "./calc";
-import { dm, itemState } from "./plan";
-import type { Assessment, ReviewItem, Subject, Todo } from "./types";
+import { dm } from "./plan";
+import type { Assessment, Subject, Todo } from "./types";
 
 /** provas nos próximos dias que entram no resumo (0 = hoje) */
 export const DIGEST_EXAM_DAYS = 3;
@@ -13,7 +13,6 @@ export interface DigestInput {
   today: string;
   subjects: Pick<Subject, "id" | "name" | "archived">[];
   assessments: Assessment[];
-  items: ReviewItem[];
   todos: Pick<Todo, "done" | "due">[];
   /** dia da sessão mais recente (null = nunca estudou) */
   lastStudy: string | null;
@@ -28,13 +27,10 @@ export function morningDigest(p: DigestInput): Digest | null {
   const exams = p.assessments
     .filter((a) => (a.kind === "prova" || a.kind === "sub") && a.status !== "cancelado" && a.grade == null && !!a.date && a.date >= p.today && a.date <= limit && active.has(a.subject_id))
     .sort((a, b) => a.date!.localeCompare(b.date!));
-  const due = p.items.filter((i) => active.has(i.subject_id) && i.due <= p.today && itemState(i, p.assessments, p.today).open);
-  const late = due.filter((i) => i.due < p.today).length;
   const tasks = p.todos.filter((t) => !t.done && !!t.due && t.due <= p.today).length;
   const idle = p.lastStudy ? daysBetween(p.lastStudy, p.today) : 0;
 
   const parts: string[] = exams.map((a) => `${a.name} de ${active.get(a.subject_id)} ${quando(daysBetween(p.today, a.date!), a.date!)}`);
-  if (due.length) parts.push(`${qt(due.length, "revisão", "revisões")} para hoje${late ? ` (${qt(late, "atrasada", "atrasadas")})` : ""}`);
   if (tasks) parts.push(`${qt(tasks, "tarefa", "tarefas")} com prazo até hoje`);
   if (idle >= DIGEST_IDLE_DAYS) parts.push(`sem estudar há ${idle} dias`);
   if (!parts.length) return null;

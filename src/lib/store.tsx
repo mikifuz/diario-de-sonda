@@ -5,25 +5,25 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { sb, friendlyError } from "./supabase";
 import type { DemoData } from "./demo";
 import { autoStop, forgotten, rollover } from "./timer";
-import type { Assessment, CalEvent, Mistake, Profile, ReviewItem, ReviewLog, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic, AppNotification, Course, Habit, HabitCheck } from "./types";
+import type { Assessment, CalEvent, Profile, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic, AppNotification, Course, Habit, HabitCheck } from "./types";
 
-export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "mistakes" | "review_items" | "review_logs" | "tasks" | "notifications" | "curriculum" | "habits" | "habit_checks";
-type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "mistakes" | "reviews" | "reviewLogs" | "todos" | "notes" | "courses" | "habits" | "habitChecks";
+export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "tasks" | "notifications" | "curriculum" | "habits" | "habit_checks";
+type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "todos" | "notes" | "courses" | "habits" | "habitChecks";
 const KEY: Record<Table, Key> = {
   subjects: "subjects", topics: "topics", study_sessions: "sessions", assessments: "assessments", events: "events",
-  routine_blocks: "blocks", mistakes: "mistakes", review_items: "reviews", review_logs: "reviewLogs", tasks: "todos", notifications: "notes", curriculum: "courses", habits: "habits", habit_checks: "habitChecks",
+  routine_blocks: "blocks", tasks: "todos", notifications: "notes", curriculum: "courses", habits: "habits", habit_checks: "habitChecks",
 };
 type RowOf = {
   subjects: Subject; topics: Topic; study_sessions: Session; assessments: Assessment; events: CalEvent;
-  routine_blocks: RoutineBlock; mistakes: Mistake; review_items: ReviewItem; review_logs: ReviewLog; tasks: Todo; notifications: AppNotification; curriculum: Course; habits: Habit; habit_checks: HabitCheck;
+  routine_blocks: RoutineBlock; tasks: Todo; notifications: AppNotification; curriculum: Course; habits: Habit; habit_checks: HabitCheck;
 };
 export const TABLES = Object.keys(KEY) as Table[];
 
 interface Data {
   profile: Profile | null; subjects: Subject[]; topics: Topic[]; sessions: Session[]; assessments: Assessment[]; events: CalEvent[];
-  blocks: RoutineBlock[]; mistakes: Mistake[]; reviews: ReviewItem[]; reviewLogs: ReviewLog[]; todos: Todo[]; notes: AppNotification[]; courses: Course[]; habits: Habit[]; habitChecks: HabitCheck[];
+  blocks: RoutineBlock[]; todos: Todo[]; notes: AppNotification[]; courses: Course[]; habits: Habit[]; habitChecks: HabitCheck[];
 }
-const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [], blocks: [], mistakes: [], reviews: [], reviewLogs: [], todos: [], notes: [], courses: [], habits: [], habitChecks: [] };
+const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [], blocks: [], todos: [], notes: [], courses: [], habits: [], habitChecks: [] };
 
 export interface Store extends Data {
   uid: string;
@@ -37,8 +37,6 @@ export interface Store extends Data {
   updateProfile: (patch: Partial<Profile>) => Promise<boolean>;
   reload: (table?: Table | "profiles") => Promise<void>;
   toast: (msg: string) => void;
-  evalId: string | null;
-  setEvalId: (id: string | null) => void;
   startTimer: (subject_id: string, topic_id: string | null, activity: Timer["activity"], social: Social) => void;
   setSocial: (social: Social) => void;
   pauseTimer: () => void;
@@ -57,17 +55,14 @@ export function useStore() {
 export const timerMs = (t: Timer | null | undefined, now = Date.now()) => (t ? (t.accum || 0) + (t.running ? now - t.since : 0) : 0);
 const normTime = <T extends { time: string | null }>(r: T): T => ({ ...r, time: r.time ? r.time.slice(0, 5) : null });
 const normBlock = (r: RoutineBlock): RoutineBlock => ({ ...r, start_time: r.start_time.slice(0, 5), end_time: r.end_time.slice(0, 5) });
-const PROFILE_COLS = "id,name,course,university,current_semester,default_min_avg,weekly_goal_h,skin,timer,study_pref,review_steps,mastery_cfg";
+const PROFILE_COLS = "id,name,course,university,current_semester,default_min_avg,weekly_goal_h,skin,timer,study_pref";
 const COLS: Record<Table, string> = {
   subjects: "id,name,code,professor,semester,credits,hours,color,min_avg,schedule,notes,traits,exam_enabled,exam_w_avg,exam_w_exam,exam_min_final,exam_min_take,archived,study_pref,recovery,sub_replace_lower",
   topics: "id,subject_id,parent_id,name,position,taught_on,assessment_id",
-  study_sessions: "id,subject_id,topic_id,activity,started_at,duration_min,questions,correct,notes,confidence,result,autonomy,difficulty,comprehension",
+  study_sessions: "id,subject_id,topic_id,activity,started_at,duration_min,notes",
   assessments: "id,subject_id,name,kind,date,time,weight,grade,predicted,sim_c,sim_e,sim_o,priority,status,description,sub_id,felt",
-  events: "id,subject_id,title,type,date,end_date,time,priority,status,description",
+  events: "id,subject_id,title,type,date,end_date,time,end_time,priority,status,description",
   routine_blocks: "id,weekday,start_time,end_time,kind,subject_id,label",
-  mistakes: "id,subject_id,topic_id,session_id,category,description,correction,source,occurred_on",
-  review_items: "id,subject_id,topic_id,mistake_id,assessment_id,title,step,due,est_min,active,last_reviewed_at",
-  review_logs: "id,item_id,reviewed_at,result,autonomy,confidence,prev_step,new_step,prev_due,new_due",
   tasks: "id,title,subject_id,due,done,done_at",
   notifications: "id,kind,title,body,data,from_user,created_at,read_at",
   curriculum: "id,name,code,phase,credits,kind,prereqs,min_pct,min_phase,status,grade,term,subject_id,position",
@@ -79,7 +74,6 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
   const [data, setData] = useState<Data>(() => (demo ? { ...EMPTY, ...demo } : EMPTY));
   const [ready, setReady] = useState(!!demo);
   const isDemo = !!demo;
-  const [evalId, setEvalId] = useState<string | null>(null);
   const dataRef = useRef(data);
   dataRef.current = data;
   const toast = onToast;
@@ -100,17 +94,18 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     }
     let q = db.from(t).select(COLS[t]);
     if (t === "study_sessions") q = q.order("started_at", { ascending: false }).limit(10000);
-    if (t === "review_logs") q = q.order("reviewed_at", { ascending: false }).limit(10000);
     if (t === "notifications") q = q.order("created_at", { ascending: false }).limit(200);
     if (t === "habit_checks") q = q.order("day", { ascending: false }).limit(5000);
     let { data: rows, error } = await q;
     // banco ainda sem a coluna "felt" (migration de "Como foi a prova?" não rodada): carrega sem ela
     if (error && t === "assessments" && /felt/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",felt", "")));
-    // banco ainda sem a coluna "end_date" (migration de viagens não rodada): carrega sem ela
-    if (error && t === "events" && /end_date/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",end_date", "")));
+    // banco ainda sem as colunas "end_time" (estudo extra) ou "end_date" (viagens): carrega sem elas
+    if (error && t === "events" && /end_time/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",end_time", "")));
+    if (error && t === "events" && /end_date/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",end_date", "").replace(",end_time", "")));
     if (error) throw error;
     let list = (rows || []) as unknown as RowOf[typeof t][];
-    if (t === "assessments" || t === "events") list = (list as (Assessment | CalEvent)[]).map(normTime) as typeof list;
+    if (t === "assessments") list = (list as Assessment[]).map(normTime) as typeof list;
+    if (t === "events") list = (list as CalEvent[]).map((e) => ({ ...normTime(e), ...(e.end_time ? { end_time: e.end_time.slice(0, 5) } : {}) })) as typeof list;
     if (t === "routine_blocks") list = (list as RoutineBlock[]).map(normBlock) as typeof list;
     setData((d) => ({ ...d, [KEY[t]]: list }));
   }, [uid]);
@@ -171,12 +166,9 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     if (error) { toast(friendlyError(error)); reload(t); return false; }
     // cascatas do banco: atualiza tabelas dependentes
     const deps: Partial<Record<Table, Table[]>> = {
-      subjects: ["topics", "study_sessions", "assessments", "events", "routine_blocks", "mistakes", "review_items", "review_logs", "tasks", "curriculum"],
-      topics: ["topics", "study_sessions", "mistakes", "review_items"],
-      assessments: ["topics", "review_items"],
-      study_sessions: ["mistakes"],
-      mistakes: ["review_items", "review_logs"],
-      review_items: ["review_logs"],
+      subjects: ["topics", "study_sessions", "assessments", "events", "routine_blocks", "tasks", "curriculum"],
+      topics: ["topics", "study_sessions"],
+      assessments: ["topics"],
       habits: ["habit_checks"],
     };
     deps[t]?.forEach((x) => reload(x));
@@ -212,7 +204,7 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     const s: Session = {
       id: crypto.randomUUID(), subject_id: t.subject_id, topic_id: t.topic_id || null, activity: t.activity,
       started_at: new Date(startedAt).toISOString(), duration_min: Math.min(1440, minutes),
-      questions: null, correct: null, notes, confidence: null, result: null, autonomy: null, difficulty: null, comprehension: null,
+      notes,
     };
     return (await save("study_sessions", s)) ? s.id : null;
   }, [save]);
@@ -242,12 +234,12 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     const s: Session = {
       id: crypto.randomUUID(), subject_id: t.subject_id, topic_id: t.topic_id || null, activity: t.activity,
       started_at: new Date(t.started || Date.now() - ms).toISOString(), duration_min: Math.min(1440, Math.max(1, Math.round(ms / 60000))),
-      questions: null, correct: null, notes: "", confidence: null, result: null, autonomy: null, difficulty: null, comprehension: null,
+      notes: "",
     };
     const exists = dataRef.current.subjects.some((x) => x.id === t.subject_id);
     await updateProfile({ timer: null });
     if (!exists) { toast("A disciplina desta sessão foi excluída; o tempo não foi salvo."); return; }
-    if (await save("study_sessions", s)) setEvalId(s.id);
+    if (await save("study_sessions", s)) toast(`Sessão salva: ${s.duration_min} min.`);
   }, [save, saveTimerPart, toast, updateProfile]);
 
   // cronômetro esquecido: mais de 20 h seguidas sem pausa → desliga sozinho e avisa
@@ -270,10 +262,7 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
           // pausada desde um dia anterior: encerra e salva no dia em que foi feita
           await updateProfile({ timer: null });
           const id = await saveTimerPart(t, r.keepMs, r.startedAt, "Sessão pausada encerrada na virada do dia.");
-          if (id) {
-            toast(`A sessão pausada de ${day} foi encerrada e salva nesse dia. Para continuar, comece uma nova.`);
-            setEvalId(id);
-          }
+          if (id) toast(`A sessão pausada de ${day} foi encerrada e salva nesse dia. Para continuar, comece uma nova.`);
         }
         autoStopping.current = false;
         return;
@@ -286,8 +275,7 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
         await save("study_sessions", {
           id: crypto.randomUUID(), subject_id: t.subject_id, topic_id: t.topic_id || null, activity: t.activity,
           started_at: new Date(t.started || lostSince - keepMs).toISOString(), duration_min: Math.min(1440, minutes),
-          questions: null, correct: null, notes: "Cronômetro desligado sozinho após 20 h sem pausa; salvo só o tempo até a última pausa.",
-          confidence: null, result: null, autonomy: null, difficulty: null, comprehension: null,
+          notes: "Cronômetro desligado sozinho após 20 h sem pausa; salvo só o tempo até a última pausa.",
         });
       }
       const from = new Date(lostSince).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -306,9 +294,9 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
   }, [ready, updateProfile, save, saveTimerPart, toast]);
 
   const value = useMemo<Store>(() => ({
-    ...data, uid, email, ready, demo: isDemo, save, saveMany, remove, updateProfile, reload, toast, evalId, setEvalId,
+    ...data, uid, email, ready, demo: isDemo, save, saveMany, remove, updateProfile, reload, toast,
     startTimer, setSocial, pauseTimer, resumeTimer, stopTimer, discardTimer,
-  }), [data, uid, email, ready, isDemo, save, saveMany, remove, updateProfile, reload, toast, evalId, startTimer, setSocial, pauseTimer, resumeTimer, stopTimer, discardTimer]);
+  }), [data, uid, email, ready, isDemo, save, saveMany, remove, updateProfile, reload, toast, startTimer, setSocial, pauseTimer, resumeTimer, stopTimer, discardTimer]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
@@ -318,18 +306,15 @@ function demoCascade(d: Data, t: Table, id: string): Data {
   const x = { ...d };
   if (t === "subjects") {
     const keep = <R extends { subject_id?: string | null }>(rs: R[]) => rs.filter((r) => r.subject_id !== id);
-    Object.assign(x, { topics: keep(x.topics), sessions: keep(x.sessions), assessments: keep(x.assessments), events: keep(x.events), blocks: keep(x.blocks), mistakes: keep(x.mistakes), reviews: keep(x.reviews), todos: keep(x.todos) });
+    Object.assign(x, { topics: keep(x.topics), sessions: keep(x.sessions), assessments: keep(x.assessments), events: keep(x.events), blocks: keep(x.blocks), todos: keep(x.todos) });
   }
   if (t === "subjects") x.courses = x.courses.map((c) => (c.subject_id === id ? { ...c, subject_id: null } : c));
   if (t === "topics") {
     const un = <R extends { topic_id: string | null }>(rs: R[]) => rs.map((r) => (r.topic_id === id ? { ...r, topic_id: null } : r));
-    Object.assign(x, { sessions: un(x.sessions), mistakes: un(x.mistakes), reviews: un(x.reviews), topics: x.topics.map((tp) => (tp.parent_id === id ? { ...tp, parent_id: null } : tp)) });
+    Object.assign(x, { sessions: un(x.sessions), topics: x.topics.map((tp) => (tp.parent_id === id ? { ...tp, parent_id: null } : tp)) });
   }
-  if (t === "assessments") Object.assign(x, { topics: x.topics.map((tp) => (tp.assessment_id === id ? { ...tp, assessment_id: null } : tp)), reviews: x.reviews.map((r) => (r.assessment_id === id ? { ...r, assessment_id: null } : r)), assessments: x.assessments.map((a) => (a.sub_id === id ? { ...a, sub_id: null } : a)) });
+  if (t === "assessments") Object.assign(x, { topics: x.topics.map((tp) => (tp.assessment_id === id ? { ...tp, assessment_id: null } : tp)), assessments: x.assessments.map((a) => (a.sub_id === id ? { ...a, sub_id: null } : a)) });
   if (t === "habits") x.habitChecks = x.habitChecks.filter((c) => c.habit_id !== id);
-  if (t === "mistakes") x.reviews = x.reviews.filter((r) => r.mistake_id !== id);
-  const items = new Set(x.reviews.map((r) => r.id));
-  x.reviewLogs = x.reviewLogs.filter((l) => items.has(l.item_id));
   return x;
 }
 

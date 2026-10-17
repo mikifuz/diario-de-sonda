@@ -62,50 +62,12 @@ export function parseNum(v: unknown): number | null {
   return isNaN(n) ? null : n;
 }
 
-/* ============ Confiança × resultado ============ */
-/** Acerto conferido (0–1): questões certas/feitas quando informado; senão o resultado declarado.
- *  "Ainda não conferi" e ausência de dados retornam null e não entram em médias. */
-export function verified(s: Pick<Session, "questions" | "correct" | "result">): number | null {
-  const q = Number(s.questions) || 0;
-  if (q > 0 && s.correct != null) return Math.max(0, Math.min(1, Number(s.correct) / q));
-  if (s.result === "certo") return 1;
-  if (s.result === "parcial") return 0.5;
-  if (s.result === "errado") return 0;
-  return null;
-}
-
-export interface Stats {
-  min: number; n: number;
-  conf: number | null; confN: number;
-  acc: number | null; accN: number;
-  solo: number | null; auN: number;
-}
+/* ============ Sessões ============ */
+export interface Stats { min: number; n: number }
 export function stats(list: Session[]): Stats {
-  let min = 0, cs = 0, cn = 0, as = 0, an = 0, solo = 0, auN = 0;
-  for (const s of list) {
-    min += Number(s.duration_min) || 0;
-    if (s.confidence) { cs += s.confidence; cn++; }
-    const v = verified(s);
-    if (v != null) { as += v; an++; }
-    if (s.autonomy) { auN++; if (s.autonomy === "sozinho") solo++; }
-  }
-  return { min, n: list.length, conf: cn ? cs / cn : null, confN: cn, acc: an ? as / an : null, accN: an, solo: auN ? solo / auN : null, auN };
-}
-
-export type SignalKind = "" | "ok" | "warn" | "bad" | "acc";
-/** Leitura de um conteúdo com regras explícitas; confiança e resultado nunca se misturam. */
-export function signal(st: Stats): { k: SignalKind; t: string; why: string } {
-  if (!st.n) return { k: "", t: "Não estudado", why: "Nenhuma sessão registrada neste conteúdo." };
-  if (st.accN < 2 || st.acc == null)
-    return { k: "", t: "Poucos dados conferidos", why: `Há ${qt(st.accN, "resultado conferido", "resultados conferidos")}; são necessários pelo menos 2 para uma leitura.` };
-  if (st.conf != null && st.conf >= 4 && st.acc < 0.6)
-    return { k: "bad", t: "Confiança acima do resultado", why: `Confiança média ${nf(st.conf)} de 5, mas acerto conferido de ${pct(st.acc)}.` };
-  if (st.conf != null && st.conf <= 2.5 && st.acc >= 0.8)
-    return { k: "acc", t: "Resultado acima da confiança", why: `Acerto conferido de ${pct(st.acc)} com confiança média de ${nf(st.conf)} de 5.` };
-  if (st.acc >= 0.8 && (st.solo == null || st.solo >= 0.5))
-    return { k: "ok", t: "Bom resultado", why: `Acerto conferido de ${pct(st.acc)}${st.solo != null ? `, ${pct(st.solo)} resolvido sozinho` : ""}.` };
-  if (st.acc < 0.5) return { k: "bad", t: "Revisar", why: `Acerto conferido de ${pct(st.acc)} em ${qt(st.accN, "registro", "registros")}.` };
-  return { k: "warn", t: "Em desenvolvimento", why: `Acerto conferido de ${pct(st.acc)} em ${qt(st.accN, "registro", "registros")}.` };
+  let min = 0;
+  for (const s of list) min += Number(s.duration_min) || 0;
+  return { min, n: list.length };
 }
 
 /* ============ Médias ============ */

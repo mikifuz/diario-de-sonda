@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addDays, gradeCalc, parseNum, periodRange, signal, stats, streak, monthStats, verified, weekStartKey, fmtMin, qt } from "./calc";
+import { addDays, gradeCalc, parseNum, periodRange, stats, streak, monthStats, weekStartKey, fmtMin, qt } from "./calc";
 import type { Assessment, Session } from "./types";
 
 const A = (p: Partial<Assessment>): Assessment => ({
@@ -10,7 +10,7 @@ const A = (p: Partial<Assessment>): Assessment => ({
 const sub = (p = {}) => ({ min_avg: 7, recovery: "nenhuma" as const, sub_replace_lower: false, exam_w_avg: 1, exam_w_exam: 1, exam_min_final: 5, exam_min_take: null, ...p });
 const S = (p: Partial<Session>): Session => ({
   id: "x", subject_id: "s", topic_id: null, activity: "exercicios", started_at: new Date().toISOString(), duration_min: 30,
-  questions: null, correct: null, notes: "", confidence: null, result: null, autonomy: null, difficulty: null, comprehension: null, ...p,
+  notes: "", ...p,
 });
 
 test("média ponderada e nota necessária", () => {
@@ -88,22 +88,11 @@ test("sem avaliações", () => {
   assert.equal(r.final, null);
 });
 
-test("acerto conferido separa resultado de confiança", () => {
-  assert.equal(verified(S({ questions: 10, correct: 7 })), 0.7);
-  assert.equal(verified(S({ result: "parcial" })), 0.5);
-  assert.equal(verified(S({ result: "nao", confidence: 5 })), null);
-  const st = stats([S({ confidence: 4, result: "certo", autonomy: "sozinho" }), S({ duration_min: 20, questions: 4, correct: 1, confidence: 5, autonomy: "ajuda" })]);
+test("tempo e número de sessões", () => {
+  const st = stats([S({}), S({ duration_min: 20 })]);
   assert.equal(st.min, 50);
-  assert.equal(st.conf, 4.5);
-  assert.equal(st.acc, 0.625);
-  assert.equal(st.solo, 0.5);
-});
-
-test("leitura do conteúdo detecta confiança acima do resultado", () => {
-  const list = [S({ confidence: 5, result: "errado" }), S({ confidence: 4, result: "parcial" })];
-  assert.equal(signal(stats(list)).t, "Confiança acima do resultado");
-  assert.equal(signal(stats([S({ confidence: 3 })])).t, "Poucos dados conferidos");
-  assert.equal(signal(stats([])).t, "Não estudado");
+  assert.equal(st.n, 2);
+  assert.deepEqual(stats([]), { min: 0, n: 0 });
 });
 
 test("datas e períodos", () => {

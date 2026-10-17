@@ -67,6 +67,9 @@ export function withLive(m: RoomMember, days: Record<string, number> = {}) {
 }
 
 /** Mesinha de cada pessoa: acesa, cinza (parou há menos de 1 h) ou nada */
+/** De folga hoje (day off marcado na Sala) */
+export const isOffToday = (m: RoomMember) => !!m.off_day && m.off_day === todayKey();
+
 export function memberDesk(m: RoomMember, days: Record<string, number> = {}, now = Date.now()): Desk {
   const t = todayKey();
   return deskState(m, (days[t] || 0) > 0 || (days[addDays(t, -1)] || 0) > 0, now);
@@ -87,7 +90,10 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     const db = sb();
     try {
       if (what === "members" || what === "all") {
-        const { data, error } = await db.from("room_members").select("user_id,nick,share_subject,studying,paused,since,accum_ms,subject,updated_at,friend_code,accept_nudges");
+        const cols = "user_id,nick,share_subject,studying,paused,since,accum_ms,subject,updated_at,friend_code,accept_nudges,off_day";
+        let { data, error } = await db.from("room_members").select(cols);
+        // banco ainda sem a coluna off_day (migration de day off não rodada): carrega sem ela
+        if (error && /off_day/.test(error.message || "")) ({ data, error } = await db.from("room_members").select(cols.replace(",off_day", "")));
         if (error) throw error;
         setMembers((data || []) as RoomMember[]);
       }
@@ -165,6 +171,14 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       if (error) console.error(error);
     });
   }, [me, timer, subjName, uid]);
+
+  // day off: o grupo vê "de folga hoje" (a folga fica no calendário; aqui só o dia vai para a sala)
+  const offToday = st.events.some((e) => e.type === "folga" && e.status !== "cancelado" && e.date === todayKey()) ? todayKey() : null;
+  useEffect(() => {
+    if (!me || !("off_day" in me) || (me.off_day ?? null) === offToday) return;
+    setMembers((ms) => ms.map((m) => (m.user_id === uid ? { ...m, off_day: offToday } : m)));
+    sb().from("room_members").update({ off_day: offToday }).eq("user_id", uid).then(({ error }) => { if (error) console.error(error); });
+  }, [me, offToday, uid]);
 
   const join = useCallback(async (nick: string, share: boolean) => {
     const { error } = await sb().from("room_members").upsert({ user_id: uid, nick: nick.trim().slice(0, 30), share_subject: share });
@@ -286,9 +300,10 @@ export function DemoRoomProvider({ demo, children }: { demo: import("./demo").De
   const members = useMemo(() => demo.members.map((m) => {
     if (m.user_id !== uid) return m;
     const t = timer && timer.social !== "sozinho" ? timer : null;
-    return { ...m, updated_at: changedAt || new Date(0).toISOString(), studying: !!(t && t.running), paused: !!(t && !t.running), since: t && t.running ? new Date(t.since).toISOString() : null,
+    const off = st.events.some((e) => e.type === "folga" && e.status !== "cancelado" && e.date === todayKey()) ? todayKey() : null;
+    return { ...m, off_day: off, updated_at: changedAt || new Date(0).toISOString(), studying: !!(t && t.running), paused: !!(t && !t.running), since: t && t.running ? new Date(t.since).toISOString() : null,
       accum_ms: t ? Math.round(t.running ? t.accum || 0 : timerMs(t)) : 0, subject: t && t.social === "materia" ? st.subjects.find((s) => s.id === t.subject_id)?.name || "" : "" };
-  }), [demo.members, uid, timer, st.subjects, changedAt]);
+  }), [demo.members, uid, timer, st.subjects, st.events, changedAt]);
   const totals = useMemo(() => {
     const out: Record<string, Record<string, number>> = {};
     for (const r of demo.totals) (out[r.user_id] ||= {})[r.day] = r.minutes;

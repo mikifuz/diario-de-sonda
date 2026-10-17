@@ -6,7 +6,7 @@ import { activeSubjects, useStore } from "@/lib/store";
 import { daysBetween, todayKey, qt } from "@/lib/calc";
 import { buildAlerts } from "@/lib/alerts";
 import { verdict } from "@/lib/verdict";
-import { masteryCfg } from "@/lib/mastery";
+import { dayOff } from "@/lib/plan";
 import type { Todo } from "@/lib/types";
 import { ConfirmButton, Dot, I, Icon } from "./ui";
 
@@ -17,7 +17,6 @@ export function AlertsPanel() {
   const [all, setAll] = useState(false);
   const alerts = buildAlerts({
     today: todayKey(), subjects: st.subjects, topics: st.topics, sessions: st.sessions, assessments: st.assessments,
-    items: st.reviews, logs: st.reviewLogs, mistakes: st.mistakes, cfg: masteryCfg(st.profile?.mastery_cfg),
   });
   // alertas da mesma prova viram um cartão só: título curto, "amanhã" ao lado e uma linha por problema
   const groups: { id: string; items: typeof alerts }[] = [];
@@ -61,9 +60,9 @@ export function AlertsPanel() {
             </div>
           );
         })}</div>
-      ) : <p className="small muted" style={{ margin: 0 }}>Nenhuma prova nos próximos 14 dias com conteúdo frágil, confiança baixa ou sem resultado conferido, e nenhuma revisão atrasada.</p>}
+      ) : <p className="small muted" style={{ margin: 0 }}>Nenhuma prova nos próximos 14 dias com conteúdo ainda sem estudo.</p>}
       {groups.length > 4 && <button className="btn sm ghost" style={{ marginTop: 6 }} onClick={() => setAll(!all)}>{all ? "Mostrar menos" : `Mostrar todos (${groups.length})`}</button>}
-      <p className="small muted hide-m" style={{ margin: "8px 0 0" }}>Os alertas usam o índice de domínio de cada conteúdo (acerto conferido, autonomia, prática recente e erros) e a confiança separadamente. Pesos em <Link href="/configuracoes">Configurações</Link>.</p>
+      <p className="small muted hide-m" style={{ margin: "8px 0 0" }}>Os alertas olham as provas dos próximos 14 dias e o tempo que você já registrou em cada conteúdo.</p>
     </section>
   );
 }
@@ -127,9 +126,9 @@ export function TodoPanel() {
 /** "Geralzão" do Painel: frase direta (com um pingo de ironia) e o fato que a justifica */
 export function VerdictCard() {
   const st = useStore();
-  const v = verdict({ today: todayKey(), sessions: st.sessions, subjects: st.subjects, assessments: st.assessments, weeklyGoalH: Number(st.profile?.weekly_goal_h) || null });
+  const v = verdict({ today: todayKey(), sessions: st.sessions, subjects: st.subjects, assessments: st.assessments, weeklyGoalH: Number(st.profile?.weekly_goal_h) || null, off: !!dayOff(todayKey(), st.events) });
   if (!v) return null;
-  const icon = { sumiu: "👀", parado: "⏳", agua: "🌊", prova_pouco: "⚠️", notas: "📉", pouco: "🐢", voando: "🚀", normal: "🧭" }[v.kind];
+  const icon = { folga: "😴", sumiu: "👀", parado: "⏳", agua: "🌊", prova_pouco: "⚠️", notas: "📉", pouco: "🐢", voando: "🚀", normal: "🧭" }[v.kind];
   const color = { bad: "var(--bad)", warn: "var(--warn)", ok: "var(--ok)", info: "var(--accent)" }[v.level];
   return (
     <section className="panel verdict" style={{ borderLeft: `4px solid ${color}` }} aria-label="Como anda seu estudo">

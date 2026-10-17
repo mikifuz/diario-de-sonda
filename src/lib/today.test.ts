@@ -21,20 +21,25 @@ test("frase do dia: fixa no dia, muda no seguinte", () => {
 
 const S = (id: string, name: string): Subject => ({ id, name } as Subject);
 const B = (x: Partial<RoutineBlock>): RoutineBlock => ({ id: "b", weekday: 5, start_time: "08:20", end_time: "10:00", kind: "aula", subject_id: null, label: "", ...x });
-const task: Task = { key: "k1", kind: "revisao", title: "Integrais", subject_id: "c", topic_id: null, minutes: 30, why: "vencida", rank: [] };
+const task: Task = { key: "k1", kind: "preparar", title: "Integrais", subject_id: "c", topic_id: null, minutes: 30, why: "vencida", rank: [] };
 
 test("quadrados de hoje: aula, compromisso, estudo encaixado, o que não coube e tarefa, na ordem", () => {
   const day = "2026-10-16"; // sexta
   const blocks = [B({ id: "a", subject_id: "c" }), B({ id: "w", kind: "trabalho", start_time: "18:00", end_time: "20:00" }), B({ id: "z", weekday: 1 })];
   const study = B({ id: "e", kind: "estudo", start_time: "14:00", end_time: "16:00" });
-  const plan: DayPlan = { slots: [{ block: study, start: 840, end: 960, placed: [{ task, start: 840, end: 870 }] }], overflow: [{ ...task, key: "k2", title: "Green" }], capacity: 120, need: 60, notes: [], hasStudyBlocks: true };
+  const plan: DayPlan = { slots: [{ block: study, start: 840, end: 960, placed: [{ task, start: 840, end: 870 }] }], overflow: [{ ...task, key: "k2", title: "Green" }], capacity: 120, need: 60, notes: [], hasStudyBlocks: true, off: false };
   const ev = { id: "x", src: "event" as const, title: "Dentista", type: "pessoal" as const, subject_id: null, date: day, time: "11:00", priority: "media" as const, status: "pendente" as const, description: "" };
   const todos: Todo[] = [{ id: "t", title: "Lista 4", subject_id: "c", due: day, done: false, done_at: null }, { id: "u", title: "Depois", subject_id: null, due: "2026-10-20", done: false, done_at: null }];
-  const cards = dayCards({ day, nowMin: 12 * 60, blocks: [...blocks, study], events: [], agenda: [ev], subjects: [S("c", "Cálculo III")], plan, todos });
+  const moved = new Map([["k2", { day: "2026-10-19", start: 840, label: "segunda (19/10), no bloco das 14:00" }]]);
+  const cards = dayCards({ day, nowMin: 12 * 60, blocks: [...blocks, study], events: [], agenda: [ev], subjects: [S("c", "Cálculo III")], plan, todos, moved });
   assert.deepEqual(cards.map((c) => c.kind), ["aula", "calendario", "estudo", "rotina", "tarefa", "nao_coube"]);
+  assert.equal(cards[5].moved?.label, "segunda (19/10), no bloco das 14:00");
+  // "fazer hoje mesmo assim": vira quadrado sem horário
+  const forced = dayCards({ day, nowMin: 12 * 60, blocks: [...blocks, study], events: [], agenda: [ev], subjects: [S("c", "Cálculo III")], plan, todos, moved, forced: new Set(["k2"]) });
+  assert.equal(forced.find((c) => c.task?.key === "k2")?.kind, "estudo");
   assert.equal(cards[0].title, "Cálculo III");
   assert.equal(cards[0].past, true);
-  assert.equal(cards[2].tag, "Revisão");
+  assert.equal(cards[2].tag, "Preparar prova");
   assert.equal(cards[2].past, false);
   assert.equal(cards[4].tag, "Tarefa · prazo hoje");
 });
@@ -42,13 +47,13 @@ test("quadrados de hoje: aula, compromisso, estudo encaixado, o que não coube e
 test("quadrados de hoje: aula cancelada aparece como sem aula", () => {
   const day = "2026-10-12"; // feriado, segunda
   const off: CalEvent[] = [];
-  const plan: DayPlan = { slots: [], overflow: [], capacity: 0, need: 0, notes: [], hasStudyBlocks: false };
+  const plan: DayPlan = { slots: [], overflow: [], capacity: 0, need: 0, notes: [], hasStudyBlocks: false, off: false };
   const cards = dayCards({ day, nowMin: 0, blocks: [B({ weekday: 1, subject_id: "c" })], events: off, agenda: [], subjects: [S("c", "Cálculo III")], plan, todos: [] });
   assert.equal(cards[0].kind, "sem_aula");
 });
 
 test("sem blocos de estudo na rotina, as tarefas viram quadrados sem horário (não 'não coube')", () => {
-  const plan: DayPlan = { slots: [], overflow: [task], capacity: 0, need: 30, notes: [], hasStudyBlocks: false };
+  const plan: DayPlan = { slots: [], overflow: [task], capacity: 0, need: 30, notes: [], hasStudyBlocks: false, off: false };
   const [c] = dayCards({ day: "2026-10-16", nowMin: 18 * 60, blocks: [], events: [], agenda: [], subjects: [S("c", "Cálculo III")], plan, todos: [] });
   assert.equal(c.kind, "estudo");
   assert.equal(c.at, null);

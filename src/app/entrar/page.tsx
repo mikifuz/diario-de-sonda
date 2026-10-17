@@ -61,7 +61,7 @@ export default function Entrar() {
         <Brand />
         <div className="stack" style={{ gap: 6 }}>
           <h1 style={{ fontSize: "calc(1.35rem*var(--display-scale))" }}>{mode === "criar" ? "Criar conta" : mode === "esqueci" ? "Recuperar senha" : "Entrar"}</h1>
-          <p className="small muted" style={{ margin: 0 }}>Horas de estudo, confiança, resultados e provas do semestre num só lugar.</p>
+          <p className="small muted" style={{ margin: 0 }}>Horas de estudo, plano do dia e provas do semestre num só lugar.</p>
         </div>
         {mode !== "esqueci" && <Tabs value={mode} onChange={(m) => { setMode(m); setMsg(null); }} options={[["entrar", "Entrar"], ["criar", "Criar conta"]]} label="Modo" />}
         <form className="stack" style={{ gap: 12 }} onSubmit={submit}>

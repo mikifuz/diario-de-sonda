@@ -38,7 +38,7 @@ export function useGuide() {
     },
     {
       title: "Comece a estudar",
-      text: "O Plano do dia já mostra o que fazer em cada bloco, com o motivo. Comece pela primeira tarefa e, ao terminar, responda a autoavaliação rápida.",
+      text: "O Plano do dia já mostra o que fazer em cada bloco, com o motivo. Comece pela primeira tarefa: ligue o cronômetro e, ao terminar, é só parar.",
       done: st.sessions.length > 0,
       doneText: "Primeira sessão registrada.",
       action: { label: "Ver o plano do dia", href: "/hoje" },

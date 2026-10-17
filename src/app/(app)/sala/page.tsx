@@ -3,11 +3,12 @@
 import { Suspense, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { activeSubjects, timerMs, topicName, useStore } from "@/lib/store";
-import { liveMs, memberDesk, NUDGES, todayMin, useRoom, weekMin, withLive, type NudgeKey } from "@/lib/room";
-import { dkey, fmtClock, fmtMin, inRange, keyDate, monthStats, nf, pct, periodRange, stats, streak, todayKey, type Period, qt } from "@/lib/calc";
+import { isOffToday, liveMs, memberDesk, NUDGES, todayMin, useRoom, weekMin, withLive, type NudgeKey } from "@/lib/room";
+import { dkey, fmtClock, fmtMin, inRange, keyDate, monthStats, periodRange, stats, streak, todayKey, type Period, qt } from "@/lib/calc";
 import { lastTaught, studyHint, topicExams } from "@/lib/plan";
 import { ACT } from "@/lib/constants";
-import type { Activity, RoomMember, Session, Social } from "@/lib/types";
+import type { Activity, CalEvent, RoomMember, Session, Social } from "@/lib/types";
+import { dayOffCheck } from "@/lib/dayoff";
 import { ConfirmButton, Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
 import { SessionModal, SubjectModal, TopicOptions } from "@/components/modals";
 import { SessionRow } from "@/components/SessionRow";
@@ -20,7 +21,7 @@ function Privacy() {
     <div className="stack small" style={{ gap: 6 }}>
       <b>O que os colegas dos seus grupos veem</b>
       {yes.map((t) => <span key={t} className="row" style={{ gap: 8, flexWrap: "nowrap", alignItems: "flex-start" }}><span style={{ color: "var(--ok)" }}>✓</span><span>{t}</span></span>)}
-      <span className="row" style={{ gap: 8, flexWrap: "nowrap", alignItems: "flex-start" }}><span style={{ color: "var(--bad)" }}>✕</span><span>Notas, confiança, acertos, erros, conteúdos e observações: ficam só com você</span></span>
+      <span className="row" style={{ gap: 8, flexWrap: "nowrap", alignItems: "flex-start" }}><span style={{ color: "var(--bad)" }}>✕</span><span>Notas, conteúdos, tarefas e observações: ficam só com você</span></span>
       <span className="row" style={{ gap: 8, flexWrap: "nowrap", alignItems: "flex-start" }}><span style={{ color: "var(--bad)" }}>✕</span><span>Quem não está em nenhum grupo com você não vê nada</span></span>
     </div>
   );
@@ -66,7 +67,7 @@ function TimerPanel({ onManual, onNewSubject }: { onManual: () => void; onNewSub
                 <button className="btn sm ghost" onClick={() => setDiscard(false)}>Manter</button></>
             ) : (
               <>{t.running ? <button className="btn" onClick={st.pauseTimer}><Icon d={I.pause} s={16} />Pausar</button> : <button className="btn" onClick={st.resumeTimer}><Icon d={I.play} s={16} />Retomar</button>}
-                <button className="btn pri" onClick={st.stopTimer}><Icon d={I.stop} s={16} />Encerrar e avaliar</button>
+                <button className="btn pri" onClick={st.stopTimer}><Icon d={I.stop} s={16} />Encerrar e salvar</button>
                 <button className="btn ghost" onClick={() => setDiscard(true)}>Descartar</button></>
             )}
           </div>
@@ -132,6 +133,46 @@ function FriendAdd({ m }: { m: RoomMember }) {
   );
 }
 
+/** Day off (pedido do dono): o plano de hoje fica vazio, o estudo das provas vai para os outros dias e o grupo vê "de folga hoje".
+ *  Durante o semestre, um por semana; em dia de prova, o app pergunta antes. */
+function DayOff() {
+  const st = useStore();
+  const room = useRoom();
+  const today = todayKey();
+  const c = dayOffCheck({ today, events: st.events, assessments: st.assessments, subjects: st.subjects });
+  const [ask, setAsk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const take = async () => {
+    setBusy(true);
+    const ev: CalEvent = { id: crypto.randomUUID(), subject_id: null, title: "Day off", type: "folga", date: today, time: null, priority: "media", status: "pendente", description: "" };
+    if (await st.save("events", ev)) st.toast(room.me ? "Day off marcado: bom descanso! O grupo vê que você está de folga hoje." : "Day off marcado: bom descanso! O plano de hoje foi para os outros dias.");
+    setBusy(false); setAsk(false);
+  };
+  const cancel = async () => {
+    setBusy(true);
+    if (c.already && (await st.remove("events", c.already.id))) st.toast("Folga cancelada: o plano de hoje voltou.");
+    setBusy(false);
+  };
+  if (c.already) return (
+    <div className="callout info row between" style={{ gap: 10 }}>
+      <span><b>Hoje é seu day off 😴</b> Nada de estudo no plano de hoje; o estudo das provas foi para os outros dias.{room.me ? " O grupo vê que você está de folga." : ""}</span>
+      <button className="btn sm ghost" disabled={busy} onClick={cancel}>Cancelar a folga</button>
+    </div>
+  );
+  return (
+    <div className="panel row between" style={{ gap: 10 }}>
+      <span className="small"><b>Vai descansar hoje?</b> <span className="muted">{c.ok ? `Tire o day off: o plano de hoje fica vazio e o estudo vai para os outros dias. A sequência de dias estudados no placar quebra. ${c.why}` : c.why}</span></span>
+      {ask ? (
+        <span className="row" style={{ gap: 6 }}>
+          <span className="small"><b>Tem certeza que você vai folgar?</b> Hoje tem {c.exams.join(" e ")}.</span>
+          <button className="btn sm pri" disabled={busy} onClick={take}>Sim, vou folgar</button>
+          <button className="btn sm ghost" onClick={() => setAsk(false)}>Não</button>
+        </span>
+      ) : <button className="btn sm" disabled={!c.ok || busy} onClick={() => (c.exams.length ? setAsk(true) : take())}>😴 Tirar day off hoje</button>}
+    </div>
+  );
+}
+
 function GroupsArea() {
   const st = useStore();
   const room = useRoom();
@@ -166,7 +207,8 @@ function GroupsArea() {
   const members = cur ? room.members.filter((m) => room.memberships.some((x) => x.code === cur.code && x.user_id === m.user_id)) : [];
   // estudando (abajur aceso) ou parou há menos de 1 h (cinza); depois disso some
   const desk = (m: typeof members[number]) => memberDesk(m, room.totals[m.user_id]);
-  const now = members.filter((m) => desk(m)).sort((a, b) => Number(b.studying) - Number(a.studying) || Number(b.paused) - Number(a.paused) || liveMs(b) - liveMs(a));
+  const off = members.filter((m) => isOffToday(m) && !m.studying);
+  const now = members.filter((m) => desk(m) && !off.includes(m)).sort((a, b) => Number(b.studying) - Number(a.studying) || Number(b.paused) - Number(a.paused) || liveMs(b) - liveMs(a));
   const ago = (m: typeof members[number]) => Math.max(1, Math.round((Date.now() - new Date(m.updated_at).getTime()) / 60000));
   const month = new Map(members.map((m) => [m.user_id, monthStats(withLive(m, room.totals[m.user_id]))]));
   const ms = (m: typeof members[number]) => month.get(m.user_id)!;
@@ -216,6 +258,7 @@ function GroupsArea() {
                 ))}
               </div>
             ) : <p className="small muted" style={{ margin: 0 }}>Ninguém do grupo estudou na última hora.</p>}
+            {off.length > 0 && <p className="small" style={{ margin: "10px 0 0" }}>😴 De folga hoje: {off.map((m) => `${m.nick}${isMe(m.user_id) ? " (você)" : ""}`).join(", ")}.</p>}
             <div className="panel-h" style={{ marginTop: 22 }}><h2>Placar</h2><Tabs value={per} onChange={setPer} options={[["hoje", "Hoje"], ["semana", "Semana"], ["mes", "Mês"]]} /></div>
             {per === "mes" && (
               <div className="panel" style={{ padding: 14, background: "var(--panel2)", marginBottom: 10 }}>
@@ -237,7 +280,7 @@ function GroupsArea() {
                 <div key={m.user_id} className="li hover-row" style={isMe(m.user_id) ? { background: "color-mix(in srgb,var(--accent) 8%,transparent)" } : undefined}>
                   <span className="num" style={{ width: "2ch", textAlign: "right", color: i < 3 && v > 0 ? "var(--accent)" : "var(--muted)" }}>{i + 1}</span>
                   <div className="grow">
-                    <div className="row between" style={{ flexWrap: "nowrap" }}><span className="t">{m.nick}{isMe(m.user_id) ? " (você)" : ""}</span><span className="num">{fmtMin(v)}</span></div>
+                    <div className="row between" style={{ flexWrap: "nowrap" }}><span className="t">{m.nick}{isMe(m.user_id) ? " (você)" : ""}{isOffToday(m) && <span className="chip" style={{ marginLeft: 6 }} title="Tirou day off hoje">de folga hoje</span>}</span><span className="num">{fmtMin(v)}</span></div>
                     <div className="bar" style={{ marginTop: 5 }}><i style={{ width: `${(v / top) * 100}%`, background: isMe(m.user_id) ? "var(--accent)" : "var(--muted)" }} /></div>
                     {per === "mes" && <div className="small muted" style={{ marginTop: 3 }}>estudou {ms(m).active} de {ms(m).elapsed} dias · maior sequência: {qt(ms(m).bestStreak, "dia", "dias")}</div>}
                   </div>
@@ -288,7 +331,7 @@ function FriendsPanel() {
             {m && memberDesk(m, room.totals[m.user_id]) ? <Desk state={memberDesk(m, room.totals[m.user_id])!} size={44} /> : <i className="dot" style={{ background: "var(--muted)", flex: "none", marginTop: 7 }} />}
             <div className="grow" style={{ minWidth: 0 }}>
               <div className="t">{f.nick}</div>
-              <div className="m">{m?.studying ? `estudando agora · ${fmtClock(liveMs(m))}${m.subject ? ` · ${m.subject}` : ""}` : m?.paused ? "pausado" : "fora da sala agora"}</div>
+              <div className="m">{m?.studying ? `estudando agora · ${fmtClock(liveMs(m))}${m.subject ? ` · ${m.subject}` : ""}` : m?.paused ? "pausado" : m && isOffToday(m) ? "de folga hoje 😴" : "fora da sala agora"}</div>
               <select value="" onChange={(e) => { if (e.target.value) room.nudge(f.other, e.target.value as NudgeKey); }} aria-label={`Chamar ${f.nick} para estudar`} style={{ marginTop: 6, padding: "4px 6px", fontSize: ".82em" }}>
                 <option value="">Chamar para estudar…</option>{(Object.keys(NUDGES) as NudgeKey[]).map((k) => <option key={k} value={k}>{NUDGES[k]}</option>)}</select>
             </div>
@@ -389,7 +432,7 @@ function History({ onEdit }: { onEdit: (id: string) => void }) {
           <Tabs value={per} onChange={setPer} label="Período" options={[["7", "7 dias"], ["30", "30 dias"], ["semestre", "Semestre"], ["tudo", "Tudo"]]} />
         </div>
       </div>
-      <div className="row small muted" style={{ marginBottom: 8, gap: 16 }}><span>{sp.n} sessões</span><span>{fmtMin(sp.min)}</span><span>confiança {sp.conf == null ? "–" : nf(sp.conf)}/5</span><span>acerto conferido {pct(sp.acc)}</span></div>
+      <div className="row small muted" style={{ marginBottom: 8, gap: 16 }}><span>{qt(sp.n, "sessão", "sessões")}</span><span>{fmtMin(sp.min)}</span></div>
       {groups.length ? groups.map(([k, arr]) => (
         <div key={k} style={{ marginTop: 10 }}>
           <div className="row between" style={{ borderBottom: "1px solid var(--line)", paddingBottom: 4 }}>
@@ -408,6 +451,7 @@ function Sala() {
   return (
     <>
       <TimerPanel onManual={() => setModal({ k: "session", id: null })} onNewSubject={() => setModal({ k: "subject" })} />
+      <DayOff />
       <GroupsArea />
       <History onEdit={(id) => setModal({ k: "session", id })} />
       {modal?.k === "session" && <SessionModal id={modal.id} onClose={() => setModal(null)} />}

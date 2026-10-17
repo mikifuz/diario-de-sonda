@@ -13,9 +13,9 @@ const A = (p: Partial<Assessment>): Assessment => ({ id: "p2", subject_id: "s", 
 const T = (p: Partial<Topic>): Topic => ({ id: "t", subject_id: "s", parent_id: null, name: "Integrais triplas", position: 0, taught_on: "2026-10-01", assessment_id: "p2", ...p });
 const B = (wd: number, start = "14:00", end = "16:00"): RoutineBlock => ({ id: `b${wd}${start}`, weekday: wd, start_time: start, end_time: end, kind: "estudo", subject_id: null, label: "" });
 const S = (p: Partial<Session>): Session => ({ id: Math.random().toString(), subject_id: "s", topic_id: "t", activity: "exercicios", started_at: new Date(2026, 9, 10, 10).toISOString(), duration_min: 30,
-  questions: null, correct: null, notes: "", confidence: null, result: null, autonomy: null, difficulty: null, comprehension: null, ...p });
+  notes: "", ...p });
 const every = [0, 1, 2, 3, 4, 5, 6].map((d) => B(d)); // 2 h por dia → 96 min úteis (20% de reserva)
-const inp = (p: Partial<RevInput>): RevInput => ({ today: TODAY, nowMin: 8 * 60, blocks: every, events: [], subjects: [SUB()], topics: [T({})], sessions: [], assessments: [A({})], items: [], logs: [], mistakes: [], ...p });
+const inp = (p: Partial<RevInput>): RevInput => ({ today: TODAY, nowMin: 8 * 60, blocks: every, events: [], subjects: [SUB()], topics: [T({})], sessions: [], assessments: [A({})], ...p });
 
 test("conteúdo sem dados recebe a meta cheia, em pedaços espaçados, e a véspera tem revisão geral", () => {
   const [pl] = reversePlan(inp({}));
@@ -28,14 +28,15 @@ test("conteúdo sem dados recebe a meta cheia, em pedaços espaçados, e a vésp
   assert.equal(pl.missing, 0);
 });
 
-test("o que já foi estudado desconta e conteúdo dominado pede menos", () => {
-  const sessions = [1, 2, 3].map(() => S({ result: "certo", autonomy: "sozinho" }));
+test("o que já foi estudado desconta da meta; matéria difícil pede mais", () => {
+  const sessions = [1, 2, 3].map(() => S({}));
   const [pl] = reversePlan(inp({ sessions }));
-  assert.equal(pl.topics[0].band, "dominado");
-  assert.equal(pl.topics[0].target, 30);
+  assert.equal(pl.topics[0].target, 120);
   assert.equal(pl.topics[0].done, 90);
-  assert.equal(pl.topics[0].need, 0);
-  assert.equal(pl.chunks.filter((x) => !x.final).length, 0);
+  assert.equal(pl.topics[0].need, 30);
+  assert.equal(pl.chunks.filter((x) => !x.final).length, 1);
+  assert.equal(reversePlan(inp({ subjects: [SUB({ traits: { esforco: "dificil" } })] }))[0].topics[0].target, 180); // 2 h × 1,5
+  assert.equal(reversePlan(inp({ subjects: [SUB({ traits: { esforco: "muito" } })] }))[0].topics[0].target, 240); // 2 h × 2
 });
 
 test("conteúdo ainda não dado só entra a partir da aula", () => {
@@ -58,7 +59,7 @@ test("prova mais cedo usa o tempo primeiro e as tarefas de hoje vão para o plan
   assert.equal(plans[0].exam.id, "f1");
   const tasks = todayTasks(plans, TODAY);
   assert.ok(tasks.length >= 1 && tasks[0].kind === "preparar");
-  const day = planDay({ today: TODAY, nowMin: 8 * 60, pref: "depois", blocks: every, events: [], subjects, topics, sessions: [], assessments, items: [], mistakes: [], extra: tasks });
+  const day = planDay({ today: TODAY, nowMin: 8 * 60, pref: "depois", blocks: every, events: [], subjects, topics, sessions: [], assessments, extra: tasks });
   assert.ok(day.slots[0].placed.some((x) => x.task.kind === "preparar"));
   assert.match(day.slots[0].placed[0].task.why, /A3 de Física II/);
 });
@@ -68,21 +69,28 @@ test("sem conteúdos ligados, explica o que fazer", () => {
   assert.match(pl.notes[0], /Nenhum conteúdo ligado/);
 });
 
-test("quando não cabe tudo: recomenda o que priorizar, com o motivo e o que fazer", () => {
-  const topics = [T({ id: "a", name: "Integrais duplas" }), T({ id: "b", name: "Teorema de Green" }), T({ id: "c", name: "Rotacional" })];
-  const sessions = [S({ topic_id: "b", confidence: 2 }), S({ topic_id: "b", confidence: 2 })];
-  const mistakes = [1, 2].map((i) => ({ id: `m${i}`, subject_id: "s", topic_id: "c", session_id: null, category: "sinal" as const, description: "x", correction: "", source: "", occurred_on: "2026-10-10" }));
+test("quando não cabe tudo: o menos estudado vem primeiro e o app mostra horários livres para estudar a mais", () => {
+  const topics = [T({ id: "b", name: "Teorema de Green" }), T({ id: "a", name: "Integrais duplas" }), T({ id: "c", name: "Rotacional", taught_on: "2026-10-05" })];
+  const sessions = [S({ topic_id: "b" }), S({ topic_id: "b" })];
   const pouco = [B(1, "14:00", "15:00")]; // só 1 h na segunda
-  const [pl] = reversePlan(inp({ topics, sessions, mistakes, blocks: pouco }));
+  const [pl] = reversePlan(inp({ topics, sessions, blocks: pouco }));
   assert.ok(pl.missing > 0);
-  assert.deepEqual(pl.priority.map((x) => x.topic.name), ["Rotacional", "Teorema de Green", "Integrais duplas"]);
-  assert.match(pl.priority[0].why, /2 erros registrados/);
-  assert.match(pl.priority[0].how, /refaça os exercícios em que errou/);
-  assert.match(pl.priority[1].why, /confiança baixa \(2,0\/5\)/);
-  // o tempo que existe vai primeiro para o mais urgente
-  assert.equal(pl.chunks.find((c) => !c.final)?.topicId, "c");
+  // nada estudado na frente (pela ordem das aulas), depois o que estudou menos
+  assert.deepEqual(pl.priority.map((x) => x.topic.name), ["Integrais duplas", "Rotacional", "Teorema de Green"]);
+  assert.match(pl.priority[0].why, /nada estudado ainda/);
+  assert.match(pl.priority[2].why, /estudou 60 de 120 min da meta/);
+  // o tempo que existe vai primeiro para o menos estudado
+  assert.equal(pl.chunks.find((c) => !c.final)?.topicId, "a");
+  // horários livres de verdade (8h–22h, fora da rotina), em dias diferentes, de até 2 h
+  assert.equal(pl.suggest.length, 2);
+  assert.ok(pl.suggest.every((w) => w.end - w.start <= 120 && w.day <= "2026-10-16"));
+  assert.notEqual(pl.suggest[0].day, pl.suggest[1].day);
+  // estudo extra marcado no calendário diminui o que falta
+  const ev = { id: "x", subject_id: "s", title: "Estudo extra", type: "estudo" as const, date: "2026-10-13", time: "09:00", end_time: "11:00", priority: "alta" as const, status: "pendente" as const, description: "" };
+  assert.ok(reversePlan(inp({ topics, sessions, blocks: pouco, events: [ev] }))[0].missing < pl.missing);
   // com tempo de sobra, não há recomendação
   assert.equal(reversePlan(inp({ topics: topics.slice(0, 1) }))[0].priority.length, 0);
+  assert.equal(reversePlan(inp({ topics: topics.slice(0, 1) }))[0].suggest.length, 0);
 });
 
 // Caso real (amiga do dono): prova de matéria difícil na semana que vem e o plano do dia só
@@ -92,9 +100,9 @@ test("prova sem conteúdos cadastrados ganha tempo para a matéria toda, maior s
   const whole = pl.chunks.filter((c) => c.whole);
   assert.ok(whole.length > 0);
   assert.equal(whole[0].day, TODAY);
-  assert.equal(whole.reduce((a, c) => a + c.minutes, 0), 335); // 4 h × 1,4 (difícil)
+  assert.equal(whole.reduce((a, c) => a + c.minutes, 0), 360); // 4 h × 1,5 (difícil)
   assert.equal(pl.missing, 0);
-  assert.match(pl.notes.join(" "), /Nenhum conteúdo ligado a esta prova: o app reserva 5h35 para a matéria toda/);
+  assert.match(pl.notes.join(" "), /Nenhum conteúdo ligado a esta prova: o app reserva 6 h para a matéria toda/);
   assert.equal(todayTasks([pl], TODAY)[0].title, "Estudar Cálculo III para a P2");
 });
 

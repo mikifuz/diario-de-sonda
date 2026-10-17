@@ -23,14 +23,14 @@ test("demonstração: dados coerentes (nada no futuro, tudo ligado à disciplina
 test("demonstração: as telas principais têm o que mostrar", () => {
   const s0 = d.subjects[0];
   assert.ok(gradeCalc(s0, d.assessments.filter((a) => a.subject_id === s0.id)).partial != null);
-  const alerts = buildAlerts({ today: TODAY, subjects: d.subjects, topics: d.topics, sessions: d.sessions, assessments: d.assessments, items: d.reviews, logs: d.reviewLogs, mistakes: d.mistakes });
+  const alerts = buildAlerts({ today: TODAY, subjects: d.subjects, topics: d.topics, sessions: d.sessions, assessments: d.assessments });
   assert.ok(alerts.length > 0);
-  const plans = reversePlan({ today: TODAY, nowMin: 8 * 60, blocks: d.blocks, events: d.events, subjects: d.subjects, topics: d.topics, sessions: d.sessions, assessments: d.assessments, items: d.reviews, logs: d.reviewLogs, mistakes: d.mistakes });
+  const plans = reversePlan({ today: TODAY, nowMin: 8 * 60, blocks: d.blocks, events: d.events, subjects: d.subjects, topics: d.topics, sessions: d.sessions, assessments: d.assessments });
   assert.ok(plans.length > 0 && plans.some((p) => p.chunks.length > 0));
-  const day = planDay({ today: TODAY, nowMin: 8 * 60, pref: "depois", blocks: d.blocks, events: d.events, subjects: d.subjects, topics: d.topics, sessions: d.sessions, assessments: d.assessments, items: d.reviews, mistakes: d.mistakes, extra: todayTasks(plans, TODAY) });
+  const day = planDay({ today: TODAY, nowMin: 8 * 60, pref: "depois", blocks: d.blocks, events: d.events, subjects: d.subjects, topics: d.topics, sessions: d.sessions, assessments: d.assessments, extra: todayTasks(plans, TODAY) });
   assert.ok(day.slots.some((x) => x.placed.length > 0));
   assert.ok(d.notes.some((n) => n.kind === "relatorio"));
-  const trips = tripImpacts({ today: TODAY, nowMin: 8 * 60, blocks: d.blocks, events: d.events, subjects: d.subjects, topics: d.topics, sessions: d.sessions, assessments: d.assessments, items: d.reviews, logs: d.reviewLogs, mistakes: d.mistakes });
+  const trips = tripImpacts({ today: TODAY, nowMin: 8 * 60, blocks: d.blocks, events: d.events, subjects: d.subjects, topics: d.topics, sessions: d.sessions, assessments: d.assessments });
   assert.equal(trips.length, 1);
   assert.ok(trips[0].lost > 0 && trips[0].why);
 });

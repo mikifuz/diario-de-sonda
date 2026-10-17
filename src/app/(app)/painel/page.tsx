@@ -3,9 +3,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { activeSubjects, agenda, useStore } from "@/lib/store";
-import { addDays, daysBetween, dkey, fmtMin, gradeCalc, inRange, keyDate, nf, pct, periodRange, stats, todayKey, verified, weekStartKey, type Period, qt } from "@/lib/calc";
+import { addDays, daysBetween, dkey, fmtMin, gradeCalc, inRange, keyDate, nf, pct, periodRange, stats, todayKey, type Period, qt } from "@/lib/calc";
 import { GRADED } from "@/lib/constants";
-import { ChartCalib, ChartDays, ChartLine, Gauge, type DayBar } from "@/components/charts";
+import { ChartDays, type DayBar } from "@/components/charts";
 import { Dot, Empty, I, Icon, Tabs } from "@/components/ui";
 import { EventModal, SubjectModal } from "@/components/modals";
 import { AlertsPanel, TodoPanel, VerdictCard } from "@/components/dashboard";
@@ -57,17 +57,6 @@ export default function Painel() {
   }
   const bySub = list.map((s) => ({ s, st: stats(inP.filter((x) => x.subject_id === s.id)) })).sort((a, b) => b.st.min - a.st.min);
   const maxMin = Math.max(1, ...bySub.map((x) => x.st.min));
-  const cal = [1, 2, 3, 4, 5].map((c) => {
-    const v = inP.filter((s) => s.confidence === c).map(verified).filter((x): x is number => x != null);
-    return { n: v.length, acc: v.length ? v.reduce((a, b) => a + b, 0) / v.length : null };
-  });
-  const calN = cal.reduce((a, r) => a + r.n, 0);
-  const wk: { lab: string; conf: number | null; acc: number | null }[] = [];
-  for (let i = 7; i >= 0; i--) {
-    const a = addDays(weekStartKey(t), -7 * i), b = addDays(a, 6), s2 = stats(all.filter((s) => inRange(s, [a, b])));
-    const d = keyDate(a);
-    wk.push({ lab: `${d.getDate()}/${d.getMonth() + 1}`, conf: s2.conf, acc: s2.acc });
-  }
   const ag = agenda(st.subjects, st.assessments, st.events);
   const up = ag.filter((e) => e.date >= t && e.date <= addDays(t, 21) && GRADED.includes(e.type) && e.status === "pendente").slice(0, 6);
   const pend = ag.filter((e) => e.date >= t && e.status === "pendente").length;
@@ -112,37 +101,17 @@ export default function Painel() {
         </div>
       </section>
       <section className="panel">
-        <div className="panel-h"><h2>Confiança × resultado</h2><Tabs value={per} onChange={setPer} label="Período" options={[["semana", "Semana"], ["mes", "Mês"], ["semestre", "Semestre"], ["tudo", "Tudo"]]} /></div>
-        <div className="grid g3">
-          <div className="stack">
-            <Gauge v={sp.acc} label="Acerto conferido" sub={`${qt(sp.accN, "registro conferido", "registros conferidos")}`} color="var(--ok)" />
-            <Gauge v={sp.conf == null ? null : (sp.conf - 1) / 4} label="Confiança declarada" sub={sp.conf == null ? "sem autoavaliações" : `média ${nf(sp.conf)} de 5 · ${qt(sp.confN, "registro", "registros")}`} color="var(--accent)" />
-            <Gauge v={sp.solo} label="Resolvido sozinho" sub={sp.auN ? `${qt(sp.auN, "registro", "registros")} com autonomia` : "sem registros de autonomia"} color="var(--warn)" />
-            <p className="small muted" style={{ margin: 0 }}>Os três medidores são independentes. Confiança é o que você sentiu; acerto é o que foi conferido; autonomia é quanto precisou de apoio.</p>
-          </div>
-          <div>
-            <h3 style={{ marginBottom: 6 }}>Calibração</h3>
-            <p className="small muted" style={{ margin: "0 0 8px" }}>Para cada nível de confiança, quanto você realmente acertou. A linha tracejada é a referência de uma confiança bem ajustada.</p>
-            {calN ? <ChartCalib rows={cal} /> : <Empty>Registre sessões com autoavaliação e resultado conferido para ver a calibração.</Empty>}
-          </div>
-          <div className="stack">
-            <div><h3>Confiança média por semana</h3>{wk.some((w) => w.conf != null) ? <ChartLine label="Confiança média por semana" pts={wk.map((w) => w.conf)} min={1} max={5} fmt={(v) => nf(v)} labels={wk.map((w) => w.lab)} color="var(--accent)" /> : <p className="muted small">Sem autoavaliações ainda.</p>}</div>
-            <div><h3>Acerto conferido por semana</h3>{wk.some((w) => w.acc != null) ? <ChartLine label="Acerto conferido por semana" pts={wk.map((w) => w.acc)} min={0} max={1} fmt={(v) => Math.round(v * 100) + "%"} labels={wk.map((w) => w.lab)} color="var(--ok)" /> : <p className="muted small">Sem resultados conferidos ainda.</p>}</div>
-          </div>
-        </div>
-      </section>
-      <section className="panel">
-        <div className="panel-h"><h2>Disciplinas no período</h2><span className="lbl">{fmtMin(sp.min)} no total</span></div>
+        <div className="panel-h"><h2>Disciplinas no período</h2><span className="lbl">{fmtMin(sp.min)} no total</span><Tabs value={per} onChange={setPer} label="Período" options={[["semana", "Semana"], ["mes", "Mês"], ["semestre", "Semestre"], ["tudo", "Tudo"]]} /></div>
         {bySub.length ? (
           <div className="tbl-wrap"><table>
-            <thead><tr><th>Disciplina</th><th style={{ width: "30%" }}>Horas</th><th className="n">Sessões</th><th className="n">Confiança</th><th className="n">Acerto</th><th className="n">Média parcial</th></tr></thead>
+            <thead><tr><th>Disciplina</th><th style={{ width: "30%" }}>Horas</th><th className="n">Sessões</th><th className="n">Média parcial</th></tr></thead>
             <tbody>{bySub.map(({ s, st: x }) => {
               const gc = gradeCalc(s, itemsOf(s.id));
               return (
                 <tr key={s.id} className="clickable" onClick={() => router.push(`/disciplinas/${s.id}`)}>
                   <td><span className="row" style={{ gap: 8, flexWrap: "nowrap" }}><Dot c={s.color} /><span className="t">{s.name}</span></span></td>
                   <td><div className="row" style={{ flexWrap: "nowrap" }}><div className="bar" style={{ flex: 1, minWidth: 60 }}><i style={{ width: `${(x.min / maxMin) * 100}%`, background: s.color }} /></div><span className="num small" style={{ minWidth: 64, textAlign: "right" }}>{fmtMin(x.min)}</span></div></td>
-                  <td className="n">{x.n}</td><td className="n">{x.conf == null ? "–" : nf(x.conf)}</td><td className="n">{pct(x.acc)}</td>
+                  <td className="n">{x.n}</td>
                   <td className="n" style={{ color: gc.partial == null ? "var(--muted)" : gc.partial >= gc.min ? "var(--ok)" : "var(--bad)" }}>{gc.partial == null ? "–" : nf(gc.partial)}</td>
                 </tr>
               );

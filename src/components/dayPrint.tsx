@@ -8,7 +8,7 @@ import { daysBetween, fmtMin, keyDate, qt } from "@/lib/calc";
 import { BLOCK, EVT } from "@/lib/constants";
 import { classOff, dm, evOn, fromMin, noClass, planDay, toMin, type PlanInput, type Task } from "@/lib/plan";
 
-const label = (t: Task) => (t.kind === "revisao" ? `Revisão: ${t.title}` : t.title);
+const label = (t: Task) => t.title;
 
 interface Line { at: number | null; end: number | null; text: string; sub?: string; box: boolean }
 

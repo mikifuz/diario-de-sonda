@@ -1,13 +1,12 @@
 "use client";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Modal, Seg, Slider, ConfirmButton, Icon, I } from "./ui";
-import { ACT, AUTO_OPTS, COLORS, COMP_OPTS, CONF_OPTS, DIFF, RES_OPTS, EVT, GRADED, PREF, PRIO, RES, STATUS } from "@/lib/constants";
-import { dkey, fmtMin, pad, parseNum, todayKey, qt } from "@/lib/calc";
+import { Modal, ConfirmButton, Icon, I } from "./ui";
+import { ACT, COLORS, EVT, GRADED, PREF, PRIO, STATUS } from "@/lib/constants";
+import { dkey, pad, parseNum, todayKey, qt } from "@/lib/calc";
 import { activeSubjects, useStore } from "@/lib/store";
 import { EFFORT } from "@/lib/effort";
-import type { Activity, Assessment, AssessmentKind, Autonomy, CalEvent, Comprehension, EventType, Priority, Result, Session, Status, StudyPref, Subject, Topic, Traits, Effort } from "@/lib/types";
-import { MistakeModal } from "./planning";
+import type { Activity, Assessment, AssessmentKind, CalEvent, EventType, Priority, Session, Status, StudyPref, Subject, Topic, Traits, Effort } from "@/lib/types";
 import { dm, pushLessons } from "@/lib/plan";
 import { REPEAT, defaultUntil, repeatDates, type Repeat } from "@/lib/repeat";
 
@@ -24,84 +23,6 @@ export function TopicOptions({ topics, subjectId, exclude }: { topics: Topic[]; 
   return <>{out}</>;
 }
 
-/* ============ Autoavaliação ============ */
-export interface EvalState {
-  confidence: number | null; result: Result | null; autonomy: Autonomy | null; difficulty: number | null; comprehension: Comprehension | null;
-  questions: string; correct: string; notes: string;
-}
-export const evalFrom = (s?: Partial<Session> | null): EvalState => ({
-  confidence: s?.confidence ?? null, result: s?.result ?? null, autonomy: s?.autonomy ?? null, difficulty: s?.difficulty ?? null,
-  comprehension: s?.comprehension ?? null, questions: s?.questions != null ? String(s.questions) : "", correct: s?.correct != null ? String(s.correct) : "", notes: s?.notes || "",
-});
-function evalToRow(e: EvalState): Pick<Session, "confidence" | "result" | "autonomy" | "difficulty" | "comprehension" | "questions" | "correct" | "notes"> | string {
-  const q = parseNum(e.questions), c = parseNum(e.correct);
-  if (q != null && (q < 0 || !Number.isInteger(q))) return "Questões feitas deve ser um número inteiro.";
-  if (c != null && (c < 0 || !Number.isInteger(c))) return "Questões certas deve ser um número inteiro.";
-  if (q != null && c != null && c > q) return "Questões certas não pode ser maior que feitas.";
-  return { confidence: e.confidence, result: e.result, autonomy: e.autonomy, difficulty: e.difficulty, comprehension: e.comprehension, questions: q, correct: c, notes: e.notes.trim() };
-}
-
-export function EvalFields({ v, set }: { v: EvalState; set: (v: EvalState) => void }) {
-  const up = (p: Partial<EvalState>) => set({ ...v, ...p });
-  const open = !!(v.questions || v.difficulty != null || v.comprehension || v.notes);
-  return (
-    <>
-      <div className="qblock"><span className="q">Quão confiante você se sentiu resolvendo?</span>
-        <Slider label="Confiança" value={v.confidence} onChange={(x) => up({ confidence: x })} options={CONF_OPTS} /></div>
-      <div className="qblock"><span className="q">Como foi o resultado?</span>
-        <Slider label="Resultado" value={v.result === "nao" ? null : v.result} onChange={(x) => up({ result: x })} options={RES_OPTS} />
-        <label className="check small"><input type="checkbox" checked={v.result === "nao"} onChange={(e) => up({ result: e.target.checked ? "nao" : null })} />{RES.nao} (não entra no acerto)</label></div>
-      <div className="qblock"><span className="q">Quanto apoio você usou?</span>
-        <Slider label="Apoio usado" value={v.autonomy} onChange={(x) => up({ autonomy: x })} options={AUTO_OPTS} /></div>
-      <details open={open}>
-        <summary>Mais detalhes (opcional)</summary>
-        <div className="stack" style={{ marginTop: 12, gap: 14 }}>
-          <div className="fgrid">
-            <label className="f"><span>Questões feitas</span><input type="number" min={0} value={v.questions} onChange={(e) => up({ questions: e.target.value })} /></label>
-            <label className="f"><span>Questões certas (conferidas)</span><input type="number" min={0} value={v.correct} onChange={(e) => up({ correct: e.target.value })} /></label>
-          </div>
-          <div className="qblock"><span className="q">Dificuldade percebida</span>
-            <Slider label="Dificuldade percebida" value={v.difficulty} onChange={(x) => up({ difficulty: x })} options={DIFF.map((d, i) => [i, d] as [number, string])} /></div>
-          <div className="qblock"><span className="q">Compreensão</span>
-            <Slider label="Compreensão" value={v.comprehension} onChange={(x) => up({ comprehension: x })} options={COMP_OPTS} /></div>
-          <label className="f"><span>Observações</span><textarea value={v.notes} onChange={(e) => up({ notes: e.target.value })} placeholder="Onde travou, o que precisa rever…" /></label>
-          <p className="small muted" style={{ margin: 0 }}>Quando você informa questões feitas e certas, o acerto conferido usa esse número. Sem isso, usa o resultado declarado (&quot;Ainda não conferi&quot; não entra no cálculo).</p>
-        </div>
-      </details>
-    </>
-  );
-}
-
-export function EvalModal({ id, onClose }: { id: string; onClose: () => void }) {
-  const st = useStore();
-  const s = st.sessions.find((x) => x.id === id);
-  const [v, setV] = useState<EvalState>(() => evalFrom(s));
-  const [logMistake, setLogMistake] = useState(true);
-  const [mistakeFor, setMistakeFor] = useState<Session | null>(null);
-  if (mistakeFor) return <MistakeModal id={null} preset={{ subject_id: mistakeFor.subject_id, topic_id: mistakeFor.topic_id, session_id: mistakeFor.id }} onClose={onClose} />;
-  if (!s) return null;
-  const sub = st.subjects.find((x) => x.id === s.subject_id);
-  const wrong = v.result === "parcial" || v.result === "errado";
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    const r = evalToRow(v);
-    if (typeof r === "string") { st.toast(r); return; }
-    if (await st.save("study_sessions", { ...s, ...r })) {
-      st.toast("Sessão registrada.");
-      if (wrong && logMistake) setMistakeFor(s); else onClose();
-    }
-  };
-  return (
-    <Modal title="Como foi a sessão?" sub={`${sub?.name || ""} · ${fmtMin(s.duration_min)}`} onClose={onClose}>
-      <form className="stack" style={{ gap: 16 }} onSubmit={submit}>
-        <EvalFields v={v} set={setV} />
-        {wrong && <label className="check"><input type="checkbox" checked={logMistake} onChange={(e) => setLogMistake(e.target.checked)} />Registrar o erro (já agenda uma revisão)</label>}
-        <div className="modal-f"><button type="button" className="btn ghost" onClick={onClose}>Pular</button><button className="btn pri">Salvar avaliação</button></div>
-      </form>
-    </Modal>
-  );
-}
-
 /* ============ Sessão (manual ou edição) ============ */
 export function SessionModal({ id, onClose }: { id: string | null; onClose: () => void }) {
   const st = useStore();
@@ -114,16 +35,14 @@ export function SessionModal({ id, onClose }: { id: string | null; onClose: () =
   const [date, setDate] = useState(dkey(start));
   const [time, setTime] = useState(`${pad(start.getHours())}:${pad(start.getMinutes())}`);
   const [dur, setDur] = useState(String(orig?.duration_min ?? 60));
-  const [ev, setEv] = useState<EvalState>(() => evalFrom(orig));
+  const [notes, setNotes] = useState(orig?.notes || "");
   if (!list.length) return <Modal title="Registrar sessão" onClose={onClose}><p>Cadastre uma disciplina primeiro.</p></Modal>;
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const d = parseNum(dur);
     if (!d || d < 1 || d > 1440 || !Number.isInteger(d)) { st.toast("Informe a duração em minutos inteiros (1 a 1440)."); return; }
-    const r = evalToRow(ev);
-    if (typeof r === "string") { st.toast(r); return; }
     const [y, m, dd] = date.split("-").map(Number), [hh, mi] = (time || "12:00").split(":").map(Number);
-    const row: Session = { id: orig?.id || crypto.randomUUID(), subject_id: subjectId, topic_id: topicId || null, activity, started_at: new Date(y, m - 1, dd, hh, mi).toISOString(), duration_min: d, ...r };
+    const row: Session = { id: orig?.id || crypto.randomUUID(), subject_id: subjectId, topic_id: topicId || null, activity, started_at: new Date(y, m - 1, dd, hh, mi).toISOString(), duration_min: d, notes: notes.trim() };
     if (await st.save("study_sessions", row)) { st.toast(orig ? "Sessão atualizada." : "Sessão registrada."); onClose(); }
   };
   return (
@@ -137,8 +56,7 @@ export function SessionModal({ id, onClose }: { id: string | null; onClose: () =
           <label className="f"><span>Início</span><input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
           <label className="f"><span>Duração (minutos)</span><input type="number" min={1} max={1440} value={dur} onChange={(e) => setDur(e.target.value)} required /></label>
         </div>
-        <h3>Autoavaliação</h3>
-        <EvalFields v={ev} set={setEv} />
+        <label className="f"><span>Observações</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Opcional" /></label>
         <div className="modal-f">
           {orig && <span style={{ marginRight: "auto" }}><ConfirmButton label={<><Icon d={I.trash} s={15} />Excluir</>} question="Excluir esta sessão?" confirmLabel="Sim, excluir" onConfirm={async () => { if (await st.remove("study_sessions", orig.id)) { st.toast("Sessão excluída."); onClose(); } }} /></span>}
           <button type="button" className="btn ghost" onClick={onClose}>Cancelar</button><button className="btn pri">Salvar</button>
@@ -281,17 +199,17 @@ export function TopicModal({ id, onClose }: { id: string; onClose: () => void })
 }
 
 /* ============ Item do calendário ============ */
-interface EvForm { title: string; type: EventType; subject_id: string; date: string; end: string; time: string; priority: Priority; status: Status; description: string; counted: boolean; weight: string }
+interface EvForm { title: string; type: EventType; subject_id: string; date: string; end: string; time: string; until: string; priority: Priority; status: Status; description: string; counted: boolean; weight: string }
 export function EventModal({ id, src, date, type, onClose }: { id: string | null; src?: "event" | "item"; date?: string; type?: EventType; onClose: () => void }) {
   const st = useStore();
   const list = activeSubjects(st.subjects);
   const item = id && src === "item" ? st.assessments.find((a) => a.id === id) : null;
   const ev = id && src === "event" ? st.events.find((e) => e.id === id) : null;
   const [f, setF] = useState<EvForm>(() => item
-    ? { title: item.name, type: item.kind as EventType, subject_id: item.subject_id, date: item.date || todayKey(), end: "", time: item.time || "", priority: item.priority, status: item.status, description: item.description, counted: true, weight: String(item.weight).replace(".", ",") }
-    : ev ? { title: ev.title, type: ev.type, subject_id: ev.subject_id || "", date: ev.date, end: ev.end_date || "", time: ev.time || "", priority: ev.priority, status: ev.status, description: ev.description, counted: false, weight: "1" }
-      : type === "viagem" ? { title: "", type, subject_id: "", date: date || todayKey(), end: "", time: "", priority: "media", status: "pendente", description: "", counted: false, weight: "1" }
-      : { title: "", type: "prova", subject_id: list[0]?.id || "", date: date || todayKey(), end: "", time: "", priority: "alta", status: "pendente", description: "", counted: true, weight: "1" });
+    ? { title: item.name, type: item.kind as EventType, subject_id: item.subject_id, date: item.date || todayKey(), end: "", time: item.time || "", until: "", priority: item.priority, status: item.status, description: item.description, counted: true, weight: String(item.weight).replace(".", ",") }
+    : ev ? { title: ev.title, type: ev.type, subject_id: ev.subject_id || "", date: ev.date, end: ev.end_date || "", time: ev.time || "", until: ev.end_time || "", priority: ev.priority, status: ev.status, description: ev.description, counted: false, weight: "1" }
+      : type === "viagem" ? { title: "", type, subject_id: "", date: date || todayKey(), end: "", time: "", until: "", priority: "media", status: "pendente", description: "", counted: false, weight: "1" }
+      : { title: "", type: "prova", subject_id: list[0]?.id || "", date: date || todayKey(), end: "", time: "", until: "", priority: "alta", status: "pendente", description: "", counted: true, weight: "1" });
   const up = (x: Partial<EvForm>) => setF({ ...f, ...x });
   const canCount = GRADED.includes(f.type) && !!f.subject_id;
   // repetir: só item novo do calendário (não viagem nem algo que conta na média); cada repetição vira um item próprio
@@ -315,6 +233,8 @@ export function EventModal({ id, src, date, type, onClose }: { id: string | null
     const time = f.time || null;
     const trip = f.type === "viagem";
     if (trip && f.end && f.end < f.date) { st.toast("A volta precisa ser no mesmo dia ou depois da ida."); return; }
+    const study = f.type === "estudo" && !!f.time && !!f.until;
+    if (study && f.until <= f.time) { st.toast("O fim do estudo precisa ser depois do início."); return; }
     if (counted) {
       const base: Assessment = item ? { ...item } : { id: crypto.randomUUID(), subject_id: f.subject_id, name: "", kind: "prova", date: null, time: null, weight: 1, grade: null, predicted: null, sim_c: null, sim_e: null, sim_o: null, priority: "alta", status: "pendente", description: "",
         // prova nova: se a disciplina tem uma única SUB, ela vale para esta prova
@@ -326,7 +246,9 @@ export function EventModal({ id, src, date, type, onClose }: { id: string | null
     } else {
       const row: CalEvent = { id: ev?.id || crypto.randomUUID(), subject_id: trip ? null : f.subject_id || null, title: f.title.trim(), type: f.type, date: f.date, time, priority: f.priority, status: f.status, description: f.description.trim(),
         // só manda a volta quando há uma (assim o resto do calendário funciona mesmo antes da migration de viagens)
-        ...(trip ? { end_date: f.end && f.end > f.date ? f.end : null } : ev?.end_date ? { end_date: null } : {}) };
+        ...(trip ? { end_date: f.end && f.end > f.date ? f.end : null } : ev?.end_date ? { end_date: null } : {}),
+        // fim do estudo extra: o horário conta como bloco de estudo no plano daquele dia
+        ...(study ? { end_time: f.until } : ev?.end_time ? { end_time: null } : {}) };
       const rows = dates.map((d, i) => (i === 0 ? row : { ...row, id: crypto.randomUUID(), date: d }));
       if (!(await st.saveMany("events", rows))) return;
       if (item) await st.remove("assessments", item.id);
@@ -339,7 +261,7 @@ export function EventModal({ id, src, date, type, onClose }: { id: string | null
       <form className="stack" style={{ gap: 14 }} onSubmit={submit}>
         <div className="fgrid">
           <label className="f full"><span>{f.type === "viagem" ? "Para onde? *" : "Título *"}</span><input type="text" value={f.title} onChange={(e) => up({ title: e.target.value })} required placeholder={f.type === "viagem" ? "Ex.: Casa dos pais" : "Ex.: Prova 2"} /></label>
-          <label className="f"><span>Tipo</span><select value={f.type} onChange={(e) => up({ type: e.target.value as EventType })}>{Object.entries(EVT).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
+          <label className="f"><span>Tipo</span><select value={f.type} onChange={(e) => up({ type: e.target.value as EventType })}>{Object.entries(EVT).filter(([k]) => k !== "folga" || f.type === "folga").map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
           {f.type === "viagem" ? <>
             <label className="f"><span>Ida *</span><input type="date" value={f.date} onChange={(e) => up({ date: e.target.value, end: f.end && f.end < e.target.value ? e.target.value : f.end })} required /></label>
             <label className="f"><span>Volta</span><input type="date" value={f.end} min={f.date} onChange={(e) => up({ end: e.target.value })} /></label>
@@ -349,7 +271,12 @@ export function EventModal({ id, src, date, type, onClose }: { id: string | null
           <label className="f"><span>Disciplina</span><select value={f.subject_id} onChange={(e) => up({ subject_id: e.target.value })}><option value="">Nenhuma</option>{list.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           {f.type === "sem_aula" && <p className="small full" style={{ margin: 0 }}>Sem disciplina: não há aula de nenhuma matéria neste dia (feriado, recesso). Com disciplina: só a aula dela não acontece. No plano, os horários dessas aulas viram tempo de estudo. Feriados nacionais o app já conhece.</p>}
           <label className="f"><span>Data *</span><input type="date" value={f.date} onChange={(e) => up({ date: e.target.value })} required /></label>
-          <label className="f"><span>Horário</span><input type="time" value={f.time} onChange={(e) => up({ time: e.target.value })} /></label>
+          <label className="f"><span>{f.type === "estudo" ? "Início" : "Horário"}</span><input type="time" value={f.time} onChange={(e) => up({ time: e.target.value })} /></label>
+          {f.type === "estudo" && <>
+            <label className="f"><span>Fim</span><input type="time" value={f.until} onChange={(e) => up({ until: e.target.value })} /></label>
+            <p className="small full" style={{ margin: 0 }}>Com início e fim, esse horário vira tempo de estudo no plano do dia: o app encaixa ali o estudo das provas e das aulas.</p>
+          </>}
+          {f.type === "folga" && <p className="small full" style={{ margin: 0 }}>Day off: nesse dia o plano não marca estudo, e o estudo das provas vai para os outros dias. Para tirar ou cancelar a folga de hoje, use o botão na Sala.</p>}
           </>}
           {f.type !== "viagem" && <label className="f"><span>Prioridade</span><select value={f.priority} onChange={(e) => up({ priority: e.target.value as Priority })}>{Object.entries(PRIO).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>}
           <label className="f"><span>Status</span><select value={f.status} onChange={(e) => up({ status: e.target.value as Status })}>{Object.entries(STATUS).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>

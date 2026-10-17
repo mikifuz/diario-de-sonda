@@ -44,11 +44,8 @@ test("converte com novos ids e mantém relações", () => {
   assert.equal(r.sessions.length, 2);
   assert.equal(r.sessions[0].subject_id, sid);
   assert.equal(r.sessions[0].topic_id, r.topics[1].id);
-  assert.equal(r.sessions[0].confidence, 4);
   // valores inválidos viram nulos/padrão em vez de quebrar a importação
   assert.equal(r.sessions[1].activity, "exercicios");
-  assert.equal(r.sessions[1].correct, null);
-  assert.equal(r.sessions[1].confidence, null);
   assert.equal(r.events.length, 1);
   assert.equal(r.events[0].subject_id, sid);
   assert.equal(r.skipped, 3);
