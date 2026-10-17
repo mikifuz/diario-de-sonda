@@ -147,12 +147,22 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   // presença acompanha o cronômetro
   const timer = st.profile?.timer || null;
   const subjName = timer ? st.subjects.find((s) => s.id === timer.subject_id)?.name || "" : "";
-  const pushing = useRef(false);
+  // Só este aparelho escreve a própria presença quando o SEU cronômetro muda (ou ao entrar na sala),
+  // nunca em resposta à linha do banco: com dois aparelhos abertos (um deles com o cronômetro
+  // atrasado, ex.: aba em segundo plano), cada um desfazia o que o outro gravava e a pessoa
+  // ficava piscando na sala, estudando/parado a cada segundo.
+  const meRef = useRef(me);
+  meRef.current = me;
+  const lastPushed = useRef<string | null>(null);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const joined = !!me;
+  const shareDefault = !!me?.share_subject;
   useEffect(() => {
-    if (!me || pushing.current) return;
+    const cur = meRef.current;
+    if (!cur) { lastPushed.current = null; return; }
     // "estudar sozinho": o cronômetro roda, mas a sala não mostra a sessão
     const t = timer && timer.social !== "sozinho" ? timer : null;
-    const showSubject = t ? (t.social ? t.social === "materia" : me.share_subject) : false;
+    const showSubject = t ? (t.social ? t.social === "materia" : shareDefault) : false;
     const want = {
       studying: !!(t && t.running),
       paused: !!(t && !t.running),
@@ -160,17 +170,23 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       accum_ms: t ? Math.round(t.running ? t.accum || 0 : timerMs(t)) : 0,
       subject: showSubject && t ? subjName.slice(0, 120) : "",
     };
-    const same = want.studying === me.studying && want.paused === me.paused && want.accum_ms === Number(me.accum_ms) && want.subject === me.subject &&
-      (want.since ? !!me.since && Math.abs(new Date(me.since).getTime() - new Date(want.since).getTime()) < 1000 : !me.since);
-    if (same) return;
-    pushing.current = true;
+    const key = JSON.stringify(want);
+    if (key === lastPushed.current) return;
+    const first = lastPushed.current === null;
+    lastPushed.current = key;
+    if (first) {
+      // primeira vez: só grava se o banco estiver diferente do meu cronômetro
+      const same = want.studying === cur.studying && want.paused === cur.paused && want.accum_ms === Number(cur.accum_ms) && want.subject === cur.subject &&
+        (want.since ? !!cur.since && Math.abs(new Date(cur.since).getTime() - new Date(want.since).getTime()) < 1000 : !cur.since);
+      if (same) return;
+    }
     // updated_at local para a mesinha ficar cinza logo ao parar (o banco devolve o valor certo em seguida)
     setMembers((ms) => ms.map((m) => (m.user_id === uid ? { ...m, ...want, updated_at: new Date().toISOString() } : m)));
-    sb().from("room_members").update(want).eq("user_id", uid).then(({ error }) => {
-      pushing.current = false;
+    queue.current = queue.current.then(() => sb().from("room_members").update(want).eq("user_id", uid)).then((r) => {
+      const error = (r as { error?: unknown } | undefined)?.error;
       if (error) console.error(error);
     });
-  }, [me, timer, subjName, uid]);
+  }, [joined, shareDefault, timer, subjName, uid]);
 
   // day off: o grupo vê "de folga hoje" (a folga fica no calendário; aqui só o dia vai para a sala)
   const offToday = st.events.some((e) => e.type === "folga" && e.status !== "cancelado" && e.date === todayKey()) ? todayKey() : null;
