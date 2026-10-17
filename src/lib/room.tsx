@@ -86,16 +86,21 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [blocks, setBlocks] = useState<Blocked[]>([]);
 
+  // Cada mudança na sala dispara uma nova leitura; as respostas podem chegar fora de ordem.
+  // Só vale a resposta da leitura mais recente, senão uma lista velha chegava depois da nova e a
+  // pessoa piscava (estudando / parado) até a próxima leitura.
+  const seq = useRef({ members: 0, totals: 0 });
   const load = useCallback(async (what: "members" | "groups" | "totals" | "friends" | "all" = "all") => {
     const db = sb();
     try {
       if (what === "members" || what === "all") {
+        const n = ++seq.current.members;
         const cols = "user_id,nick,share_subject,studying,paused,since,accum_ms,subject,updated_at,friend_code,accept_nudges,off_day";
         let { data, error } = await db.from("room_members").select(cols);
         // banco ainda sem a coluna off_day (migration de day off não rodada): carrega sem ela
         if (error && /off_day/.test(error.message || "")) ({ data, error } = await db.from("room_members").select(cols.replace(",off_day", "")));
         if (error) throw error;
-        setMembers((data || []) as RoomMember[]);
+        if (n === seq.current.members) setMembers((data || []) as RoomMember[]);
       }
       if (what === "groups" || what === "all") {
         const [g, gm] = await Promise.all([db.from("study_groups").select("code,name,created_by"), db.from("group_members").select("code,user_id")]);
@@ -113,10 +118,11 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         setBlocks((b.data || []) as Blocked[]);
       }
       if (what === "totals" || what === "all") {
+        const n = ++seq.current.totals;
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo";
         const { data, error } = await db.rpc("room_daily_totals", { p_days: 35, p_tz: tz });
         if (error) throw error;
-        setTotalsRaw(((data || []) as DailyTotal[]).map((r) => ({ ...r, minutes: Number(r.minutes) })));
+        if (n === seq.current.totals) setTotalsRaw(((data || []) as DailyTotal[]).map((r) => ({ ...r, minutes: Number(r.minutes) })));
       }
     } catch (e) {
       console.error(e);
@@ -126,15 +132,18 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let alive = true;
     load("all").then(() => alive && setReady(true));
+    // várias mudanças seguidas (de várias pessoas) viram uma leitura só
+    const tm: Record<string, ReturnType<typeof setTimeout>> = {};
+    const soon = (w: "members" | "groups" | "all") => { clearTimeout(tm[w]); tm[w] = setTimeout(() => { if (alive) load(w); }, 300); };
     const ch = sb().channel("room")
-      .on("postgres_changes", { event: "*", schema: "public", table: "room_members" }, () => load("members"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "group_members" }, () => load("groups"))
-      .on("postgres_changes", { event: "*", schema: "public", table: "study_groups" }, () => load("groups"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "room_members" }, () => soon("members"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "group_members" }, () => soon("groups"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "study_groups" }, () => soon("groups"))
       // amizade nova ou desfeita muda quem aparece na sala
-      .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, () => load("all"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, () => soon("all"))
       .subscribe();
     const iv = setInterval(() => load("totals"), 60000);
-    return () => { alive = false; sb().removeChannel(ch); clearInterval(iv); };
+    return () => { alive = false; sb().removeChannel(ch); clearInterval(iv); Object.values(tm).forEach(clearTimeout); };
   }, [load]);
 
   // totais mudam quando eu registro sessões
