@@ -18,6 +18,7 @@ import { EventModal } from "@/components/modals";
 import { GettingStarted } from "@/components/onboarding";
 import { dayCards, firstName, greeting, motto, type DayCard } from "@/lib/today";
 import { TripsPanel } from "@/components/trips";
+import { ExamExercises } from "@/components/exercises";
 
 type Tab = "plano" | "provas";
 const TABS: [Tab, string][] = [["plano", "Plano do dia"], ["provas", "Provas"]];
@@ -333,6 +334,7 @@ function ExamsTab({ open, goRoutine }: { open: Open; goRoutine: () => void }) {
             </div>
             {pl.missing > 0 && <div style={{ marginBottom: 8 }}><MissingCard pl={pl} today={today} goRoutine={goRoutine} /></div>}
             {pl.notes.filter((n) => !(pl.missing > 0 && n.startsWith("Faltam"))).map((n) => <div key={n} className={"callout small" + (n.startsWith("Conteúdos que ainda") ? " info" : "")} style={{ marginBottom: 8 }}>{n}</div>)}
+            <ExamExercises exam={pl.exam} />
             {pl.topics.length > 0 && (
               <div className="tbl-wrap"><table>
                 <thead><tr><th>Conteúdo</th><th className="n">Meta (min)</th><th className="n">Já estudou</th><th className="n">Falta</th></tr></thead>

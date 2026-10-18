@@ -5,25 +5,27 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { sb, friendlyError } from "./supabase";
 import type { DemoData } from "./demo";
 import { autoStop, forgotten, rollover } from "./timer";
-import type { Assessment, CalEvent, Profile, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic, AppNotification, Course, Habit, HabitCheck } from "./types";
+import type { Assessment, CalEvent, Profile, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic, AppNotification, Course, Habit, HabitCheck, ExerciseList } from "./types";
 
-export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "tasks" | "notifications" | "curriculum" | "habits" | "habit_checks";
-type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "todos" | "notes" | "courses" | "habits" | "habitChecks";
+export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "tasks" | "notifications" | "curriculum" | "habits" | "habit_checks" | "exercise_lists";
+type Key = "subjects" | "topics" | "sessions" | "assessments" | "events" | "blocks" | "todos" | "notes" | "courses" | "habits" | "habitChecks" | "exLists";
 const KEY: Record<Table, Key> = {
   subjects: "subjects", topics: "topics", study_sessions: "sessions", assessments: "assessments", events: "events",
-  routine_blocks: "blocks", tasks: "todos", notifications: "notes", curriculum: "courses", habits: "habits", habit_checks: "habitChecks",
+  routine_blocks: "blocks", tasks: "todos", notifications: "notes", curriculum: "courses", habits: "habits", habit_checks: "habitChecks", exercise_lists: "exLists",
 };
 type RowOf = {
   subjects: Subject; topics: Topic; study_sessions: Session; assessments: Assessment; events: CalEvent;
-  routine_blocks: RoutineBlock; tasks: Todo; notifications: AppNotification; curriculum: Course; habits: Habit; habit_checks: HabitCheck;
+  routine_blocks: RoutineBlock; tasks: Todo; notifications: AppNotification; curriculum: Course; habits: Habit; habit_checks: HabitCheck; exercise_lists: ExerciseList;
 };
 export const TABLES = Object.keys(KEY) as Table[];
 
 interface Data {
   profile: Profile | null; subjects: Subject[]; topics: Topic[]; sessions: Session[]; assessments: Assessment[]; events: CalEvent[];
-  blocks: RoutineBlock[]; todos: Todo[]; notes: AppNotification[]; courses: Course[]; habits: Habit[]; habitChecks: HabitCheck[];
+  blocks: RoutineBlock[]; todos: Todo[]; notes: AppNotification[]; courses: Course[]; habits: Habit[]; habitChecks: HabitCheck[]; exLists: ExerciseList[];
+  /** banco ainda sem a tabela das listas de exercícios (migration não rodada) */
+  exMissing: boolean;
 }
-const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [], blocks: [], todos: [], notes: [], courses: [], habits: [], habitChecks: [] };
+const EMPTY: Data = { profile: null, subjects: [], topics: [], sessions: [], assessments: [], events: [], blocks: [], todos: [], notes: [], courses: [], habits: [], habitChecks: [], exLists: [], exMissing: false };
 
 export interface Store extends Data {
   uid: string;
@@ -68,6 +70,7 @@ const COLS: Record<Table, string> = {
   curriculum: "id,name,code,phase,credits,kind,prereqs,min_pct,min_phase,status,grade,term,subject_id,position",
   habits: "id,name,position,active",
   habit_checks: "id,habit_id,day",
+  exercise_lists: "id,subject_id,assessment_id,event_id,name,kind,items,done,position,created_at",
 };
 
 export function DataProvider({ uid, email, children, onToast, demo }: { uid: string; email: string; children: ReactNode; onToast: (m: string) => void; demo?: DemoData }) {
@@ -102,7 +105,10 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     // banco ainda sem as colunas "end_time" (estudo extra) ou "end_date" (viagens): carrega sem elas
     if (error && t === "events" && /end_time/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",end_time", "")));
     if (error && t === "events" && /end_date/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",end_date", "").replace(",end_time", "")));
+    // banco ainda sem a tabela das listas de exercícios: o resto do app segue; a aba Provas pede a migration
+    if (error && t === "exercise_lists" && /exercise_lists/.test(error.message || "")) { setData((d) => ({ ...d, exLists: [], exMissing: true })); return; }
     if (error) throw error;
+    if (t === "exercise_lists") setData((d) => ({ ...d, exMissing: false }));
     let list = (rows || []) as unknown as RowOf[typeof t][];
     if (t === "assessments") list = (list as Assessment[]).map(normTime) as typeof list;
     if (t === "events") list = (list as CalEvent[]).map((e) => ({ ...normTime(e), ...(e.end_time ? { end_time: e.end_time.slice(0, 5) } : {}) })) as typeof list;
@@ -166,10 +172,11 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     if (error) { toast(friendlyError(error)); reload(t); return false; }
     // cascatas do banco: atualiza tabelas dependentes
     const deps: Partial<Record<Table, Table[]>> = {
-      subjects: ["topics", "study_sessions", "assessments", "events", "routine_blocks", "tasks", "curriculum"],
+      subjects: ["topics", "study_sessions", "assessments", "events", "routine_blocks", "tasks", "curriculum", "exercise_lists"],
       topics: ["topics", "study_sessions"],
-      assessments: ["topics"],
       habits: ["habit_checks"],
+      assessments: ["topics", "exercise_lists"],
+      events: ["exercise_lists"],
     };
     deps[t]?.forEach((x) => reload(x));
     return true;
@@ -314,6 +321,8 @@ function demoCascade(d: Data, t: Table, id: string): Data {
     Object.assign(x, { sessions: un(x.sessions), topics: x.topics.map((tp) => (tp.parent_id === id ? { ...tp, parent_id: null } : tp)) });
   }
   if (t === "assessments") Object.assign(x, { topics: x.topics.map((tp) => (tp.assessment_id === id ? { ...tp, assessment_id: null } : tp)), assessments: x.assessments.map((a) => (a.sub_id === id ? { ...a, sub_id: null } : a)) });
+  if (t === "assessments" || t === "events") x.exLists = x.exLists.filter((l) => l.assessment_id !== id && l.event_id !== id);
+  if (t === "subjects") x.exLists = x.exLists.filter((l) => l.subject_id !== id);
   if (t === "habits") x.habitChecks = x.habitChecks.filter((c) => c.habit_id !== id);
   return x;
 }

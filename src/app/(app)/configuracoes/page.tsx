@@ -12,8 +12,8 @@ import { DEMO_FLAG } from "@/lib/demo";
 import { PushSettings } from "@/components/pushSettings";
 
 // ordem das chaves estrangeiras: conteúdos apontam para provas
-const ORDER: Table[] = ["subjects", "assessments", "topics", "study_sessions", "events", "routine_blocks", "tasks", "curriculum", "habits", "habit_checks"];
-const NONE = { routine_blocks: [], tasks: [], notifications: [], curriculum: [], habits: [], habit_checks: [] };
+const ORDER: Table[] = ["subjects", "assessments", "topics", "study_sessions", "events", "routine_blocks", "tasks", "curriculum", "habits", "habit_checks", "exercise_lists"];
+const NONE = { routine_blocks: [], tasks: [], notifications: [], curriculum: [], habits: [], habit_checks: [], exercise_lists: [] };
 // cópias antigas trazem a autoavaliação, os erros e as revisões, que o app não usa mais: ficam de fora
 const SESSION_KEYS = ["id", "subject_id", "topic_id", "activity", "started_at", "duration_min", "notes"];
 const pickKeys = (x: Record<string, unknown>, keys: string[]) => Object.fromEntries(keys.filter((k) => k in x).map((k) => [k, x[k]]));
@@ -37,7 +37,7 @@ export default function Configuracoes() {
 
   const exportData = () => {
     const payload = { app: "diario-de-sonda", version: 2, exportedAt: new Date().toISOString(), profile: { ...p, timer: null }, subjects: st.subjects, topics: st.topics, sessions: st.sessions, assessments: st.assessments, events: st.events,
-      routine_blocks: st.blocks, tasks: st.todos, curriculum: st.courses, habits: st.habits, habit_checks: st.habitChecks };
+      routine_blocks: st.blocks, tasks: st.todos, curriculum: st.courses, habits: st.habits, habit_checks: st.habitChecks, exercise_lists: st.exLists };
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 1)], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url; a.download = `fundo-do-poco-${todayKey()}.json`;
@@ -61,7 +61,7 @@ export default function Configuracoes() {
         const subjects = (j.subjects || []).map((x: Record<string, unknown>) => (x.recovery ? x : { ...x, recovery: x.exam_enabled ? "exame" : "nenhuma" }));
         rows = {
           subjects, topics: j.topics || [], assessments: j.assessments || [], study_sessions: (j.sessions || []).map((x: Record<string, unknown>) => pickKeys(x, SESSION_KEYS)), events: j.events || [],
-          routine_blocks: j.routine_blocks || [], tasks: j.tasks || [], notifications: [], curriculum: j.curriculum || [], habits: j.habits || [], habit_checks: j.habit_checks || [],
+          routine_blocks: j.routine_blocks || [], tasks: j.tasks || [], notifications: [], curriculum: j.curriculum || [], habits: j.habits || [], habit_checks: j.habit_checks || [], exercise_lists: j.exercise_lists || [],
         };
         const { id: _id, timer: _t, review_steps: _r, mastery_cfg: _m, ...rest } = j.profile || {};
         void _id; void _t; void _r; void _m;
