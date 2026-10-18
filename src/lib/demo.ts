@@ -3,7 +3,8 @@
 import { addDays, dkey, keyDate, todayKey } from "./calc";
 import { buildReport, reportWeek } from "./report";
 import { fromTemplate } from "./curriculum";
-import type { Course, Habit, HabitCheck,
+import { itemsOf, plainQuestions } from "./exercises";
+import type { Course, ExerciseList, Habit, HabitCheck,
   AppNotification, Assessment, CalEvent, DailyTotal, Friend, Profile, RoomMember, RoutineBlock, Session, StudyGroup,
   Subject, Todo, Topic, GroupMember,
 } from "./types";
@@ -13,7 +14,7 @@ export const DEMO_UID = "demo-voce";
 
 export interface DemoData {
   profile: Profile; subjects: Subject[]; topics: Topic[]; sessions: Session[]; assessments: Assessment[]; events: CalEvent[];
-  blocks: RoutineBlock[]; todos: Todo[]; notes: AppNotification[]; courses: Course[]; habits: Habit[]; habitChecks: HabitCheck[];
+  blocks: RoutineBlock[]; todos: Todo[]; notes: AppNotification[]; courses: Course[]; habits: Habit[]; habitChecks: HabitCheck[]; exLists: ExerciseList[];
 }
 export interface DemoRoom { members: RoomMember[]; groups: StudyGroup[]; memberships: GroupMember[]; totals: DailyTotal[]; friends: Friend[] }
 
@@ -178,5 +179,16 @@ export function buildDemo(today = todayKey()): { data: DemoData; room: DemoRoom 
   habits.forEach((h, i) => { for (let d = 1; d <= 9; d++) if (r() < [0.6, 0.75, 0.35][i]) habitChecks.push({ id: `d-hc${i}-${d}`, habit_id: h.id, day: addDays(today, -d) }); });
   // Física II marcada como difícil pelo aluno (o plano reserva mais tempo)
   const subs = subjects.map((s) => (s.name === "Física II" ? { ...s, traits: { ...s.traits, esforco: "dificil" as const } } : s));
-  return { data: { profile, subjects: subs, topics, sessions, assessments, events, blocks, todos, notes, courses, habits, habitChecks }, room };
+  // progresso pré-prova: listas da P2 de Cálculo III, parte feita nos últimos dias
+  const L = (id: string, name: string, kind: ExerciseList["kind"], items: string[], doneN: number, position: number): ExerciseList => ({
+    id, subject_id: "d-s0", assessment_id: "d-a02", event_id: null, name, kind, items, position, created_at: at(addDays(today, -10), 9),
+    done: Object.fromEntries(items.slice(0, doneN).map((it, k) => [it, addDays(today, -1 - Math.floor((k * 9) / Math.max(1, doneN)))])),
+  });
+  const q = (parts: number[]) => itemsOf(parts.map((p, k) => ({ n: String(k + 1), parts: p })));
+  const exLists = [
+    L("d-l0", "Lista 7 - Funções vetoriais", "lista", q([4, 2, 3, 2, 4, 1, 1, 3, 2, 1, 3, 4, 4]), 34, 0),
+    L("d-l1", "Lista 8 - Derivadas parciais", "lista", q([3, 3, 1, 4, 2, 6, 1, 1, 2, 3]), 9, 1),
+    L("d-l2", "Livro (Stewart), cap. 14", "livro", itemsOf(plainQuestions(20)), 0, 2),
+  ];
+  return { data: { profile, subjects: subs, topics, sessions, assessments, events, blocks, todos, notes, courses, habits, habitChecks, exLists }, room };
 }

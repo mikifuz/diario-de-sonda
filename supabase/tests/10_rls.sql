@@ -527,6 +527,50 @@ do $$ begin
 end $$;
 delete from public.routine_blocks where kind = 'exercicio';
 
+-- ============ Progresso pré-prova (listas de exercícios) ============
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.assessments (id, subject_id, name, date) values ('90000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'P2', current_date + 10);
+insert into public.events (id, subject_id, title, type, date) values ('90000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'Prova de Cálculo', 'prova', current_date + 12);
+insert into public.exercise_lists (id, subject_id, assessment_id, name, items, done)
+  values ('90000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000001', '90000000-0000-0000-0000-000000000001', 'Lista 8', '["1a","1b","2"]', '{"1a":"2026-10-18"}');
+insert into public.exercise_lists (subject_id, event_id, name, kind, items)
+  values ('10000000-0000-0000-0000-000000000001', '90000000-0000-0000-0000-000000000002', 'Livro cap. 15', 'livro', '["1","2","3"]');
+do $$ begin
+  begin
+    insert into public.exercise_lists (subject_id, name, items) values ('10000000-0000-0000-0000-000000000001', 'Sem prova', '["1"]');
+    raise exception 'FALHOU: lista sem prova';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into public.exercise_lists (subject_id, assessment_id, name, items) values ('10000000-0000-0000-0000-000000000001', '90000000-0000-0000-0000-000000000001', 'Vazia', '[]');
+    raise exception 'FALHOU: lista sem exercícios';
+  exception when check_violation then null;
+  end;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+update public.exercise_lists set done = '{}';
+delete from public.exercise_lists;
+do $$ begin
+  if (select count(*) from public.exercise_lists) <> 0 then raise exception 'Bruno vê as listas de Ana'; end if;
+  begin
+    insert into public.subjects (id, name) values ('10000000-0000-0000-0000-0000000000b1', 'Física de Bruno');
+    insert into public.exercise_lists (subject_id, assessment_id, name, items)
+      values ('10000000-0000-0000-0000-0000000000b1', '90000000-0000-0000-0000-000000000001', 'Na prova de Ana', '["1"]');
+    raise exception 'FALHOU: Bruno ligou uma lista à prova de Ana';
+  exception when foreign_key_violation then null;
+  end;
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+do $$ begin
+  if (select count(*) from public.exercise_lists) <> 2 then raise exception 'Bruno apagou as listas de Ana'; end if;
+  if (select done from public.exercise_lists where name = 'Lista 8') <> '{"1a":"2026-10-18"}'::jsonb then raise exception 'Bruno alterou o progresso de Ana'; end if;
+end $$;
+delete from public.assessments where id = '90000000-0000-0000-0000-000000000001';
+delete from public.events where id = '90000000-0000-0000-0000-000000000002';
+do $$ begin
+  if (select count(*) from public.exercise_lists) <> 0 then raise exception 'lista da prova apagada continuou'; end if;
+end $$;
+
 -- Ana: apagar disciplina apaga sessões e avaliações dela
 delete from public.subjects where id = '10000000-0000-0000-0000-000000000001';
 do $$ begin

@@ -246,3 +246,21 @@ export interface Course {
 /* ============ Hábitos do dia ============ */
 export interface Habit { id: string; name: string; position: number; active: boolean }
 export interface HabitCheck { id: string; habit_id: string; day: string }
+
+/* ============ Progresso pré-prova (listas de exercícios) ============ */
+export type ExerciseKind = "lista" | "livro" | "outro";
+export interface ExerciseList {
+  id: string;
+  subject_id: string;
+  /** a prova (em Notas) ou a prova cadastrada só no calendário; uma das duas */
+  assessment_id: string | null;
+  event_id: string | null;
+  name: string;
+  kind: ExerciseKind;
+  /** os exercícios, na ordem da lista: "1a", "1b", "2", … */
+  items: string[];
+  /** exercício feito → dia em que foi marcado (aaaa-mm-dd) */
+  done: Record<string, string>;
+  position: number;
+  created_at?: string;
+}
