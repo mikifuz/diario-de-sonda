@@ -246,7 +246,7 @@ export function dayTasks(p: PlanInput): Task[] {
       const t = lastTaught(p.topics, s.id, day);
       const eff = effortOf(s);
       tasks.push({
-        key: "c" + s.id, kind: "consolidar", title: `Consolidar a aula${ago ? " de ontem" : ""} de ${s.name}${t ? `: ${t.name}` : ""}`, subject_id: s.id, topic_id: t?.id ?? null,
+        key: "c" + s.id, kind: "consolidar", title: `Revisar a aula de ${ago ? "ontem" : "hoje"} de ${s.name}${t ? `: ${t.name}` : ""}`, subject_id: s.id, topic_id: t?.id ?? null,
         minutes: scaleMin(CLASS_MIN, eff.factor), notBefore: ago ? undefined : end,
         why: ago ? `Aula de ontem às ${b.start_time.slice(0, 5)} e você ainda não estudou ${s.name} depois dela; você prefere revisar depois da aula.${eff.why ? ` ${eff.why}` : ""}`
           : `Aula de hoje às ${b.start_time.slice(0, 5)}; você prefere revisar depois da aula, enquanto está fresco.${eff.why ? ` ${eff.why}` : ""}`,
