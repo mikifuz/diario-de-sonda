@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addDays, gradeCalc, parseNum, periodRange, stats, streak, monthStats, weekStartKey, fmtMin, qt } from "./calc";
+import { addDays, earlyGrades, gradeCalc, gradeToSim, parseNum, periodRange, stats, streak, monthStats, weekStartKey, fmtMin, qt } from "./calc";
 import type { Assessment, Session } from "./types";
 
 const A = (p: Partial<Assessment>): Assessment => ({
@@ -121,4 +121,19 @@ test("singular e plural sem \"(s)\"", () => {
   assert.equal(qt(1, "sessão", "sessões"), "1 sessão");
   assert.equal(qt(0, "sessão", "sessões"), "0 sessões");
   assert.equal(qt(3, "revisão feita", "revisões feitas"), "3 revisões feitas");
+});
+
+test("nota lançada em prova que ainda não aconteceu é apontada e vira simulação", () => {
+  const items = [
+    A({ id: "p1", date: "2026-10-05", grade: 4 }),
+    A({ id: "p2", date: "2026-10-26", grade: 6.5 }),
+    A({ id: "p3", date: "2026-11-04", grade: 0 }),
+    A({ id: "hoje", date: "2026-10-19", grade: 7 }),
+    A({ id: "sem", date: "2026-10-30", grade: null }),
+  ];
+  assert.deepEqual(earlyGrades(items, "2026-10-19").map((a) => a.id), ["p2", "p3"]);
+  const m = gradeToSim(items[1]);
+  assert.equal(m.grade, null); assert.equal(m.status, "pendente"); assert.equal(m.sim_e, 6.5); assert.equal(m.sim_c, 6.5);
+  const z = gradeToSim(items[2]);
+  assert.equal(z.grade, null); assert.equal(z.sim_e, null);
 });

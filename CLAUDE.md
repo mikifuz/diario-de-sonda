@@ -13,6 +13,7 @@ Aplicativo de acompanhamento de estudos de um aluno de Engenharia de Petróleo (
 - Nunca inventar dados nos painéis. Dados de exemplo só em modo demonstração claramente marcado.
 - Toda leitura/estimativa mostra o motivo (ex.: `signal()` em `calc.ts` devolve `why`). Sem dados suficientes, dizer isso.
 - Notas estimadas (simulação, futura correção por IA) sempre separadas da nota oficial.
+- **Nota lançada antes da prova** (caso real da Marcely: palpites e zeros digitados em "Nota" fizeram todas as provas sumirem do plano): nota = prova feita para o app inteiro. `earlyGrades` (`calc.ts`) aponta prova/SUB com nota e data futura; aviso nas Notas da disciplina e no topo da aba Provas de Hoje, com o botão "Passar para a simulação" (`gradeToSim`: o palpite vai para os cenários vazios; 0 só é apagado).
 - Regras de média variam por disciplina (média mínima e exame configuráveis); não assumir regra da universidade.
 - Privacidade: dados acadêmicos são só do dono (RLS). A sala expõe apenas apelido, presença e minutos por dia (`room_daily_totals`), e **só para quem divide um grupo** (não existe sala geral; códigos de grupo não são listáveis).
 - Não criar botões que parecem funcionar mas não fazem nada; recursos futuros aparecem só como "próximas etapas".

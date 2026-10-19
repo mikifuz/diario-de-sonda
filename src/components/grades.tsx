@@ -3,7 +3,7 @@
 // na visão geral de Disciplinas. Os cálculos ficam em calc.ts (gradeCalc).
 import { useState } from "react";
 import { useStore } from "@/lib/store";
-import { gradeCalc, nf, parseNum, type GradeResult, type SubResult } from "@/lib/calc";
+import { earlyGrades, gradeCalc, gradeToSim, nf, parseNum, todayKey, type GradeResult, type SubResult } from "@/lib/calc";
 import { RECOVERY } from "@/lib/constants";
 import type { Assessment, Recovery, Scenario, Subject } from "@/lib/types";
 import { ConfirmButton, I, Icon, Tabs } from "./ui";
@@ -76,6 +76,7 @@ export function GradesPanel({ s }: { s: Subject }) {
   };
   const ex = r.exam;
   const projV = r.proj[sc];
+  const early = earlyGrades(items, todayKey());
 
   return (
     <section className="panel" id="notas">
@@ -104,6 +105,16 @@ export function GradesPanel({ s }: { s: Subject }) {
           ))}</tbody>
         </table></div>
       ) : <p className="small muted" style={{ margin: 0 }}>Nenhuma avaliação ainda. Adicione as provas e trabalhos com o peso de cada um.</p>}
+
+      {early.length > 0 && (
+        <div className="small" style={{ marginTop: 10, padding: "8px 10px", border: "1px solid var(--warn)", borderRadius: 8 }}>
+          <b>{early.length === 1 ? `${early[0].name} ainda não aconteceu` : `${early.length} provas ainda não aconteceram`}</b> ({early.map((a) => `${a.name} em ${dm(a.date)}`).join(", ")}), mas já {early.length === 1 ? "tem nota" : "têm nota"} em &quot;Nota&quot;.
+          {" "}O app entende nota como prova feita: {early.length === 1 ? "ela fica" : "elas ficam"} fora do plano de estudo e a média conta {early.length === 1 ? "esse valor" : "esses valores"} como oficial.
+          {" "}Se é palpite, use a coluna &quot;Simul.&quot;.
+          <div style={{ marginTop: 6 }}><button className="btn sm" onClick={() => st.saveMany("assessments", early.map(gradeToSim))}>Passar para a simulação</button>
+            <span className="muted"> {early.some((a) => Number(a.grade) === 0) ? "(nota 0 é só apagada)" : ""}</span></div>
+        </div>
+      )}
 
       <div className="row" style={{ marginTop: 10, gap: 6 }}>
         <button className="btn sm" onClick={() => st.save("assessments", blank({ name: `P${nProvas + 1}` }))}><Icon d={I.plus} s={14} />Avaliação</button>

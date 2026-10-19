@@ -107,6 +107,17 @@ export interface GradeResult {
 const has = (v: number | null | undefined): v is number => v != null && !isNaN(Number(v));
 const simOf = (a: Assessment, k: Scenario) => (k === "c" ? a.sim_c : k === "e" ? a.sim_e : a.sim_o);
 
+/** Provas e SUBs com nota lançada antes da data (ainda não aconteceram): quase sempre é palpite
+ *  digitado em "Nota" em vez de "Simul.". O app trata nota como prova feita, então elas somem do plano. */
+export const earlyGrades = (items: Assessment[], today: string) =>
+  items.filter((a) => (a.kind === "prova" || a.kind === "sub") && has(a.grade) && a.status !== "cancelado" && !!a.date && a.date > today);
+
+/** Tira a nota de uma prova que ainda não aconteceu: o palpite vira simulação (nos cenários vazios); 0 só é apagado */
+export const gradeToSim = (a: Assessment): Assessment => {
+  const g = Number(a.grade) > 0 ? Number(a.grade) : null;
+  return { ...a, grade: null, status: "pendente", sim_c: a.sim_c ?? g, sim_e: a.sim_e ?? g, sim_o: a.sim_o ?? g };
+};
+
 type GradeRules = Pick<Subject, "min_avg" | "recovery" | "sub_replace_lower" | "exam_w_avg" | "exam_w_exam" | "exam_min_final" | "exam_min_take">;
 
 /** Média ponderada Σ(peso × nota) ÷ Σpesos na escala 0–10.
