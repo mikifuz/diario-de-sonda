@@ -182,7 +182,7 @@ test("aula que não coube hoje volta amanhã (consolidar a de ontem) e o quadrad
   const hoje = planDay(base);
   assert.deepEqual(hoje.overflow.map((t) => t.kind), ["consolidar"]);
   const terca = planDay({ ...base, today: "2026-10-20", nowMin: 0 });
-  assert.equal(terca.slots[0].placed[0].task.title, "Consolidar a aula de ontem de Cálculo III");
+  assert.equal(terca.slots[0].placed[0].task.title, "Revisar a aula de ontem de Cálculo III");
   const m = whereNext(base, hoje.overflow, () => []);
   assert.deepEqual(m.get(hoje.overflow[0].key), { day: "2026-10-20", start: 14 * 60, label: "amanhã, no bloco das 14:00" });
   // já estudou a matéria depois da aula: não volta

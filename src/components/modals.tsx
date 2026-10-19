@@ -182,7 +182,7 @@ export function TopicModal({ id, onClose }: { id: string; onClose: () => void })
         </div>
         {later > 0 && <label className="check"><input type="checkbox" checked={push} onChange={(e) => setPush(e.target.checked)} />
           Aula remarcada: empurrar também {later === 1 ? "o conteúdo seguinte" : `os ${later} conteúdos seguintes`} para o próximo dia de aula{classDays.length ? "" : " (pelos dias em que a disciplina costuma ter aula)"}</label>}
-        <p className="small muted" style={{ margin: 0 }}>A data da aula ajuda o plano do dia a sugerir o que adiantar ou consolidar. A prova define até quando este conteúdo é revisado.</p>
+        <p className="small muted" style={{ margin: 0 }}>A data da aula ajuda o plano do dia a sugerir o que adiantar ou revisar. A prova define até quando este conteúdo é revisado.</p>
         <div className="modal-f">
           <span style={{ marginRight: "auto" }}><ConfirmButton label={<><Icon d={I.trash} s={15} />Excluir</>} question={n > 0 ? n === 1 ? `1 sessão ficará como "geral da disciplina".` : `${n} sessões ficarão como "geral da disciplina".` : "Excluir?"} confirmLabel="Excluir"
             onConfirm={async () => {

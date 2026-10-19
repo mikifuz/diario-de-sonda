@@ -133,7 +133,7 @@ function NextUp({ plans, today, free, open }: { plans: ExamPlan[]; today: string
 }
 
 const ACT_OF: Record<Task["kind"], Activity> = { consolidar: "revisao", adiantar: "leitura", preparar: "exercicios" };
-const KIND_CHIP: Record<Task["kind"], [string, string]> = { consolidar: ["Consolidar aula", "ok"], adiantar: ["Adiantar", "warn"], preparar: ["Preparar prova", "bad"] };
+const KIND_CHIP: Record<Task["kind"], [string, string]> = { consolidar: ["Revisar aula", "ok"], adiantar: ["Adiantar", "warn"], preparar: ["Preparar prova", "bad"] };
 
 function TaskRow({ t, at, open }: { t: Task; at?: string; open: Open }) {
   const st = useStore();
@@ -339,7 +339,7 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
         <summary>Como o plano é montado</summary>
         <ol className="muted" style={{ margin: ".5em 0 0", paddingLeft: "1.2em" }}>
           <li>Usa só os blocos de <b>estudo</b> da sua rotina para o dia da semana, a partir de agora, e os &quot;Estudo planejado&quot; do calendário com início e fim. Compromissos e dias &quot;Indisponível&quot; do calendário tiram blocos; no day off não há estudo.</li>
-          <li>Entram o estudo das provas que o planejamento reverso (aba Provas) marcou para hoje e as aulas: <b>consolidar</b> a de hoje (depois do fim da aula) ou <b>adiantar</b> a de amanhã, conforme a sua preferência ({PREF[st.profile?.study_pref || "depois"].toLowerCase()} por padrão; cada disciplina pode ter a sua).</li>
+          <li>Entram o estudo das provas que o planejamento reverso (aba Provas) marcou para hoje e as aulas: <b>revisar</b> a de hoje (depois do fim da aula) ou <b>adiantar</b> a de amanhã, conforme a sua preferência ({PREF[st.profile?.study_pref || "depois"].toLowerCase()} por padrão; cada disciplina pode ter a sua).</li>
           <li>Ordem: estudo de provas em até 3 dias; depois o estudo das outras provas; depois as aulas.</li>
           <li>Cada tarefa entra inteira no primeiro bloco onde cabe. O que não couber vai para o próximo horário livre, e o quadrado diz quando.</li>
         </ol>

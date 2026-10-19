@@ -56,7 +56,7 @@ export interface DayCard {
   past: boolean;
 }
 
-const TASK_TAG: Record<Task["kind"], string> = { consolidar: "Consolidar aula", adiantar: "Adiantar aula", preparar: "Preparar prova" };
+const TASK_TAG: Record<Task["kind"], string> = { consolidar: "Revisar aula", adiantar: "Adiantar aula", preparar: "Preparar prova" };
 
 export interface DayCardsInput {
   day: string;
