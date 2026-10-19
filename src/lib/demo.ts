@@ -137,7 +137,7 @@ export function buildDemo(today = todayKey()): { data: DemoData; room: DemoRoom 
   ];
   const profile: Profile = {
     id: DEMO_UID, name: "Demonstração", course: "Engenharia de Petróleo", university: "UDESC", current_semester: "2026.2", default_min_avg: 7,
-    weekly_goal_h: 15, skin: "sonda", timer: null, study_pref: "depois",
+    weekly_goal_h: 15, skin: "sonda", timer: null, study_pref: "depois", skipped: {},
   };
 
   const notes: AppNotification[] = [

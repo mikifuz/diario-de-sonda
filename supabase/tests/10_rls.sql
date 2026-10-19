@@ -410,6 +410,12 @@ do $$ begin
     raise exception 'FALHOU: nome gigante aceito';
   exception when check_violation then null;
   end;
+  update public.profiles set skipped = '{"consolidar:t1": "2026-10-19"}' where id = auth.uid();
+  begin
+    update public.profiles set skipped = jsonb_build_object('x', repeat('x', 20000)) where id = auth.uid();
+    raise exception 'FALHOU: lista de tarefas descartadas gigante aceita';
+  exception when check_violation then null;
+  end;
   begin
     insert into public.subjects (name, notes) values ('Y', repeat('x', 20000));
     raise exception 'FALHOU: anotação gigante aceita';

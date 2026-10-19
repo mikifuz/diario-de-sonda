@@ -185,21 +185,26 @@ function useForced(today: string): [Set<string>, (key: string) => void] {
   return [set, add];
 }
 
-/** Tarefas de estudo descartadas na lixeira do quadrado (só neste aparelho): id do `skipId` → dia em que descartou.
+/** Tarefas de estudo descartadas na lixeira do quadrado: id do `skipId` → dia em que descartou.
+ *  Fica no perfil (`profiles.skipped`), então vale em todos os aparelhos; sem a migration, só neste aparelho (`localStorage`).
  *  Aula com conteúdo some de vez; estudo das provas só no dia (o plano das provas se refaz). Guarda 60 dias. */
 const SKIP_KEY = "ds-descartar";
 function useSkipped(today: string): [Set<string>, (t: Task) => void, number, () => void] {
-  const read = (): Record<string, string> => {
-    try {
-      const j = JSON.parse(localStorage.getItem(SKIP_KEY) || "{}") as Record<string, string>;
-      const min = addDays(today, -60);
-      return Object.fromEntries(Object.entries(j).filter(([, d]) => typeof d === "string" && d >= min));
-    } catch { return {}; }
-  };
-  const [map, setMap] = useState<Record<string, string>>(read);
-  useEffect(() => { setMap(read()); }, [today]); // eslint-disable-line react-hooks/exhaustive-deps
+  const st = useStore();
+  const synced = !!st.profile && st.profile.skipped !== undefined;
+  const readLocal = (): Record<string, string> => { try { return JSON.parse(localStorage.getItem(SKIP_KEY) || "{}") as Record<string, string>; } catch { return {}; } };
+  const [local, setLocal] = useState<Record<string, string>>(readLocal);
+  const min = addDays(today, -60);
+  const fresh = (m: Record<string, string>) => Object.fromEntries(Object.entries(m || {}).filter(([, d]) => typeof d === "string" && d >= min));
+  // o que foi descartado neste aparelho antes da migration entra junto
+  const map = fresh(synced ? { ...local, ...st.profile!.skipped } : local);
   const write = (next: Record<string, string>) => {
-    setMap(next);
+    if (synced) {
+      st.updateProfile({ skipped: next });
+      if (Object.keys(local).length) { setLocal({}); try { localStorage.removeItem(SKIP_KEY); } catch { /* sem armazenamento */ } }
+      return;
+    }
+    setLocal(next);
     try { localStorage.setItem(SKIP_KEY, JSON.stringify(next)); } catch { /* sem armazenamento */ }
   };
   const add = (t: Task) => write({ ...map, [skipId(t, today)]: today });
