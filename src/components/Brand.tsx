@@ -1,10 +1,15 @@
 export function Brand() {
   return (
     <div className="brand">
-      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
-        <path d="M5 20C5 11.5 9.5 5.5 15 5.5S25 11.5 25 20Z" fill="none" stroke="var(--accent)" strokeWidth="1.6" strokeLinejoin="round" />
-        <path d="M12.6 20V6.4M17.4 20V6.4" stroke="var(--accent)" strokeWidth="1.4" />
-        <rect x="2.5" y="20" width="25" height="4.6" rx="2.3" fill="none" stroke="var(--accent)" strokeWidth="1.6" />
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="var(--accent)" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round">
+        <path d="M6.4 17.4V22.6M12 25.6L16.4 11.8L20.8 25.6M13.4 21.2H19.4M25 11.4L24.2 20.4" />
+        <circle cx="24" cy="21" r="3.6" />
+        <g transform="rotate(-9 16.4 11.8)">
+          <rect x="8" y="10.5" width="19" height="2.8" rx="1.2" />
+          <path d="M8.6 9.2C5.6 9.2 4 11.6 4 14.2C4 15.9 4.8 17.2 5.8 17.8L8.6 14.8Z" />
+        </g>
+        <rect x="4.6" y="22.6" width="3.6" height="3" rx="0.8" />
+        <path d="M2.6 25.6H29.4" />
       </svg>
       <div><b>Fundo do Poço</b><span>BOLETIM DE ESTUDOS</span></div>
     </div>
