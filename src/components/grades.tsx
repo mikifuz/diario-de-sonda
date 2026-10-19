@@ -48,6 +48,20 @@ export function subLine(r: GradeResult, sc?: Scenario, sb: SubResult | null = r.
   return t;
 }
 
+/** Conta com a simulação do cenário (nota oficial onde já tem): média, ou quanto precisa nas que faltam simular */
+function simLine(r: GradeResult, sc: Scenario) {
+  const m = r.sim!;
+  const lbl = <>Pela simulação {SN[sc].replace(/o$/, "a")}{r.Wk ? " (com as notas oficiais que já saíram)" : ""}:</>;
+  if (m.avg != null) {
+    const ok = m.avg >= r.min;
+    return <>{lbl} média <b className="num" style={{ color: ok ? "var(--ok)" : "var(--bad)" }}>{nf(m.avg)}</b> · <span style={{ color: ok ? "var(--ok)" : "var(--bad)" }}>{ok ? "aprovado" : "abaixo da mínima"}</span>{!ok && r.subs.length ? " (veja a SUB abaixo)" : ""}.</>;
+  }
+  const n = m.needed ?? 0;
+  const where = m.left.length === 1 ? `em ${m.left[0]}` : `nas que faltam simular (${m.left.join(", ")})`;
+  if (n <= 0) return <>{lbl} <span style={{ color: "var(--ok)" }}>a mínima já fica garantida</span>, mesmo com 0 {where}.</>;
+  return <>{lbl} precisa de <b className="num" style={{ color: n > 10 ? "var(--bad)" : n > 8 ? "var(--warn)" : undefined }}>{nf(n)}</b> {where}{n > 10 ? " (acima de 10)" : ""}.</>;
+}
+
 export function GradesPanel({ s }: { s: Subject }) {
   const st = useStore();
   const [sc, setSc] = useState<Scenario>("e");
@@ -75,7 +89,6 @@ export function GradesPanel({ s }: { s: Subject }) {
     if (!subs.length) await st.saveMany("assessments", items.filter((i) => i.kind === "prova" && !i.sub_id).map((i) => ({ ...i, sub_id: row.id })));
   };
   const ex = r.exam;
-  const projV = r.proj[sc];
   const early = earlyGrades(items, todayKey());
 
   return (
@@ -130,8 +143,9 @@ export function GradesPanel({ s }: { s: Subject }) {
           <div>
             Média atual <b className="num">{r.partial == null ? "–" : nf(r.partial)}</b> <span className="muted">(peso {nf(r.Wk, 0)} de {nf(r.W, 0)} lançado)</span>
             {" · "}<span style={{ color: v.c }}>{v.t}</span>
-            {projV != null && r.nRem > 0 && <> · projeção {SN[sc]} <b className="num" style={{ color: projV >= r.min ? "var(--ok)" : "var(--bad)" }}>{nf(projV)}</b></>}
           </div>
+          {r.sim ? <div>{simLine(r, sc)}</div>
+            : r.nRem > 0 && <div className="muted">Preencha &quot;Simul.&quot; com os seus palpites para ver a conta com eles.</div>}
           {r.subs.map((x) => <div key={x.id}><span className="chip acc">{x.name}</span> {subLine(r, sc, x)}</div>)}
           {r.subs.length > 1 && r.subFinal != null && <div>Com todas as SUBs: média {r.subOfficial ? "final" : "projetada"} <b className="num">{nf(r.subFinal)}</b>.</div>}
           {s.recovery !== "exame" && !subs.length && <div className="muted">Esta disciplina tem SUB (mesmo que o professor tenha avisado por fora)? Use o botão &quot;+ SUB&quot; e depois marque em cada prova se ela tem SUB.</div>}

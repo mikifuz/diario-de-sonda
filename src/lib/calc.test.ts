@@ -137,3 +137,16 @@ test("nota lançada em prova que ainda não aconteceu é apontada e vira simula�
   const z = gradeToSim(items[2]);
   assert.equal(z.grade, null); assert.equal(z.sim_e, null);
 });
+
+test("conta com a simulação: oficial onde tem, simulada onde não tem", () => {
+  const rules = sub({ min_avg: 6 });
+  const p1 = A({ id: "1", name: "P1", weight: 1, grade: 5, sim_e: 9 });
+  const p2 = A({ id: "2", name: "P2", weight: 1, grade: null, sim_e: 7 });
+  const p3 = A({ id: "3", name: "P3", weight: 1, grade: null });
+  const r = gradeCalc(rules, [p1, p2, p3], "e");
+  // precisa de 6 de média: 18 - 5 (oficial, não a simulação 9) - 7 = 6 na P3
+  assert.deepEqual(r.sim, { simulated: ["P2"], left: ["P3"], needed: 6, avg: null });
+  const all = gradeCalc(rules, [p1, p2, { ...p3, sim_e: 6 }], "e");
+  assert.equal(all.sim!.avg, 6);
+  assert.equal(gradeCalc(rules, [p1, p3], "e").sim, null);
+});
