@@ -57,7 +57,7 @@ export function useStore() {
 export const timerMs = (t: Timer | null | undefined, now = Date.now()) => (t ? (t.accum || 0) + (t.running ? now - t.since : 0) : 0);
 const normTime = <T extends { time: string | null }>(r: T): T => ({ ...r, time: r.time ? r.time.slice(0, 5) : null });
 const normBlock = (r: RoutineBlock): RoutineBlock => ({ ...r, start_time: r.start_time.slice(0, 5), end_time: r.end_time.slice(0, 5) });
-const PROFILE_COLS = "id,name,course,university,current_semester,default_min_avg,weekly_goal_h,skin,timer,study_pref";
+const PROFILE_COLS = "id,name,course,university,current_semester,default_min_avg,weekly_goal_h,skin,timer,study_pref,skipped";
 const COLS: Record<Table, string> = {
   subjects: "id,name,code,professor,semester,credits,hours,color,min_avg,schedule,notes,traits,exam_enabled,exam_w_avg,exam_w_exam,exam_min_final,exam_min_take,archived,study_pref,recovery,sub_replace_lower",
   topics: "id,subject_id,parent_id,name,position,taught_on,assessment_id",
@@ -84,13 +84,16 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
   const fetchTable = useCallback(async (t: Table | "profiles") => {
     const db = sb();
     if (t === "profiles") {
-      const { data: p, error } = await db.from("profiles").select(PROFILE_COLS).eq("id", uid).maybeSingle();
+      let { data: p, error } = await db.from("profiles").select(PROFILE_COLS).eq("id", uid).maybeSingle();
+      // banco ainda sem a coluna "skipped" (migration da lixeira não rodada): carrega sem ela; a lixeira fica só no aparelho
+      const noSkip = !!error && /skipped/.test(error.message || "");
+      if (noSkip) ({ data: p, error } = await db.from("profiles").select(PROFILE_COLS.replace(",skipped", "")).eq("id", uid).maybeSingle());
       if (error) throw error;
       let prof = p as Profile | null;
       if (!prof) {
-        const ins = await db.from("profiles").upsert({ id: uid }).select(PROFILE_COLS).single();
+        const ins = await db.from("profiles").upsert({ id: uid }).select(PROFILE_COLS.replace(",skipped", "")).single();
         if (ins.error) throw ins.error;
-        prof = ins.data as Profile;
+        prof = { ...(ins.data as unknown as Profile), ...(noSkip ? {} : { skipped: {} }) };
       }
       setData((d) => ({ ...d, profile: prof }));
       return;

@@ -40,6 +40,8 @@ export interface Profile {
   skin: Skin;
   timer: Timer | null;
   study_pref: StudyPref;
+  /** tarefas de estudo descartadas na lixeira do Plano do dia (`skipId` → dia); ausente se o banco não tem a coluna */
+  skipped?: Record<string, string>;
 }
 
 export interface Traits {

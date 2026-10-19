@@ -152,7 +152,13 @@ export interface PlanInput {
   assessments: Assessment[];
   /** tarefas vindas do planejamento reverso (reverse.ts) */
   extra?: Task[];
+  /** tarefas que a pessoa descartou (lixeira no quadrado), pelo `skipId` */
+  skip?: Set<string>;
 }
+
+/** Identidade de uma tarefa descartada: aula com conteúdo some de vez (consolidar/adiantar aquele conteúdo);
+ *  o resto (estudo das provas, aula sem conteúdo cadastrado) some só naquele dia */
+export const skipId = (t: Task, day: string) => (t.kind !== "preparar" && t.topic_id ? `${t.kind}:${t.topic_id}` : `${t.key}@${day}`);
 
 const CLASS_MIN = 30;
 const cmpRank = (a: number[], b: number[]) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (a[i] ?? 0) - (b[i] ?? 0); if (d) return d; } return 0; };
@@ -284,7 +290,7 @@ export function planDay(p: PlanInput): DayPlan {
   const slots: Slot[] = free.blocks
     .map((b) => ({ block: b, start: Math.max(toMin(b.start_time), p.nowMin), end: toMin(b.end_time), placed: [] as Placed[] }))
     .filter((s) => s.end - s.start >= 5);
-  const tasks = dayTasks(p);
+  const tasks = dayTasks(p).filter((t) => !p.skip?.has(skipId(t, p.today)));
   const overflow: Task[] = [];
   for (const t of tasks) {
     let ok = false;
