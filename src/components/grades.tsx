@@ -3,7 +3,7 @@
 // na visão geral de Disciplinas. Os cálculos ficam em calc.ts (gradeCalc).
 import { useState } from "react";
 import { useStore } from "@/lib/store";
-import { gradeCalc, nf, parseNum, type GradeResult, type SubResult } from "@/lib/calc";
+import { earlyGrades, gradeCalc, gradeToSim, nf, parseNum, todayKey, type GradeResult, type SubResult } from "@/lib/calc";
 import { RECOVERY } from "@/lib/constants";
 import type { Assessment, Recovery, Scenario, Subject } from "@/lib/types";
 import { ConfirmButton, I, Icon, Tabs } from "./ui";
@@ -48,6 +48,20 @@ export function subLine(r: GradeResult, sc?: Scenario, sb: SubResult | null = r.
   return t;
 }
 
+/** Conta com a simulação do cenário (nota oficial onde já tem): média, ou quanto precisa nas que faltam simular */
+function simLine(r: GradeResult, sc: Scenario) {
+  const m = r.sim!;
+  const lbl = <>Pela simulação {SN[sc].replace(/o$/, "a")}{r.Wk ? " (com as notas oficiais que já saíram)" : ""}:</>;
+  if (m.avg != null) {
+    const ok = m.avg >= r.min;
+    return <>{lbl} média <b className="num" style={{ color: ok ? "var(--ok)" : "var(--bad)" }}>{nf(m.avg)}</b> · <span style={{ color: ok ? "var(--ok)" : "var(--bad)" }}>{ok ? "aprovado" : "abaixo da mínima"}</span>{!ok && r.subs.length ? " (veja a SUB abaixo)" : ""}.</>;
+  }
+  const n = m.needed ?? 0;
+  const where = m.left.length === 1 ? `em ${m.left[0]}` : `nas que faltam simular (${m.left.join(", ")})`;
+  if (n <= 0) return <>{lbl} <span style={{ color: "var(--ok)" }}>a mínima já fica garantida</span>, mesmo com 0 {where}.</>;
+  return <>{lbl} precisa de <b className="num" style={{ color: n > 10 ? "var(--bad)" : n > 8 ? "var(--warn)" : undefined }}>{nf(n)}</b> {where}{n > 10 ? " (acima de 10)" : ""}.</>;
+}
+
 export function GradesPanel({ s }: { s: Subject }) {
   const st = useStore();
   const [sc, setSc] = useState<Scenario>("e");
@@ -75,7 +89,7 @@ export function GradesPanel({ s }: { s: Subject }) {
     if (!subs.length) await st.saveMany("assessments", items.filter((i) => i.kind === "prova" && !i.sub_id).map((i) => ({ ...i, sub_id: row.id })));
   };
   const ex = r.exam;
-  const projV = r.proj[sc];
+  const early = earlyGrades(items, todayKey());
 
   return (
     <section className="panel" id="notas">
@@ -105,6 +119,16 @@ export function GradesPanel({ s }: { s: Subject }) {
         </table></div>
       ) : <p className="small muted" style={{ margin: 0 }}>Nenhuma avaliação ainda. Adicione as provas e trabalhos com o peso de cada um.</p>}
 
+      {early.length > 0 && (
+        <div className="small" style={{ marginTop: 10, padding: "8px 10px", border: "1px solid var(--warn)", borderRadius: 8 }}>
+          <b>{early.length === 1 ? `${early[0].name} ainda não aconteceu` : `${early.length} provas ainda não aconteceram`}</b> ({early.map((a) => `${a.name} em ${dm(a.date)}`).join(", ")}), mas já {early.length === 1 ? "tem nota" : "têm nota"} em &quot;Nota&quot;.
+          {" "}O app entende nota como prova feita: {early.length === 1 ? "ela fica" : "elas ficam"} fora do plano de estudo e a média conta {early.length === 1 ? "esse valor" : "esses valores"} como oficial.
+          {" "}Se é palpite, use a coluna &quot;Simul.&quot;.
+          <div style={{ marginTop: 6 }}><button className="btn sm" onClick={() => st.saveMany("assessments", early.map(gradeToSim))}>Passar para a simulação</button>
+            <span className="muted"> {early.some((a) => Number(a.grade) === 0) ? "(nota 0 é só apagada)" : ""}</span></div>
+        </div>
+      )}
+
       <div className="row" style={{ marginTop: 10, gap: 6 }}>
         <button className="btn sm" onClick={() => st.save("assessments", blank({ name: `P${nProvas + 1}` }))}><Icon d={I.plus} s={14} />Avaliação</button>
         <button className="btn sm" onClick={addSub} title="Adicionar uma SUB (prova substitutiva), mesmo que não esteja no cronograma"><Icon d={I.plus} s={14} />{subs.length ? "Outra SUB" : "SUB"}</button>
@@ -119,8 +143,9 @@ export function GradesPanel({ s }: { s: Subject }) {
           <div>
             Média atual <b className="num">{r.partial == null ? "–" : nf(r.partial)}</b> <span className="muted">(peso {nf(r.Wk, 0)} de {nf(r.W, 0)} lançado)</span>
             {" · "}<span style={{ color: v.c }}>{v.t}</span>
-            {projV != null && r.nRem > 0 && <> · projeção {SN[sc]} <b className="num" style={{ color: projV >= r.min ? "var(--ok)" : "var(--bad)" }}>{nf(projV)}</b></>}
           </div>
+          {r.sim ? <div>{simLine(r, sc)}</div>
+            : r.nRem > 0 && <div className="muted">Preencha &quot;Simul.&quot; com os seus palpites para ver a conta com eles.</div>}
           {r.subs.map((x) => <div key={x.id}><span className="chip acc">{x.name}</span> {subLine(r, sc, x)}</div>)}
           {r.subs.length > 1 && r.subFinal != null && <div>Com todas as SUBs: média {r.subOfficial ? "final" : "projetada"} <b className="num">{nf(r.subFinal)}</b>.</div>}
           {s.recovery !== "exame" && !subs.length && <div className="muted">Esta disciplina tem SUB (mesmo que o professor tenha avisado por fora)? Use o botão &quot;+ SUB&quot; e depois marque em cada prova se ela tem SUB.</div>}

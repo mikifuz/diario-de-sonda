@@ -103,9 +103,23 @@ export interface GradeResult {
   /** média com todas as SUBs que têm nota (oficial ou simulada) aplicadas */
   subFinal: number | null;
   subOfficial: boolean;
+  /** conta com a simulação do cenário: nota oficial onde já tem, simulada onde não tem.
+   *  needed = quanto precisa (média) nas que ainda não têm nem nota nem simulação; avg = média quando todas têm */
+  sim: null | { simulated: string[]; left: string[]; needed: number | null; avg: number | null };
 }
 const has = (v: number | null | undefined): v is number => v != null && !isNaN(Number(v));
 const simOf = (a: Assessment, k: Scenario) => (k === "c" ? a.sim_c : k === "e" ? a.sim_e : a.sim_o);
+
+/** Provas e SUBs com nota lançada antes da data (ainda não aconteceram): quase sempre é palpite
+ *  digitado em "Nota" em vez de "Simul.". O app trata nota como prova feita, então elas somem do plano. */
+export const earlyGrades = (items: Assessment[], today: string) =>
+  items.filter((a) => (a.kind === "prova" || a.kind === "sub") && has(a.grade) && a.status !== "cancelado" && !!a.date && a.date > today);
+
+/** Tira a nota de uma prova que ainda não aconteceu: o palpite vira simulação (nos cenários vazios); 0 só é apagado */
+export const gradeToSim = (a: Assessment): Assessment => {
+  const g = Number(a.grade) > 0 ? Number(a.grade) : null;
+  return { ...a, grade: null, status: "pendente", sim_c: a.sim_c ?? g, sim_e: a.sim_e ?? g, sim_o: a.sim_o ?? g };
+};
 
 type GradeRules = Pick<Subject, "min_avg" | "recovery" | "sub_replace_lower" | "exam_w_avg" | "exam_w_exam" | "exam_min_final" | "exam_min_take">;
 
@@ -142,7 +156,15 @@ export function gradeCalc(sub: GradeRules, items: Assessment[], scen?: Scenario)
     subs: [],
     subFinal: null,
     subOfficial: false,
+    sim: null,
   };
+  if (scen && rem.length) {
+    const simd = rem.filter((i) => has(simOf(i, scen)));
+    const left = rem.filter((i) => !has(simOf(i, scen)));
+    const S = Sk + simd.reduce((a, i) => a + Number(i.weight) * Number(simOf(i, scen)), 0);
+    const Wl = left.reduce((a, i) => a + Number(i.weight), 0);
+    if (simd.length) r.sim = { simulated: simd.map((i) => i.name), left: left.map((i) => i.name), needed: Wl > 0 ? (min * W - S) / Wl : null, avg: Wl === 0 ? S / W : null };
+  }
   const base = r.final != null ? r.final : scen && r.proj[scen] != null ? r.proj[scen] : null;
   if (sub.recovery === "exame") {
     const wa = Number(sub.exam_w_avg) || 1, we = Number(sub.exam_w_exam) || 1, mf = Number(sub.exam_min_final ?? 5);

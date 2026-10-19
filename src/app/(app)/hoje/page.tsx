@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { agenda, useStore } from "@/lib/store";
-import { addDays, fmtMin, keyDate, todayKey, qt } from "@/lib/calc";
+import { addDays, daysBetween, earlyGrades, fmtMin, gradeToSim, keyDate, todayKey, qt } from "@/lib/calc";
 import { dm, fromMin, planDay, skipId, whereNext, type PlanInput, type Task } from "@/lib/plan";
 import { PREF, WD_S } from "@/lib/constants";
 import { FINAL_MIN, RESERVE, TARGET, reversePlan, todayTasks, type ExamPlan } from "@/lib/reverse";
@@ -11,7 +11,7 @@ import type { Activity, CalEvent, EventType } from "@/lib/types";
 import { Dot, Empty, I, Icon, Tabs, useNow } from "@/components/ui";
 import { ImportSigaModal } from "@/components/importSiga";
 import { DayPrint } from "@/components/dayPrint";
-import { easyReminders } from "@/lib/effort";
+import { easyReminders, isTrivial } from "@/lib/effort";
 import { WeekPrint } from "@/components/weekPrint";
 import { StartModal, type StartArgs } from "@/components/studyStart";
 import { EventModal } from "@/components/modals";
@@ -349,12 +349,37 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
 }
 
 /* ============ Provas (planejamento reverso) ============ */
+/** Provas dos próximos 30 dias com nota lançada antes de acontecer: o app as trata como feitas e elas
+ *  somem do plano (caso real: palpites digitados em "Nota" em vez de "Simul."). */
+function EarlyGrades({ today }: { today: string }) {
+  const st = useStore();
+  const subj = new Map(st.subjects.filter((s) => !s.archived && !isTrivial(s)).map((s) => [s.id, s]));
+  const early = earlyGrades(st.assessments, today).filter((a) => a.kind === "prova" && subj.has(a.subject_id) && daysBetween(today, a.date!) <= 30);
+  if (!early.length) return null;
+  return (
+    <section className="panel" style={{ borderColor: "var(--warn)" }}>
+      <h2 style={{ marginTop: 0 }}>{early.length === 1 ? "Uma prova ficou de fora do plano" : `${early.length} provas ficaram de fora do plano`}</h2>
+      <p className="small" style={{ margin: "0 0 6px" }}>{early.length === 1 ? "Ela ainda não aconteceu, mas já tem nota" : "Elas ainda não aconteceram, mas já têm nota"} em &quot;Nota&quot; (nas Notas da disciplina). Nota quer dizer prova feita, então o app não monta estudo para {early.length === 1 ? "ela" : "elas"}. Se é palpite, o lugar é a coluna &quot;Simul.&quot;.</p>
+      <div className="list small">{early.map((a) => (
+        <div key={a.id} className="li"><span className="cdays warn">{daysBetween(today, a.date!)} d</span>
+          <div className="grow"><Link href={`/disciplinas/${a.subject_id}#notas`}>{a.name} · {subj.get(a.subject_id)!.name}</Link> <span className="muted">· {dm(a.date!)} · nota lançada: {String(a.grade).replace(".", ",")}</span></div></div>
+      ))}</div>
+      <div className="row" style={{ marginTop: 8, gap: 6 }}>
+        <button className="btn sm pri" onClick={() => st.saveMany("assessments", early.map(gradeToSim))}>Passar essas notas para a simulação</button>
+        {early.some((a) => Number(a.grade) === 0) && <span className="small muted">Nota 0 é só apagada (deve ter sido um espaço reservado).</span>}
+      </div>
+    </section>
+  );
+}
+
 function ExamsTab({ open, goRoutine }: { open: Open; goRoutine: () => void }) {
   const st = useStore();
   const { plans, today } = useReverse();
-  if (!plans.length) return <Empty title="Nenhuma prova nos próximos 30 dias">Cadastre as provas com data (ou importe o cronograma na disciplina) para o app montar o plano até cada uma.</Empty>;
+  const early = <EarlyGrades today={today} />;
+  if (!plans.length) return <>{early}<Empty title="Nenhuma prova nos próximos 30 dias">Cadastre as provas com data (ou importe o cronograma na disciplina) para o app montar o plano até cada uma.</Empty></>;
   return (
     <>
+      {early}
       {plans.map((pl) => {
         const byDay = new Map<string, typeof pl.chunks>();
         for (const c of pl.chunks) byDay.set(c.day, [...(byDay.get(c.day) || []), c]);
