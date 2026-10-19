@@ -1,7 +1,7 @@
 import { holidayOf, easter } from "./holidays";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { slotRanges, anchorFor, freeStudy, freeWindows, noClass, studyHint, planDay, planWeek, whereNext, type PlanInput, type Task } from "./plan";
+import { slotRanges, anchorFor, freeStudy, freeWindows, noClass, studyHint, planDay, planWeek, skipId, whereNext, type PlanInput, type Task } from "./plan";
 import type { Assessment, CalEvent, RoutineBlock, Session, Subject, Topic } from "./types";
 
 const TODAY = "2026-10-19"; // segunda-feira
@@ -49,6 +49,18 @@ test("plano do dia: prioridade, encaixe nos blocos e o que não coube", () => {
   assert.equal(p.overflow.length, 0);
   const cheio = planDay(input({ blocks: [B({ start_time: "14:00", end_time: "14:40" })], extra }));
   assert.deepEqual(cheio.overflow.map((x) => x.title), ["Longe"]);
+});
+
+test("tarefa descartada sai do plano e libera o tempo para a seguinte", () => {
+  const extra = [P({ key: "perto", title: "Perto", rank: [0, 2, 0, 0, 0, 0] }), P({ key: "longe", title: "Longe", rank: [0.5, 30, 0, 0, 0, 0] })];
+  const blocks = [B({ start_time: "14:00", end_time: "14:40" })];
+  const p = planDay(input({ blocks, extra, skip: new Set([skipId(extra[0], TODAY)]) }));
+  assert.deepEqual(p.slots[0].placed.map((x) => x.task.title), ["Longe"]);
+  assert.equal(p.overflow.length, 0);
+  assert.equal(p.need, 30);
+  // estudo de prova descartado vale só para aquele dia; aula com conteúdo, para aquele conteúdo
+  assert.equal(planDay(input({ today: "2026-10-26", blocks: [B({})], extra, skip: new Set([skipId(extra[0], TODAY)]) })).slots[0].placed.length, 2);
+  assert.equal(skipId(P({ kind: "adiantar", topic_id: "t1" }), TODAY), skipId(P({ kind: "adiantar", topic_id: "t1" }), "2026-10-20"));
 });
 
 test("plano do dia: só o que sobra do dia conta", () => {

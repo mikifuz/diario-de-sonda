@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { agenda, useStore } from "@/lib/store";
 import { addDays, fmtMin, keyDate, todayKey, qt } from "@/lib/calc";
-import { dm, fromMin, planDay, whereNext, type PlanInput, type Task } from "@/lib/plan";
+import { dm, fromMin, planDay, skipId, whereNext, type PlanInput, type Task } from "@/lib/plan";
 import { PREF, WD_S } from "@/lib/constants";
 import { FINAL_MIN, RESERVE, TARGET, reversePlan, todayTasks, type ExamPlan } from "@/lib/reverse";
 import type { Activity, CalEvent, EventType } from "@/lib/types";
@@ -73,7 +73,7 @@ function Greeting() {
   );
 }
 
-function TodayTiles({ cards, open, force }: { cards: DayCard[]; open: Open; force: (key: string) => void }) {
+function TodayTiles({ cards, open, force, discard, discarded, restore }: { cards: DayCard[]; open: Open; force: (key: string) => void; discard: (t: Task) => void; discarded: number; restore: () => void }) {
   const st = useStore();
   const color = (c: DayCard) => (c.kind === "rotina" ? "var(--line)" : c.kind === "livre" ? "var(--accent)" : c.kind === "tarefa" ? "var(--warn)" : st.subjects.find((s) => s.id === c.subject_id)?.color || "var(--accent)");
   const done = (t: NonNullable<DayCard["todo"]>) => st.save("tasks", { ...t, done: true, done_at: new Date().toISOString() });
@@ -95,13 +95,16 @@ function TodayTiles({ cards, open, force }: { cards: DayCard[]; open: Open; forc
                   ? <button className="btn sm" onClick={() => force(c.task!.key)} title="Vira um quadrado sem horário hoje">Fazer hoje mesmo assim</button>
                   : <button className="btn sm" disabled={!!st.profile?.timer} title={st.profile?.timer ? "Já existe uma sessão em andamento" : undefined}
                     onClick={() => open({ k: "start", args: { subject_id: c.task!.subject_id, topic_id: c.task!.topic_id, activity: ACT_OF[c.task!.kind] } })}><Icon d={I.play} s={13} />Começar</button>}
+                <button className="btn sm ghost icon" style={{ marginLeft: "auto" }} onClick={() => discard(c.task!)} aria-label={`Descartar: ${c.task.title}`}
+                  title={c.task.kind === "preparar" || !c.task.topic_id ? "Descartar hoje: sai do plano e o tempo fica para as outras tarefas" : "Descartar: o app não sugere mais esta aula"}><Icon d={I.trash} s={14} /></button>
               </span>
             )}
             {c.todo && <span style={{ marginTop: "auto", paddingTop: 6 }}><button className="btn sm" onClick={() => done(c.todo!)}>Feito</button></span>}
           </div>
         ))}</div>
       ) : <Empty title="Nada marcado para hoje">Monte sua rotina semanal (aulas e blocos de estudo) no Calendário: o app encaixa o estudo das provas e das aulas.<Link className="btn sm pri" href="/calendario#rotina">Montar minha rotina</Link></Empty>}
-      {cards.some((c) => c.task) && <p className="small muted" style={{ margin: "10px 0 0" }}>Passe o mouse numa tarefa de estudo para ver por que ela entrou hoje. O motivo de cada uma também fica na lista logo abaixo.{cards.some((c) => c.kind === "nao_coube") ? " O que não cabe hoje vai sozinho para o próximo horário de estudo livre." : ""}</p>}
+      {cards.some((c) => c.task) && <p className="small muted" style={{ margin: "10px 0 0" }}>Passe o mouse numa tarefa de estudo para ver por que ela entrou hoje. O motivo de cada uma também fica na lista logo abaixo.{cards.some((c) => c.kind === "nao_coube") ? " O que não cabe hoje vai sozinho para o próximo horário de estudo livre." : ""} A lixeira tira a tarefa do plano.</p>}
+      {discarded > 0 && <p className="small muted" style={{ margin: "6px 0 0" }}>{qt(discarded, "tarefa descartada", "tarefas descartadas")} hoje. <button className="btn sm ghost" onClick={restore}>Trazer de volta</button></p>}
     </section>
   );
 }
@@ -182,6 +185,28 @@ function useForced(today: string): [Set<string>, (key: string) => void] {
   return [set, add];
 }
 
+/** Tarefas de estudo descartadas na lixeira do quadrado (só neste aparelho): id do `skipId` → dia em que descartou.
+ *  Aula com conteúdo some de vez; estudo das provas só no dia (o plano das provas se refaz). Guarda 60 dias. */
+const SKIP_KEY = "ds-descartar";
+function useSkipped(today: string): [Set<string>, (t: Task) => void, number, () => void] {
+  const read = (): Record<string, string> => {
+    try {
+      const j = JSON.parse(localStorage.getItem(SKIP_KEY) || "{}") as Record<string, string>;
+      const min = addDays(today, -60);
+      return Object.fromEntries(Object.entries(j).filter(([, d]) => typeof d === "string" && d >= min));
+    } catch { return {}; }
+  };
+  const [map, setMap] = useState<Record<string, string>>(read);
+  useEffect(() => { setMap(read()); }, [today]); // eslint-disable-line react-hooks/exhaustive-deps
+  const write = (next: Record<string, string>) => {
+    setMap(next);
+    try { localStorage.setItem(SKIP_KEY, JSON.stringify(next)); } catch { /* sem armazenamento */ }
+  };
+  const add = (t: Task) => write({ ...map, [skipId(t, today)]: today });
+  const restore = () => write(Object.fromEntries(Object.entries(map).filter(([, d]) => d !== today)));
+  return [new Set(Object.keys(map)), add, Object.values(map).filter((d) => d === today).length, restore];
+}
+
 const hm = (m: number) => (m % 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}` : `${m / 60}h`);
 const dayName = (d: string, today: string) => (d === today ? "hoje" : d === addDays(today, 1) ? "amanhã" : `${WD_S[keyDate(d).getDay()].toLowerCase()} (${dm(d)})`);
 
@@ -217,9 +242,10 @@ function MissingCard({ pl, today, goRoutine, goExams }: { pl: ExamPlan; today: s
 function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => void; goExams: () => void }) {
   const st = useStore();
   const { plans, today, nowMin } = useReverse();
+  const [skip, discard, discarded, restore] = useSkipped(today);
   const input: PlanInput = {
     today, nowMin, pref: st.profile?.study_pref || "depois", blocks: st.blocks, events: st.events,
-    subjects: st.subjects, topics: st.topics, sessions: st.sessions, assessments: st.assessments, extra: todayTasks(plans, today),
+    subjects: st.subjects, topics: st.topics, sessions: st.sessions, assessments: st.assessments, extra: todayTasks(plans, today), skip,
   };
   const plan = planDay(input);
   const [forced, force] = useForced(today);
@@ -236,7 +262,8 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
   return (
     <>
       {plan.off && <div className="callout info"><b>Hoje é seu day off 😴</b> Nada de estudo no plano de hoje: o estudo das provas foi para os outros dias. Para cancelar a folga, vá na Sala.</div>}
-      <TodayTiles cards={cards} open={open} force={force} />
+      <TodayTiles cards={cards} open={open} force={force} discarded={discarded} restore={restore}
+        discard={(t) => { discard(t); st.toast(t.kind === "preparar" || !t.topic_id ? "Tarefa descartada por hoje. O tempo dela ficou para as outras." : "Tarefa descartada. O app não sugere mais esta aula."); }} />
       {!plan.off && !cards.some((c) => c.task?.kind === "preparar" && !c.past) && <NextUp plans={plans} today={today} free={plan.capacity} open={open} />}
       <section className="panel" aria-label="Imprimir ou salvar em PDF">
         <div className="row" style={{ gap: 6 }}>
