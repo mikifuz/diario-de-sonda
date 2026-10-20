@@ -1,6 +1,6 @@
 // Cronômetro esquecido e a mesinha da sala. Funções puras, testadas em timer.test.ts.
 import { dkey } from "./calc";
-import type { Timer } from "./types";
+import type { Session, Timer } from "./types";
 
 /** Depois de 20 h seguidas sem pausa, o cronômetro é desligado sozinho (pedido do dono: quase sempre é esquecimento) */
 export const MAX_RUN_MS = 20 * 3600_000;
@@ -77,4 +77,54 @@ export function deskState(m: { studying: boolean; paused: boolean; updated_at: s
   const ago = now - new Date(m.updated_at).getTime();
   if (!(ago >= 0 && ago < DESK_FADE_MS)) return null;
   return m.paused || studiedRecently ? "parou" : null;
+}
+
+/**
+ * "Parei de estudar às HH:MM" (pedido do dono: esqueceu o cronômetro ligado depois de parar):
+ * o instante mais recente com esse horário que não passa de `endedAt` (pode ser ontem, se virou a noite).
+ */
+export function stopAtFrom(hhmm: string, endedAt: number): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!m || +m[1] > 23 || +m[2] > 59) return null;
+  const d = new Date(endedAt);
+  d.setHours(+m[1], +m[2], 0, 0);
+  if (d.getTime() > endedAt) d.setDate(d.getDate() - 1);
+  return d.getTime();
+}
+
+const endOf = (s: Session) => new Date(s.started_at).getTime() + s.duration_min * 60000;
+
+/**
+ * A sessão que acabou de ser salva e as anteriores grudadas nela (mesma disciplina, terminam onde a
+ * seguinte começa; ex.: o pedaço de antes da meia-noite), da mais antiga para a mais nova.
+ */
+export function sessionChain(sessions: Session[], lastId: string): Session[] {
+  const last = sessions.find((s) => s.id === lastId);
+  if (!last) return [];
+  const out = [last];
+  for (;;) {
+    const start = new Date(out[0].started_at).getTime();
+    const prev = sessions.find((s) => s.subject_id === last.subject_id && !out.includes(s) && Math.abs(endOf(s) - start) <= 2 * 60000);
+    if (!prev) return out;
+    out.unshift(prev);
+  }
+}
+
+/**
+ * Tira do fim da cadeia o tempo entre `stopAt` (quando parou de verdade) e `endedAt` (quando o
+ * cronômetro foi encerrado): sessões inteiras depois de `stopAt` são apagadas, a do meio encurta.
+ * Devolve null se `stopAt` é antes do começo (não sobraria nada) ou depois do fim.
+ */
+export function trimTail(chain: Session[], endedAt: number, stopAt: number) {
+  let cut = Math.round((endedAt - stopAt) / 60000);
+  if (!chain.length || cut < 1) return null;
+  const cutMin = cut;
+  const update: Session[] = [], remove: string[] = [];
+  for (let i = chain.length - 1; i >= 0 && cut > 0; i--) {
+    const s = chain[i];
+    if (cut >= s.duration_min) { remove.push(s.id); cut -= s.duration_min; }
+    else { update.push({ ...s, duration_min: s.duration_min - cut }); cut = 0; }
+  }
+  if (cut > 0 || remove.length === chain.length) return null;
+  return { update, remove, cutMin, keptMin: chain.reduce((a, s) => a + s.duration_min, 0) - cutMin };
 }

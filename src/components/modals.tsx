@@ -36,6 +36,11 @@ export function SessionModal({ id, onClose }: { id: string | null; onClose: () =
   const [time, setTime] = useState(`${pad(start.getHours())}:${pad(start.getMinutes())}`);
   const [dur, setDur] = useState(String(orig?.duration_min ?? 60));
   const [notes, setNotes] = useState(orig?.notes || "");
+  // "Terminou às" = início + duração; mudar o fim muda a duração
+  const toMin = (v: string) => { const [h, m] = (v || "").split(":").map(Number); return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null; };
+  const t0 = toMin(time), d0 = parseNum(dur);
+  const endTime = t0 != null && d0 != null && d0 > 0 ? `${pad(Math.floor((t0 + d0) / 60) % 24)}:${pad((t0 + d0) % 60)}` : "";
+  const setEnd = (v: string) => { const e = toMin(v); if (e == null || t0 == null) return; setDur(String((e - t0 + 1440) % 1440 || 1440)); };
   if (!list.length) return <Modal title="Registrar sessão" onClose={onClose}><p>Cadastre uma disciplina primeiro.</p></Modal>;
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -55,6 +60,8 @@ export function SessionModal({ id, onClose }: { id: string | null; onClose: () =
           <label className="f"><span>Data</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></label>
           <label className="f"><span>Início</span><input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
           <label className="f"><span>Duração (minutos)</span><input type="number" min={1} max={1440} value={dur} onChange={(e) => setDur(e.target.value)} required /></label>
+          <label className="f"><span>Terminou às</span><input type="time" value={endTime} onChange={(e) => setEnd(e.target.value)} />
+            <span className="small">Esqueceu o cronômetro ligado? Ponha a hora em que parou: a duração se ajusta (do início até aqui, sem descontar pausas).</span></label>
         </div>
         <label className="f"><span>Observações</span><textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Opcional" /></label>
         <div className="modal-f">

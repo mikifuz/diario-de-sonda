@@ -43,7 +43,8 @@ export interface Store extends Data {
   setSocial: (social: Social) => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
-  stopTimer: () => Promise<void>;
+  /** devolve a sessão salva e quando o cronômetro foi encerrado (para "Parei de estudar às") */
+  stopTimer: () => Promise<{ id: string; endedAt: number } | null>;
   discardTimer: () => void;
 }
 
@@ -233,23 +234,26 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
   }, [updateProfile, saveTimerPart, toast]);
   const discardTimer = useCallback(() => { updateProfile({ timer: null }); }, [updateProfile]);
   const stopTimer = useCallback(async () => {
-    let t = dataRef.current.profile?.timer; if (!t) return;
-    const r = rollover(t);
+    let t = dataRef.current.profile?.timer; if (!t) return null;
+    const endedAt = Date.now();
+    const r = rollover(t, endedAt);
     if (r?.next) {
       // passou da meia-noite ligado e a virada ainda não tinha sido feita: o pedaço de ontem fica em ontem
       await saveTimerPart(t, r.keepMs, r.startedAt, "Parte de antes da meia-noite; a sessão continuou no dia seguinte.");
       t = r.next;
     }
-    const ms = timerMs(t);
+    const ms = timerMs(t, endedAt);
     const s: Session = {
       id: crypto.randomUUID(), subject_id: t.subject_id, topic_id: t.topic_id || null, activity: t.activity,
-      started_at: new Date(t.started || Date.now() - ms).toISOString(), duration_min: Math.min(1440, Math.max(1, Math.round(ms / 60000))),
+      started_at: new Date(t.started || endedAt - ms).toISOString(), duration_min: Math.min(1440, Math.max(1, Math.round(ms / 60000))),
       notes: "",
     };
     const exists = dataRef.current.subjects.some((x) => x.id === t.subject_id);
     await updateProfile({ timer: null });
-    if (!exists) { toast("A disciplina desta sessão foi excluída; o tempo não foi salvo."); return; }
-    if (await save("study_sessions", s)) toast(`Sessão salva: ${s.duration_min} min.`);
+    if (!exists) { toast("A disciplina desta sessão foi excluída; o tempo não foi salvo."); return null; }
+    if (!(await save("study_sessions", s))) return null;
+    toast(`Sessão salva: ${s.duration_min} min.`);
+    return { id: s.id, endedAt };
   }, [save, saveTimerPart, toast, updateProfile]);
 
   // cronômetro esquecido: mais de 20 h seguidas sem pausa → desliga sozinho e avisa

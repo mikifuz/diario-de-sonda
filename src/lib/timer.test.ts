@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { autoStop, deskState, forgotten, liveFrom, MAX_RUN_MS, nextMidnight, rollover } from "./timer";
-import type { Timer } from "./types";
+import { autoStop, deskState, forgotten, liveFrom, MAX_RUN_MS, nextMidnight, rollover, sessionChain, stopAtFrom, trimTail } from "./timer";
+import type { Session, Timer } from "./types";
 
 const H = 3600_000;
 const T = (p: Partial<Timer>): Timer => ({ subject_id: "s", topic_id: null, activity: "exercicios", since: 0, started: 0, accum: 0, running: true, ...p });
@@ -72,4 +72,34 @@ test("sala: o cronômetro ao vivo só conta no dia em que foi feito", () => {
   assert.equal(liveFrom({ studying: true, paused: false, since: iso(at(11, 23)), accum_ms: H, updated_at: iso(at(11, 23)) }, today, now), 9 * H);
   assert.equal(liveFrom({ studying: true, paused: false, since: iso(at(12, 8)), accum_ms: H, updated_at: iso(at(12, 8)) }, today, now), 2 * H);
   assert.equal(liveFrom({ studying: false, paused: false, since: null, accum_ms: 0, updated_at: iso(at(12, 8)) }, today, now), 0);
+});
+
+test("parei às: o horário mais recente até o fim (pode ser ontem)", () => {
+  const ended = new Date(2026, 9, 20, 4, 10).getTime();
+  assert.equal(stopAtFrom("20:00", ended), new Date(2026, 9, 19, 20, 0).getTime());
+  assert.equal(stopAtFrom("3:30", ended), new Date(2026, 9, 20, 3, 30).getTime());
+  assert.equal(stopAtFrom("25:00", ended), null);
+  assert.equal(stopAtFrom("", ended), null);
+});
+
+test("corrigir cronômetro esquecido: corta o fim, apagando o pedaço depois da meia-noite", () => {
+  const S = (id: string, y: number, mo: number, d: number, h: number, mi: number, dur: number, sub = "s"): Session =>
+    ({ id, subject_id: sub, topic_id: null, activity: "exercicios", started_at: new Date(y, mo, d, h, mi).toISOString(), duration_min: dur, notes: "" });
+  // começou 17:00, esqueceu ligado, a virada salvou 17:00–24:00 e o resto foi até 04:10
+  const ontem = S("a", 2026, 9, 19, 17, 0, 420), hoje = S("b", 2026, 9, 20, 0, 0, 250), outra = S("c", 2026, 9, 19, 10, 0, 60, "x");
+  const chain = sessionChain([outra, ontem, hoje], "b");
+  assert.deepEqual(chain.map((s) => s.id), ["a", "b"]);
+  const ended = new Date(2026, 9, 20, 4, 10).getTime();
+  const r = trimTail(chain, ended, stopAtFrom("20:00", ended)!)!;
+  assert.deepEqual(r.remove, ["b"]);
+  assert.equal(r.update[0].id, "a");
+  assert.equal(r.update[0].duration_min, 180);
+  assert.equal(r.cutMin, 490);
+  assert.equal(r.keptMin, 180);
+  // sessão só de hoje: só encurta
+  const one = S("d", 2026, 9, 20, 9, 0, 660);
+  const r2 = trimTail([one], new Date(2026, 9, 20, 20, 0).getTime(), new Date(2026, 9, 20, 12, 0).getTime())!;
+  assert.deepEqual([r2.remove, r2.update[0].duration_min], [[], 180]);
+  // antes de começar: não sobraria nada
+  assert.equal(trimTail([one], new Date(2026, 9, 20, 20, 0).getTime(), new Date(2026, 9, 20, 8, 0).getTime()), null);
 });

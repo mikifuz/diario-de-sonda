@@ -14,6 +14,7 @@ import { SessionModal, SubjectModal, TopicOptions } from "@/components/modals";
 import { SessionRow } from "@/components/SessionRow";
 import { SOCIAL, StartModal, type StartArgs } from "@/components/studyStart";
 import { Desk } from "@/components/desk";
+import { sessionChain, stopAtFrom, trimTail } from "@/lib/timer";
 
 function Privacy() {
   const yes = ["Seu apelido, se está estudando agora e há quanto tempo", "Minutos estudados por dia (últimos 35 dias) e sequência de dias", "O nome da disciplina em andamento, só quando você escolhe mostrar"];
@@ -28,7 +29,7 @@ function Privacy() {
 }
 
 /* ============ Cronômetro ============ */
-function TimerPanel({ onManual, onNewSubject }: { onManual: () => void; onNewSubject: () => void }) {
+function TimerPanel({ onManual, onNewSubject, onStopped }: { onManual: () => void; onNewSubject: () => void; onStopped: (x: Stopped) => void }) {
   const st = useStore();
   const room = useRoom();
   const params = useSearchParams();
@@ -67,7 +68,7 @@ function TimerPanel({ onManual, onNewSubject }: { onManual: () => void; onNewSub
                 <button className="btn sm ghost" onClick={() => setDiscard(false)}>Manter</button></>
             ) : (
               <>{t.running ? <button className="btn" onClick={st.pauseTimer}><Icon d={I.pause} s={16} />Pausar</button> : <button className="btn" onClick={st.resumeTimer}><Icon d={I.play} s={16} />Retomar</button>}
-                <button className="btn pri" onClick={st.stopTimer}><Icon d={I.stop} s={16} />Encerrar e salvar</button>
+                <button className="btn pri" onClick={async () => { const r = await st.stopTimer(); if (r) onStopped(r); }}><Icon d={I.stop} s={16} />Encerrar e salvar</button>
                 <button className="btn ghost" onClick={() => setDiscard(true)}>Descartar</button></>
             )}
           </div>
@@ -97,6 +98,42 @@ function TimerPanel({ onManual, onNewSubject }: { onManual: () => void; onNewSub
         <span className="small muted">O tempo continua contando mesmo se você fechar a página ou trocar de aparelho.</span>
       </div>
       {start && <StartModal args={start} onClose={() => setStart(null)} />}
+    </div>
+  );
+}
+
+/* ============ Logo depois de encerrar: corrigir o tempo ============ */
+type Stopped = { id: string; endedAt: number };
+const hm = (ms: number) => new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+/** Esqueceu o cronômetro ligado depois de parar (pedido do dono): "Parei de estudar às" tira o tempo a mais */
+function StoppedNote({ stopped, onEdit, onClose }: { stopped: Stopped; onEdit: (id: string) => void; onClose: () => void }) {
+  const st = useStore();
+  const chain = sessionChain(st.sessions, stopped.id);
+  const [at, setAt] = useState("");
+  if (!chain.length) return null;
+  const total = chain.reduce((a, s) => a + s.duration_min, 0);
+  const sub = st.subjects.find((x) => x.id === chain[0].subject_id);
+  const fix = async (e: FormEvent) => {
+    e.preventDefault();
+    const stopAt = stopAtFrom(at, stopped.endedAt);
+    if (stopAt == null) { st.toast("Escolha o horário em que você parou de estudar."); return; }
+    const r = trimTail(chain, stopped.endedAt, stopAt);
+    if (!r) { st.toast(`Esse horário não dá: a sessão começou às ${hm(new Date(chain[0].started_at).getTime())} e foi encerrada às ${hm(stopped.endedAt)}.`); return; }
+    if (r.update.length && !(await st.saveMany("study_sessions", r.update))) return;
+    for (const id of r.remove) if (!(await st.remove("study_sessions", id))) return;
+    st.toast(`Pronto: tirei ${fmtMin(r.cutMin)}. A sessão ficou com ${fmtMin(r.keptMin)}.`);
+    onClose();
+  };
+  return (
+    <div className="panel">
+      <div className="panel-h"><h3>Sessão salva: {fmtMin(total)}{sub ? ` de ${sub.name}` : ""}</h3><button className="btn sm ghost" onClick={onClose}>Está certo</button></div>
+      <p className="small muted" style={{ marginTop: 0 }}>Das {hm(new Date(chain[0].started_at).getTime())} às {hm(stopped.endedAt)}{chain.length > 1 ? `, em ${qt(chain.length, "parte", "partes")} (a virada do dia separa)` : ""}. Esqueceu o cronômetro ligado? Diga quando parou e o app tira o tempo a mais.</p>
+      <form className="row" style={{ gap: 8 }} onSubmit={fix}>
+        <label className="row small" style={{ gap: 8 }}>Parei de estudar às<input type="time" value={at} onChange={(e) => setAt(e.target.value)} required style={{ width: "auto" }} /></label>
+        <button className="btn pri sm">Corrigir o tempo</button>
+        <button type="button" className="btn sm ghost" onClick={() => onEdit(chain[chain.length - 1].id)}><Icon d={I.edit} s={14} />Editar sessão</button>
+      </form>
     </div>
   );
 }
@@ -448,9 +485,11 @@ function History({ onEdit }: { onEdit: (id: string) => void }) {
 
 function Sala() {
   const [modal, setModal] = useState<null | { k: "session"; id: string | null } | { k: "subject" }>(null);
+  const [stopped, setStopped] = useState<Stopped | null>(null);
   return (
     <>
-      <TimerPanel onManual={() => setModal({ k: "session", id: null })} onNewSubject={() => setModal({ k: "subject" })} />
+      <TimerPanel onManual={() => setModal({ k: "session", id: null })} onNewSubject={() => setModal({ k: "subject" })} onStopped={setStopped} />
+      {stopped && <StoppedNote stopped={stopped} onEdit={(id) => setModal({ k: "session", id })} onClose={() => setStopped(null)} />}
       <DayOff />
       <GroupsArea />
       <History onEdit={(id) => setModal({ k: "session", id })} />
