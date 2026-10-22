@@ -8,7 +8,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { sb, friendlyError } from "./supabase";
 import { useStore, timerMs } from "./store";
 import { addDays, keyDate, todayKey, weekStartKey } from "./calc";
-import { deskState, liveFrom, type Desk } from "./timer";
+import { deskState, liveFrom, presenceCut, type Desk } from "./timer";
 import { flushPush } from "./pushClient";
 import type { DailyTotal, Friend, GroupMember, RoomMember, StudyGroup } from "./types";
 
@@ -79,7 +79,11 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const st = useStore();
   const { uid, toast } = st;
   const [ready, setReady] = useState(false);
-  const [members, setMembers] = useState<RoomMember[]>([]);
+  const [rawMembers, setMembers] = useState<RoomMember[]>([]);
+  // quem esqueceu o cronômetro ligado (12 h sem pausa) aparece parado para todos; confere a cada minuto
+  const [tick, setTick] = useState(() => Date.now());
+  useEffect(() => { const iv = setInterval(() => setTick(Date.now()), 60000); return () => clearInterval(iv); }, []);
+  const members = useMemo(() => rawMembers.map((m) => presenceCut(m, tick)), [rawMembers, tick]);
   const [groups, setGroups] = useState<StudyGroup[]>([]);
   const [memberships, setMemberships] = useState<GroupMember[]>([]);
   const [totalsRaw, setTotalsRaw] = useState<DailyTotal[]>([]);

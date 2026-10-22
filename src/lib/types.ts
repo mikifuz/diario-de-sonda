@@ -22,7 +22,7 @@ export interface Timer {
   running: boolean;
   /** ms epoch da última pausa (ausente em sessões antigas: usa `since`) */
   paused_at?: number;
-  /** ms epoch do início do trecho sem pausa, quando ele passou da meia-noite (a regra das 20 h conta daqui) */
+  /** ms epoch do início do trecho sem pausa, quando ele passou da meia-noite (a regra das 12 h conta daqui) */
   run_since?: number;
   /** como a sessão aparece na sala: com a matéria, sem a matéria ou só para mim (ausente = sessões antigas) */
   social?: Social;

@@ -252,7 +252,7 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     if (await save("study_sessions", s)) toast(`Sessão salva: ${s.duration_min} min.`);
   }, [save, saveTimerPart, toast, updateProfile]);
 
-  // cronômetro esquecido: mais de 20 h seguidas sem pausa → desliga sozinho e avisa
+  // cronômetro esquecido: mais de 12 h seguidas sem pausa → desliga sozinho e avisa
   const autoStopping = useRef(false);
   useEffect(() => {
     if (!ready) return;
@@ -285,16 +285,16 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
         await save("study_sessions", {
           id: crypto.randomUUID(), subject_id: t.subject_id, topic_id: t.topic_id || null, activity: t.activity,
           started_at: new Date(t.started || lostSince - keepMs).toISOString(), duration_min: Math.min(1440, minutes),
-          notes: "Cronômetro desligado sozinho após 20 h sem pausa; salvo só o tempo até a última pausa.",
+          notes: "Cronômetro desligado sozinho após 12 h sem pausa; salvo só o tempo até a última pausa.",
         });
       }
       const from = new Date(lostSince).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-      const body = `O cronômetro${subj ? ` de ${subj.name}` : ""} ficou ligado mais de 20 h sem pausa (desde ${from}) e foi desligado sozinho. ` +
+      const body = `O cronômetro${subj ? ` de ${subj.name}` : ""} ficou ligado mais de 12 h sem pausa (desde ${from}) e foi desligado sozinho. ` +
         "Esse trecho não foi salvo, porque não dá para saber quando você parou de verdade" +
         (minutes >= 1 ? `; os ${minutes} min de antes da última pausa foram salvos. ` : ". ") +
         (t.run_since ? "O que foi até a meia-noite já tinha sido salvo como sessão do dia anterior; se não estudou nesse tempo, apague essa sessão no histórico da Sala. " : "") +
         "Se estudou nesse período, registre o tempo certo em Sala → Registrar manualmente.";
-      toast("Cronômetro desligado sozinho: ficou mais de 20 h ligado sem pausa.");
+      toast("Cronômetro desligado sozinho: ficou mais de 12 h ligado sem pausa.");
       await save("notifications", { id: crypto.randomUUID(), kind: "aviso", title: "Cronômetro desligado sozinho", body, data: {}, from_user: null, created_at: new Date().toISOString(), read_at: null });
       autoStopping.current = false;
     };
