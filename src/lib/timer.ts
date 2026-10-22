@@ -2,15 +2,15 @@
 import { dkey } from "./calc";
 import type { Timer } from "./types";
 
-/** Depois de 20 h seguidas sem pausa, o cronômetro é desligado sozinho (pedido do dono: quase sempre é esquecimento) */
-export const MAX_RUN_MS = 20 * 3600_000;
+/** Depois de 12 h seguidas sem pausa, o cronômetro é desligado sozinho (pedido do dono: quase sempre é esquecimento) */
+export const MAX_RUN_MS = 12 * 3600_000;
 
-/** Ligado sem pausa há mais de 20 h? */
+/** Ligado sem pausa há mais de 12 h? */
 export const forgotten = (t: Timer | null | undefined, now = Date.now()) => !!t && t.running && now - (t.run_since ?? t.since) > MAX_RUN_MS;
 
 /**
  * O que salvar ao desligar sozinho. Não dá para saber quando a pessoa parou de verdade,
- * então o trecho sem pausa não é salvo (nada de inventar 20 h de estudo); só o tempo
+ * então o trecho sem pausa não é salvo (nada de inventar 12 h de estudo); só o tempo
  * acumulado antes da última retomada, que já foi interrompido por uma pausa.
  */
 export function autoStop(t: Timer) {
@@ -32,7 +32,7 @@ export function nextMidnight(ms: number) {
  * - Ligada atravessando a meia-noite: o que foi até a meia-noite vira uma sessão do dia anterior
  *   e o cronômetro segue ligado, contando do zero a partir da meia-noite.
  * `keepMs` é o que salvar (o dia é o de `startedAt`); `next` é o cronômetro que continua (ou null).
- * Mais de uma meia-noite sem pausa já passa de 20 h e cai em `forgotten`, que é checado antes.
+ * Mais de uma meia-noite sem pausa já passa de 12 h e cai em `forgotten`, que é checado antes.
  */
 export function rollover(t: Timer | null | undefined, now = Date.now()): { kind: "pausada" | "meia-noite"; keepMs: number; startedAt: number; next: Timer | null } | null {
   if (!t) return null;
@@ -62,6 +62,18 @@ export function liveFrom(m: { studying: boolean; paused: boolean; since: string 
   }
   if (m.paused) return new Date(m.updated_at).getTime() >= from ? Number(m.accum_ms || 0) : 0;
   return 0;
+}
+
+/**
+ * Presença de alguém da sala ligada há mais de 12 h sem pausa (esqueceu e não abriu o app, então o
+ * aparelho dela ainda não desligou o cronômetro): para os outros, conta como parado desde as 12 h,
+ * sem somar o trecho sem pausa. Quando ela abrir o app, o próprio cronômetro se desliga (`forgotten`).
+ */
+export function presenceCut<M extends { studying: boolean; paused: boolean; since: string | null; updated_at: string }>(m: M, now = Date.now()): M {
+  if (!m.studying || !m.since) return m;
+  const s = new Date(m.since).getTime();
+  if (!(now - s > MAX_RUN_MS)) return m;
+  return { ...m, studying: false, paused: false, since: null, updated_at: new Date(s + MAX_RUN_MS).toISOString() };
 }
 
 /** Mesinha da sala: abajur aceso estudando; tudo cinza parado há menos de 1 h; some depois disso */
