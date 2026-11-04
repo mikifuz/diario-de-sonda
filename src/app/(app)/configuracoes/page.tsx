@@ -10,6 +10,7 @@ import type { Profile, Skin } from "@/lib/types";
 import { ConfirmButton, I, Icon } from "@/components/ui";
 import { DEMO_FLAG } from "@/lib/demo";
 import { PushSettings } from "@/components/pushSettings";
+import { isUdesc, uniFor } from "@/lib/udesc";
 
 // ordem das chaves estrangeiras: conteúdos apontam para provas
 const ORDER: Table[] = ["subjects", "assessments", "topics", "study_sessions", "events", "routine_blocks", "tasks", "curriculum", "habits", "habit_checks", "exercise_lists"];
@@ -33,6 +34,15 @@ export default function Configuracoes() {
     if (min == null || min < 0 || min > 10) { st.toast("A média mínima deve estar entre 0 e 10."); return; }
     if (goal != null && goal <= 0) { st.toast("A meta semanal precisa ser maior que zero."); return; }
     if (await st.updateProfile({ name: f.name.trim(), course: f.course.trim(), university: f.university.trim(), current_semester: f.current_semester.trim(), default_min_avg: min, weekly_goal_h: goal })) st.toast("Perfil salvo.");
+  };
+
+  // modo UDESC: liga/desliga na hora (grava o campo Universidade)
+  const setUdesc = async (on: boolean) => {
+    const university = uniFor(on, f.university);
+    if (await st.updateProfile({ university })) {
+      up({ university });
+      st.toast(on ? "Modo UDESC ligado." : "Modo UDESC desligado: fluxograma e SIGA saíram do app.");
+    }
   };
 
   const exportData = () => {
@@ -131,6 +141,11 @@ export default function Configuracoes() {
           <label className="f"><span>Meta semanal de estudo (horas)</span><input type="text" inputMode="decimal" value={f.goal} onChange={(e) => up({ goal: e.target.value })} placeholder="Ex.: 20" /></label>
           <div className="full row"><button className="btn pri">Salvar perfil</button></div>
         </form>
+      </section>
+      <section className="panel">
+        <div className="panel-h"><h2>Modo UDESC</h2><span className="lbl">{isUdesc(p) ? "ligado" : "desligado"}</span></div>
+        <label className="check"><input type="checkbox" checked={isUdesc(p)} onChange={(e) => setUdesc(e.target.checked)} />Sou da UDESC</label>
+        <p className="small muted" style={{ margin: "8px 0 0" }}>Ligado: importar aulas do comprovante do SIGA, horários de aula da UDESC prontos na rotina e o Fluxograma de disciplinas (matriz do curso). Desligado: o mesmo painel de estudo, para qualquer universidade, sem essas partes. Nada é apagado ao desligar: a grade do curso volta igual se você ligar de novo.</p>
       </section>
       <PushSettings />
       <section className="panel">

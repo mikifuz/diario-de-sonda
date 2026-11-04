@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { activeSubjects, useStore } from "@/lib/store";
+import { activeSubjects, useStore, useUdesc } from "@/lib/store";
 import { daysBetween, fmtMin, gradeCalc, nf, stats, todayKey } from "@/lib/calc";
 import { Dot, Empty, I, Icon, Tabs } from "@/components/ui";
 import { SubjectModal } from "@/components/modals";
@@ -18,8 +18,11 @@ export default function DisciplinasPage() {
 function Disciplinas() {
   const params = useSearchParams();
   const router = useRouter();
+  const udesc = useUdesc();
   const [aba, setAba] = useState<Aba>(params.get("aba") === "fluxograma" ? "fluxograma" : "lista");
   const go = (a: Aba) => { setAba(a); router.replace(a === "fluxograma" ? "/disciplinas?aba=fluxograma" : "/disciplinas", { scroll: false }); };
+  // fluxograma é a matriz da UDESC: sem o modo UDESC, só a lista
+  if (!udesc) return <SubjectList />;
   return (
     <>
       <Tabs value={aba} onChange={go} label="Seções" options={[["lista", "Minhas disciplinas"], ["fluxograma", "Fluxograma de disciplinas"]]} />
@@ -30,6 +33,7 @@ function Disciplinas() {
 
 function SubjectList() {
   const st = useStore();
+  const udesc = useUdesc();
   const router = useRouter();
   const [arch, setArch] = useState<"0" | "1">("0");
   const [modal, setModal] = useState(false);
@@ -69,7 +73,7 @@ function SubjectList() {
           <p className="small muted" style={{ margin: "10px 0 0" }}>Clique numa disciplina para lançar notas, ver conteúdos e sessões. &quot;Média atual&quot; considera só as notas oficiais já lançadas.</p>
         </section>
       ) : arch === "1" ? <Empty title="Nenhuma disciplina arquivada" /> : (
-        <Empty title="Nenhuma disciplina cadastrada">Comece pelas matérias deste semestre (ou importe do comprovante do SIGA em Calendário → Rotina semanal). Os conteúdos de cada uma podem ser adicionados depois.<button className="btn pri sm" onClick={() => setModal(true)}><Icon d={I.plus} s={14} />Nova disciplina</button></Empty>
+        <Empty title="Nenhuma disciplina cadastrada">Comece pelas matérias deste semestre{udesc ? " (ou importe do comprovante do SIGA em Calendário → Rotina semanal)" : ""}. Os conteúdos de cada uma podem ser adicionados depois.<button className="btn pri sm" onClick={() => setModal(true)}><Icon d={I.plus} s={14} />Nova disciplina</button></Empty>
       )}
       {arch === "0" && list.length > 0 && (
         <details className="panel">

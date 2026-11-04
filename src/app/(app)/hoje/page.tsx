@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { agenda, useStore } from "@/lib/store";
+import { agenda, useStore, useUdesc } from "@/lib/store";
 import { addDays, daysBetween, earlyGrades, fmtMin, gradeToSim, keyDate, todayKey, qt } from "@/lib/calc";
 import { dm, fromMin, planDay, skipId, whereNext, type PlanInput, type Task } from "@/lib/plan";
 import { PREF, WD_S } from "@/lib/constants";
@@ -16,6 +16,7 @@ import { WeekPrint } from "@/components/weekPrint";
 import { StartModal, type StartArgs } from "@/components/studyStart";
 import { EventModal } from "@/components/modals";
 import { GettingStarted } from "@/components/onboarding";
+import { UdescAsk } from "@/components/udesc";
 import { dayCards, firstName, greeting, motto, type DayCard } from "@/lib/today";
 import { TripsPanel } from "@/components/trips";
 import { ExamExercises } from "@/components/exercises";
@@ -46,6 +47,7 @@ function Hoje() {
   return (
     <>
       <Greeting />
+      <UdescAsk />
       <GettingStarted />
       <Tabs value={tab} onChange={setTab} label="Seções" options={TABS} />
       {tab === "plano" && <PlanTab open={setModal} goRoutine={() => router.push("/calendario#rotina")} goExams={() => setTab("provas")} />}
@@ -246,6 +248,7 @@ function MissingCard({ pl, today, goRoutine, goExams }: { pl: ExamPlan; today: s
 
 function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => void; goExams: () => void }) {
   const st = useStore();
+  const udesc = useUdesc();
   const { plans, today, nowMin } = useReverse();
   const [skip, discard, discarded, restore] = useSkipped(today);
   const input: PlanInput = {
@@ -288,7 +291,7 @@ function PlanTab({ open, goRoutine, goExams }: { open: Open; goRoutine: () => vo
       {!plan.hasStudyBlocks && (
         <div className="callout info stack" style={{ gap: 8 }}>
           <span><b>Monte sua rotina para o plano funcionar.</b> Cadastre seus horários de aula e os blocos em que você costuma estudar. O plano encaixa o estudo das provas e das aulas nesses blocos, sem inventar horários.</span>
-          <span className="row"><button className="btn sm pri" onClick={goRoutine}>Montar minha rotina</button><button className="btn sm" onClick={() => open({ k: "siga" })}>Importar aulas do SIGA (PDF)</button></span>
+          <span className="row"><button className="btn sm pri" onClick={goRoutine}>Montar minha rotina</button>{udesc && <button className="btn sm" onClick={() => open({ k: "siga" })}>Importar aulas do SIGA (PDF)</button>}</span>
         </div>
       )}
       {easyReminders(today, st.subjects, st.assessments).map((r) => (
