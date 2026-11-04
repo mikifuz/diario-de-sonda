@@ -1,7 +1,7 @@
 "use client";
 // Formulário do bloco da rotina semanal.
 import { useState, type FormEvent } from "react";
-import { activeSubjects, useStore } from "@/lib/store";
+import { activeSubjects, useStore, useUdesc } from "@/lib/store";
 import { qt } from "@/lib/calc";
 import { slotRanges, toMin } from "@/lib/plan";
 import { BLOCK, CLASS_SLOTS, COLORS, WD_S } from "@/lib/constants";
@@ -12,6 +12,8 @@ import { ConfirmButton, I, Icon, Modal } from "./ui";
 const NEW = "__nova";
 export function BlockModal({ id, weekday, onClose }: { id: string | null; weekday?: number; onClose: () => void }) {
   const st = useStore();
+  // horários de aula pré-definidos são os da UDESC: sem o modo UDESC, só "início e fim"
+  const udesc = useUdesc();
   const orig = id ? st.blocks.find((b) => b.id === id) : null;
   const list = activeSubjects(st.subjects);
   const [days, setDays] = useState<number[]>(orig ? [orig.weekday] : [weekday ?? 1]);
@@ -21,6 +23,7 @@ export function BlockModal({ id, weekday, onClose }: { id: string | null; weekda
   }));
   // horários pré-definidos marcados; vazio = horário personalizado (campos de início e fim)
   const [slots, setSlots] = useState<number[]>(() => {
+    if (!udesc) return [];
     if (!orig) return [0];
     const i = CLASS_SLOTS.findIndex((x) => x.start === orig.start_time);
     const j = CLASS_SLOTS.findIndex((x) => x.end === orig.end_time);
@@ -81,7 +84,7 @@ export function BlockModal({ id, weekday, onClose }: { id: string | null; weekda
               <span className="small">Criada com a média mínima padrão ({String(st.profile?.default_min_avg ?? 7).replace(".", ",")}); o resto você completa depois em Disciplinas.</span></label>
           )}
         </div>
-        {isClass && (
+        {isClass && udesc && (
           <div className="qblock"><span className="q">Horário {orig ? "" : "(pode marcar vários)"}</span>
             <div className="seg">
               {CLASS_SLOTS.map((x, i) => (

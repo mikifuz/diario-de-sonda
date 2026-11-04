@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { activeSubjects, useStore } from "@/lib/store";
+import { activeSubjects, useStore, useUdesc } from "@/lib/store";
 import { fmtMin, nf, qt } from "@/lib/calc";
 import { toMin, weekCapacity } from "@/lib/plan";
 import { BLOCK, PREF, WEEKDAYS } from "@/lib/constants";
@@ -12,6 +12,7 @@ import { ImportSigaModal } from "@/components/importSiga";
 /** Semana típica (blocos da rotina), embaixo do calendário */
 export function WeekRoutine({ title = "Semana típica", onBlock, onSiga, children }: { title?: string; onBlock: (id: string | null, weekday?: number) => void; onSiga: () => void; children?: React.ReactNode }) {
   const st = useStore();
+  const udesc = useUdesc();
   const p = st.profile!;
   const cap = weekCapacity(st.blocks);
   const total = cap.reduce((a, b) => a + b, 0);
@@ -22,7 +23,7 @@ export function WeekRoutine({ title = "Semana típica", onBlock, onSiga, childre
   const noClasses = activeSubjects(st.subjects).filter((s) => s.schedule && !st.blocks.some((b) => b.kind === "aula" && b.subject_id === s.id));
   return (
     <section className="panel">
-      <div className="panel-h"><h2>{title}</h2><span className="row" style={{ gap: 6 }}><button className="btn sm" onClick={onSiga}>Importar aulas do SIGA (PDF)</button><button className="btn sm pri" onClick={() => onBlock(null)}><Icon d={I.plus} s={14} />Adicionar bloco</button></span></div>
+      <div className="panel-h"><h2>{title}</h2><span className="row" style={{ gap: 6 }}>{udesc && <button className="btn sm" onClick={onSiga}>Importar aulas do SIGA (PDF)</button>}<button className="btn sm pri" onClick={() => onBlock(null)}><Icon d={I.plus} s={14} />Adicionar bloco</button></span></div>
       {children}
       <div className="week">
         {[1, 2, 3, 4, 5, 6, 0].map((d) => {
@@ -55,8 +56,10 @@ export function WeekRoutine({ title = "Semana típica", onBlock, onSiga, childre
 
 /** Rotina semanal completa (grade + preferências do plano), embaixo do calendário.
  *  id="rotina" para os links /calendario#rotina; ?abrir=siga já abre a importação do SIGA. */
-export function RoutineSection({ openSiga = false }: { openSiga?: boolean }) {
+export function RoutineSection({ openSiga: askSiga = false }: { openSiga?: boolean }) {
   const st = useStore();
+  const udesc = useUdesc();
+  const openSiga = askSiga && udesc;
   const p = st.profile!;
   const [modal, setModal] = useState<null | { k: "block"; id: string | null; weekday?: number } | { k: "siga" }>(openSiga ? { k: "siga" } : null);
   useEffect(() => {

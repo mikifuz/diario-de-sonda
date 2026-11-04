@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { sb, friendlyError } from "./supabase";
 import type { DemoData } from "./demo";
 import { autoStop, forgotten, rollover } from "./timer";
+import { isUdesc } from "./udesc";
 import type { Assessment, CalEvent, Profile, RoutineBlock, Session, Social, Subject, Timer, Todo, Topic, AppNotification, Course, Habit, HabitCheck, ExerciseList } from "./types";
 
 export type Table = "subjects" | "topics" | "study_sessions" | "assessments" | "events" | "routine_blocks" | "tasks" | "notifications" | "curriculum" | "habits" | "habit_checks" | "exercise_lists";
@@ -52,6 +53,10 @@ export function useStore() {
   const s = useContext(Ctx);
   if (!s) throw new Error("useStore fora do DataProvider");
   return s;
+}
+/** modo UDESC ligado? (campo Universidade do perfil; ver src/lib/udesc.ts) */
+export function useUdesc() {
+  return isUdesc(useStore().profile);
 }
 
 export const timerMs = (t: Timer | null | undefined, now = Date.now()) => (t ? (t.accum || 0) + (t.running ? now - t.since : 0) : 0);

@@ -1,26 +1,35 @@
 "use client";
-// Guia de primeiros passos (ordem combinada com o dono): SIGA → cronograma e notas → rotina de estudo → estudar.
+// Guia de primeiros passos (ordem combinada com o dono): SIGA (ou aulas à mão, sem o modo UDESC) → cronograma e notas → rotina de estudo → estudar.
 // Cada passo se marca sozinho pelos dados; nada é gravado além de "esconder o guia" neste aparelho.
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { activeSubjects, useStore } from "@/lib/store";
+import { activeSubjects, useStore, useUdesc } from "@/lib/store";
 import { I, Icon } from "./ui";
 
 interface Step { title: string; text: string; done: boolean; doneText?: string; action?: { label: string; href: string }; extra?: { label: string; href: string } }
 
 export function useGuide() {
   const st = useStore();
+  const udesc = useUdesc();
   const subs = activeSubjects(st.subjects);
   const withPlan = subs.filter((s) => st.topics.some((t) => t.subject_id === s.id) && st.assessments.some((a) => a.subject_id === s.id));
   const pending = subs.find((s) => !withPlan.includes(s));
   const steps: Step[] = [
-    {
+    udesc ? {
       title: "Importe suas aulas do SIGA",
       text: "No SIGA, baixe o Comprovante de matrícula (PDF) e envie aqui: o app cria suas disciplinas e coloca os horários de aula na rotina. O arquivo não sai do seu aparelho.",
       done: st.blocks.some((b) => b.kind === "aula"),
       doneText: "Aulas na rotina.",
       action: { label: "Importar do SIGA", href: "/calendario?abrir=siga#rotina" },
       extra: subs.length ? undefined : { label: "Prefiro cadastrar as disciplinas à mão", href: "/disciplinas" },
+    } : {
+      // sem o modo UDESC não há SIGA: as aulas entram à mão na rotina (o bloco de aula cria a disciplina na hora)
+      title: "Coloque suas aulas na rotina",
+      text: "Na Rotina semanal, adicione um bloco de aula para cada horário (dá para criar a disciplina ali mesmo). Assim o app sabe quando cada matéria tem aula.",
+      done: st.blocks.some((b) => b.kind === "aula"),
+      doneText: "Aulas na rotina.",
+      action: { label: "Cadastrar minhas aulas", href: "/calendario#rotina" },
+      extra: subs.length ? undefined : { label: "Prefiro cadastrar as disciplinas primeiro", href: "/disciplinas" },
     },
     {
       title: "Envie o cronograma de cada disciplina",
