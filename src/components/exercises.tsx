@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { qt, todayKey } from "@/lib/calc";
-import { examProgress, itemsOf, labelsOf, listStats, MAX_ITEMS, MAX_PARTS, plainQuestions, questionsOf, type Question } from "@/lib/exercises";
+import { byChapter, examProgress, itemsOf, labelsOf, listStats, MAX_ITEMS, MAX_PARTS, nextQuestionN, plainQuestions, questionsOf, type Question } from "@/lib/exercises";
 import type { Assessment, ExerciseKind, ExerciseList } from "@/lib/types";
 import { ConfirmButton, I, Icon, Modal, Seg } from "./ui";
 
@@ -96,6 +96,12 @@ function ListModal({ list, onClose }: { list: ExerciseList; onClose: () => void 
     if (await st.save("exercise_lists", { ...list, name: edit.name.trim().slice(0, 120), kind: edit.kind, items, done })) setEdit(null);
   };
 
+  const chapters = byChapter(list.items);
+  const square = (it: string, label: string) => (
+    <button key={it} className={"ex-sq" + (list.done[it] ? " on" : "")} aria-pressed={!!list.done[it]} aria-label={it} onClick={() => toggle(it)}
+      title={`${it}: ` + (list.done[it] ? `feito em ${list.done[it].split("-").reverse().slice(0, 2).join("/")}. Tocar desmarca.` : "tocar marca como feito hoje")}>{label}</button>
+  );
+
   if (edit) {
     return (
       <Modal title="Editar lista" sub={list.name} onClose={() => setEdit(null)}>
@@ -109,16 +115,20 @@ function ListModal({ list, onClose }: { list: ExerciseList; onClose: () => void 
   }
   return (
     <Modal title={list.name} sub={`${s.done} de ${s.total} · ${s.left ? (s.next ? `próxima: ${s.next}` : "") : "completa"}`} onClose={onClose}>
-      <div className="ex-grid">
-        {questionsOf(list.items).map((q) => (
-          <span key={q.n} className="ex-q">
-            {labelsOf(q).map((it) => (
-              <button key={it} className={"ex-sq" + (list.done[it] ? " on" : "")} aria-pressed={!!list.done[it]} onClick={() => toggle(it)}
-                title={list.done[it] ? `Feito em ${list.done[it].split("-").reverse().slice(0, 2).join("/")}. Tocar desmarca.` : "Tocar marca como feito hoje"}>{it}</button>
-            ))}
-          </span>
-        ))}
-      </div>
+      {chapters ? (
+        <div className="ex-chs">
+          {chapters.map((g) => (
+            <div key={g.ch}>
+              <div className="small muted" style={{ marginBottom: 4 }}>Capítulo {g.ch} · {g.items.filter((it) => list.done[it]).length}/{g.items.length}</div>
+              <span className="ex-q">{g.items.map((it) => square(it, it.slice(g.ch.length + 1)))}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="ex-grid">
+          {questionsOf(list.items).map((q) => <span key={q.n} className="ex-q">{labelsOf(q).map((it) => square(it, it))}</span>)}
+        </div>
+      )}
       <p className="small muted" style={{ margin: "10px 0 0" }}>Toque no exercício quando terminar. O app guarda o dia para medir o seu ritmo até a prova.</p>
       <div className="row" style={{ justifyContent: "space-between", gap: 8, marginTop: 12 }}>
         <ConfirmButton small label={<><Icon d={I.trash} s={14} />Excluir lista</>} question="Excluir a lista e o que foi marcado?" confirmLabel="Excluir"
@@ -138,7 +148,6 @@ interface Draft { name: string; kind: ExerciseKind; qs: Question[]; note?: strin
 function DraftEditor({ d, onChange }: { d: Draft; onChange: (x: Partial<Draft>) => void }) {
   const total = itemsOf(d.qs).length;
   const setParts = (i: number, parts: number) => onChange({ qs: d.qs.map((q, k) => (k === i ? { ...q, parts: Math.max(1, Math.min(MAX_PARTS, parts)) } : q)) });
-  const nextN = () => String(Math.max(0, ...d.qs.map((q) => Number(q.n) || 0)) + 1);
   return (
     <div>
       <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -162,7 +171,7 @@ function DraftEditor({ d, onChange }: { d: Draft; onChange: (x: Partial<Draft>) 
         ))}
       </div>
       <div className="row" style={{ gap: 6, marginTop: 8 }}>
-        <button type="button" className="btn sm ghost" onClick={() => total < MAX_ITEMS && onChange({ qs: [...d.qs, { n: nextN(), parts: 1 }] })}><Icon d={I.plus} s={13} />Questão</button>
+        <button type="button" className="btn sm ghost" onClick={() => total < MAX_ITEMS && onChange({ qs: [...d.qs, { n: nextQuestionN(d.qs), parts: 1 }] })}><Icon d={I.plus} s={13} />Questão</button>
         {d.qs.length > 1 && <button type="button" className="btn sm ghost" onClick={() => onChange({ qs: d.qs.slice(0, -1) })}>Tirar a última</button>}
       </div>
     </div>
@@ -188,7 +197,8 @@ function AddListsModal({ exam, after, onClose }: { exam: Assessment; after: numb
         if (!f.name.toLowerCase().endsWith(".pdf")) { out.push({ name: f.name, kind: "lista", qs: plainQuestions(10), note: "Só leio PDF. Em Word, use Salvar como PDF; ou acerte o número de questões abaixo." }); continue; }
         try {
           const r = parseListPdf(await pdfItems(f), f.name);
-          out.push(r.questions.length ? { name: r.name, kind: "lista", qs: r.questions }
+          out.push(r.book ? { name: r.name, kind: "livro", qs: r.questions, note: "Exercícios do livro por capítulo: 18.1 é o exercício 1 do capítulo 18. Confira se veio tudo." }
+            : r.questions.length ? { name: r.name, kind: "lista", qs: r.questions }
             : { name: r.name, kind: "lista", qs: plainQuestions(10), note: "Não achei as questões neste PDF (pode ser foto ou digitalização). Coloquei 10: acerte o número abaixo." });
         } catch {
           out.push({ name: f.name, kind: "lista", qs: plainQuestions(10), note: "Não consegui abrir este PDF. Coloquei 10 questões: acerte o número abaixo." });
