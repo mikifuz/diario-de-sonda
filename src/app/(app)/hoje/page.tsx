@@ -20,6 +20,7 @@ import { UdescAsk } from "@/components/udesc";
 import { dayCards, firstName, greeting, motto, type DayCard } from "@/lib/today";
 import { TripsPanel } from "@/components/trips";
 import { ExamExercises } from "@/components/exercises";
+import { SubPrepBox, SubPrepPanels } from "@/components/subPrep";
 
 type Tab = "plano" | "provas";
 const TABS: [Tab, string][] = [["plano", "Plano do dia"], ["provas", "Provas"]];
@@ -378,7 +379,7 @@ function EarlyGrades({ today }: { today: string }) {
 function ExamsTab({ open, goRoutine }: { open: Open; goRoutine: () => void }) {
   const st = useStore();
   const { plans, today } = useReverse();
-  const early = <EarlyGrades today={today} />;
+  const early = <><EarlyGrades today={today} /><SubPrepPanels planned={new Set(plans.map((pl) => pl.exam.id))} /></>;
   if (!plans.length) return <>{early}<Empty title="Nenhuma prova nos próximos 30 dias">Cadastre as provas com data (ou importe o cronograma na disciplina) para o app montar o plano até cada uma.</Empty></>;
   return (
     <>
@@ -392,8 +393,9 @@ function ExamsTab({ open, goRoutine }: { open: Open; goRoutine: () => void }) {
               <h2><Dot c={pl.subject.color} /> {pl.exam.name} · {pl.subject.name}</h2>
               <span className={"chip " + (pl.missing ? "bad" : pl.days <= 7 ? "warn" : "")}>{dm(pl.exam.date!)} · em {qt(pl.days, "dia", "dias")}</span>
             </div>
+            {pl.sub && <SubPrepBox sub={pl.exam} note={pl.notes.find((n) => n.startsWith("Acompanhamento para a SUB"))} />}
             {pl.missing > 0 && <div style={{ marginBottom: 8 }}><MissingCard pl={pl} today={today} goRoutine={goRoutine} /></div>}
-            {pl.notes.filter((n) => !(pl.missing > 0 && n.startsWith("Faltam"))).map((n) => <div key={n} className={"callout small" + (n.startsWith("Conteúdos que ainda") ? " info" : "")} style={{ marginBottom: 8 }}>{n}</div>)}
+            {pl.notes.filter((n) => !(pl.missing > 0 && n.startsWith("Faltam")) && !n.startsWith("Acompanhamento para a SUB")).map((n) => <div key={n} className={"callout small" + (n.startsWith("Conteúdos que ainda") ? " info" : "")} style={{ marginBottom: 8 }}>{n}</div>)}
             <ExamExercises exam={pl.exam} />
             {pl.topics.length > 0 && (
               <div className="tbl-wrap"><table>
@@ -429,6 +431,7 @@ function ExamsTab({ open, goRoutine }: { open: Open; goRoutine: () => void }) {
           <li>Meta de estudo por conteúdo: {TARGET / 60} h, ajustadas pela dificuldade da matéria para você (fácil ×0,8; difícil ×1,5; muito difícil ×2). Desconta o que você já estudou do conteúdo nas últimas semanas.</li>
           <li>O tempo vem dos seus blocos de estudo (e dos &quot;Estudo planejado&quot; do calendário), deixando {Math.round(RESERVE * 100)}% de cada dia para as aulas. A prova mais próxima usa o tempo primeiro; dentro de cada prova, o que você estudou menos vem antes. Day off e viagem não têm estudo.</li>
           <li>Pedaços de até 45 min, no máximo um por conteúdo por dia (estudo espaçado rende mais que maratona). Conteúdo ainda não dado só entra a partir da aula.</li>
+          <li>A SUB só entra quando você pede o acompanhamento para a SUB (depois de uma nota abaixo da média): entram os conteúdos da prova que ela substitui, contando só o estudo feito depois dessa prova, a partir de 60 dias antes.</li>
           <li>Na véspera: {FINAL_MIN} min de revisão geral (resumo e prova antiga), sem conteúdo novo.</li>
           <li>Nada fica gravado: conforme você registra sessões, o que falta diminui e o plano se refaz. Se não couber tudo, o app mostra horários livres para estudar a mais.</li>
         </ol>

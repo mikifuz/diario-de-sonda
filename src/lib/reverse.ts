@@ -4,6 +4,7 @@
 import { addDays, daysBetween, dkey } from "./calc";
 import { effortOf, isTrivial, scaleMin } from "./effort";
 import { dayOff, dm, extraStudy, freeStudy, freeWindows, toMin, topicsForExam, tripOn, type FreeWindow, type Task } from "./plan";
+import { subSince, SUB_HORIZON, trackedSubs } from "./subPrep";
 import type { Assessment, CalEvent, RoutineBlock, Session, Subject, Topic } from "./types";
 
 /** Minutos de estudo que cada conteúdo deve receber antes da prova (antes da dificuldade da matéria) */
@@ -40,6 +41,8 @@ export interface ExamPlan {
   /** quando falta tempo: horários livres (sem nada na rotina nem no calendário) para estudar a mais */
   suggest: FreeWindow[];
   notes: string[];
+  /** acompanhamento para a SUB (a SUB só entra no plano quando a pessoa pede) */
+  sub?: boolean;
 }
 
 const r5 = (n: number) => Math.max(0, Math.round(n / 5) * 5);
@@ -88,8 +91,11 @@ export function calendarExams(events: CalEvent[], assessments: Assessment[]): As
 export function reversePlan(p0: RevInput): ExamPlan[] {
   const p = { ...p0, assessments: [...p0.assessments, ...calendarExams(p0.events, p0.assessments)] };
   const active = new Map(p.subjects.filter((s) => !s.archived).map((s) => [s.id, s]));
+  // SUB só com acompanhamento (a pessoa aceitou se preparar depois de uma nota baixa), com horizonte maior
+  const tracked = trackedSubs(p.assessments);
   const exams = p.assessments
-    .filter((a) => a.kind === "prova" && active.has(a.subject_id) && !isTrivial(active.get(a.subject_id)) && a.grade == null && a.status !== "cancelado" && a.date && a.date > p.today && daysBetween(p.today, a.date) <= HORIZON)
+    .filter((a) => (a.kind === "prova" || (a.kind === "sub" && tracked.has(a.id))) && active.has(a.subject_id) && !isTrivial(active.get(a.subject_id)) && a.grade == null && a.status !== "cancelado" && a.date && a.date > p.today
+      && daysBetween(p.today, a.date) <= (a.kind === "sub" ? SUB_HORIZON : HORIZON))
     .sort((a, b) => a.date!.localeCompare(b.date!) || Number(b.weight) - Number(a.weight));
   // capacidade de cada dia (minutos de estudo livres, menos a reserva). Sem nenhum bloco de estudo na rotina,
   // supõe 2 h por dia (menos viagem e dia indisponível): antes, sem blocos, nenhuma prova recebia estudo.
@@ -113,11 +119,22 @@ export function reversePlan(p0: RevInput): ExamPlan[] {
     const subject = active.get(exam.subject_id)!;
     const days = daysBetween(p.today, exam.date!);
     const eve = addDays(exam.date!, -1);
-    const from = addDays(exam.date!, -45);
+    const isSub = exam.kind === "sub";
+    // SUB: o que foi estudado antes da prova que ela substitui não conta (é para estudar de novo)
+    const since = isSub ? subSince(exam, p.assessments, p.today) : null;
+    const from = since && addDays(since, 1) > addDays(exam.date!, -45) ? addDays(since, 1) : addDays(exam.date!, -45);
     const notes: string[] = noBlocks ? [NO_BLOCKS_NOTE] : [];
+    if (isSub) {
+      const cov = p.assessments.filter((a) => a.kind === "prova" && a.sub_id === exam.id && a.grade != null).map((a) => a.name);
+      notes.push(`Acompanhamento para a SUB: entram os conteúdos ${cov.length ? `da ${cov.join(" e da ")}` : "das provas que ela substitui"}${since ? `, e só conta o estudo depois de ${dm(since)}` : ""}.`);
+    }
     const eff = effortOf(subject);
     if (eff.why) notes.push(eff.why);
-    const topics: TopicNeed[] = examTopics(exam, p.topics, p.assessments, p.today).map((t) => {
+    // SUB: só os conteúdos das provas já feitas que ela substitui (não os das provas que ainda vão acontecer, que têm plano próprio)
+    const sat = isSub ? p.assessments.filter((a) => a.kind === "prova" && a.sub_id === exam.id && a.grade != null) : [];
+    const list = isSub ? [...new Map(sat.flatMap((a) => examTopics(a, p.topics, p.assessments, p.today)).map((t) => [t.id, t])).values()]
+      : examTopics(exam, p.topics, p.assessments, p.today);
+    const topics: TopicNeed[] = list.map((t) => {
       const target = scaleMin(TARGET, eff.factor);
       const done = p.sessions.filter((s) => s.topic_id === t.id && dkey(s.started_at) >= from && dkey(s.started_at) <= p.today).reduce((a, s) => a + s.duration_min, 0);
       // conteúdo ainda não dado: só entra a partir da aula
@@ -182,7 +199,7 @@ export function reversePlan(p0: RevInput): ExamPlan[] {
     const suggest = missing > 0 ? suggestWindows(p, eve, missing, suggested) : [];
     if (missing > 0 && (topics.length || whole)) notes.push(`Faltam ${missing} min de estudo antes da ${exam.name}: não couberam nos seus horários de estudo até ${dm(eve)} (depois das provas anteriores e de ${Math.round(RESERVE * 100)}% reservado para as aulas).`);
     if (topics.some((t) => t.available)) notes.push("Conteúdos que ainda não foram dados entram no plano a partir da data da aula.");
-    out.push({ exam, subject, days, topics, chunks: chunks.sort((a, b) => a.day.localeCompare(b.day)), missing, priority, suggest, notes });
+    out.push({ exam, subject, days, topics, chunks: chunks.sort((a, b) => a.day.localeCompare(b.day)), missing, priority, suggest, notes, ...(isSub ? { sub: true } : {}) });
   }
   return out;
 }
