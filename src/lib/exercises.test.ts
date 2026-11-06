@@ -1,12 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { examProgress, fixAccents, itemsOf, listStats, nameFromFile, parseListPdf, plainQuestions, questionsOf } from "./exercises";
+import { byChapter, examProgress, fixAccents, itemsOf, listStats, nameFromFile, nextQuestionN, parseBookList, parseListPdf, plainQuestions, questionsOf } from "./exercises";
 import type { PdfItem } from "./siga";
 import type { ExerciseList } from "./types";
 
-// Texto e posições de 4 listas reais de 2026/2 (Cálculo III, Álgebra Linear, Física 1, Programação), sem nome de professor
-const fx: Record<"calculo3" | "algebra" | "fisica" | "programacao", PdfItem[]> = JSON.parse(readFileSync(new URL("./fixtures/listas-exercicios.json", import.meta.url), "utf8"));
+// Texto e posições de 5 listas reais de 2026/2 (Cálculo III, Álgebra Linear, Física 1, Programação e os exercícios sugeridos
+// do Halliday de Física 2, por capítulo), sem nome de professor
+const fx: Record<"calculo3" | "algebra" | "fisica" | "programacao" | "halliday", PdfItem[]> = JSON.parse(readFileSync(new URL("./fixtures/listas-exercicios.json", import.meta.url), "utf8"));
 
 const read = (k: keyof typeof fx) => parseListPdf(fx[k], k + ".pdf");
 const shape = (k: keyof typeof fx) => read(k).questions.map((q) => (q.parts > 1 ? `${q.n}:${q.parts}` : q.n)).join(" ");
@@ -33,6 +34,24 @@ describe("leitura das listas (PDFs reais, sem nomes)", () => {
     assert.deepEqual(r.questions.map((q) => q.n), Array.from({ length: 24 }, (_, k) => String(k + 1)));
     assert.equal(itemsOf(r.questions).length, 24);
   });
+  it("Física 2: exercícios sugeridos do livro por capítulo (\"CAPÍTULO 18\" + \"1, 3, 7…\"), com palavras e números cortados no PDF", () => {
+    const r = parseListPdf(fx.halliday, "Exercicios_sugeridos_-_Temp_Calor_1a_Lei_Transm_Calor_-_Halliday.pdf");
+    assert.equal(r.book, true);
+    assert.equal(r.name, "Exercicios sugeridos - Temp Calor 1a Lei Transm Calor - Halliday");
+    const items = itemsOf(r.questions);
+    assert.equal(items.length, 61); // 25 + 18 + 18
+    assert.deepEqual(items.slice(0, 3), ["18.1", "18.3", "18.7"]);
+    assert.ok(items.includes("18.105") && items.includes("19.43") && items.includes("20.15")); // "19,43" e "1" + "5" no PDF
+    assert.deepEqual(byChapter(items)?.map((g) => [g.ch, g.items.length]), [["18", 25], ["19", 18], ["20", 18]]);
+  });
+  it("livro por capítulo: na mesma linha, intervalos e \"e\"", () => {
+    const L = (s: string, y: number) => ({ p: 1, s, x: 50, y, w: 200 });
+    const qs = parseBookList([L("Cap. 2: 1, 4–6 e 9", 700), L("Capítulo 3", 680), L("Problemas: 10, 12", 660), L("Bons estudos!", 640), L("1, 2, 3", 620)]);
+    assert.deepEqual(qs.map((q) => q.n), ["2.1", "2.4", "2.5", "2.6", "2.9", "3.10", "3.12"]);
+  });
+  it("listas comuns continuam lidas como antes (não viram livro)", () => {
+    for (const k of ["calculo3", "algebra", "fisica", "programacao"] as const) assert.notEqual(read(k).book, true);
+  });
   it("PDF sem texto (foto): nenhuma questão, nome do arquivo", () => {
     assert.deepEqual(parseListPdf([], "Lista_3___Fisica.pdf"), { name: "Lista 3 Fisica", questions: [] });
   });
@@ -44,6 +63,13 @@ describe("rótulos", () => {
     const items = itemsOf(qs);
     assert.deepEqual(items, ["1a", "1b", "1c", "2", "3a", "3b"]);
     assert.deepEqual(questionsOf(items), qs);
+  });
+  it("capítulo.exercício: ida e volta, próxima questão", () => {
+    const qs = [{ n: "18.1", parts: 1 }, { n: "18.3", parts: 2 }];
+    assert.deepEqual(questionsOf(itemsOf(qs)), qs);
+    assert.equal(nextQuestionN(qs), "18.4");
+    assert.equal(nextQuestionN([{ n: "1", parts: 2 }, { n: "12", parts: 1 }]), "13");
+    assert.equal(byChapter(["1", "2"]), null);
   });
   it("livro: quadradinhos de 1 a N", () => {
     assert.deepEqual(itemsOf(plainQuestions(5)), ["1", "2", "3", "4", "5"]);

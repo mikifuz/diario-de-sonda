@@ -7,7 +7,8 @@ import { addDays, daysBetween } from "./calc";
 
 /** Uma questão da lista: número e quantas partes (letras) ela tem; 1 = sem letras */
 export interface Question { n: string; parts: number }
-export interface ParsedList { name: string; questions: Question[] }
+/** `book`: veio de "Capítulo 18: 1, 3, 7…" (exercícios sugeridos do livro); as questões são "18.1", "18.3"… */
+export interface ParsedList { name: string; questions: Question[]; book?: boolean }
 
 /** Máximo de exercícios numa lista (o banco também limita) */
 export const MAX_ITEMS = 400;
@@ -43,10 +44,66 @@ function columnStarts(items: PdfItem[]): number[] {
   return starts.length ? starts : [Math.min(...items.map((i) => i.x))];
 }
 
+/** Linhas do PDF em ordem de leitura; junta os pedaços que o pdf.js corta no meio ("CAPÍTU" + "LO 20", "1" + "5") */
+function textLines(items: PdfItem[]): string[] {
+  const sorted = [...items].sort((a, b) => a.p - b.p || b.y - a.y || a.x - b.x);
+  const out: { p: number; y: number; s: string; end: number }[] = [];
+  for (const i of sorted) {
+    const l = out[out.length - 1];
+    if (l && l.p === i.p && Math.abs(l.y - i.y) <= 2) { l.s += (i.x - l.end > 2 ? " " : "") + i.s; l.end = i.x + i.w; }
+    else out.push({ p: i.p, y: i.y, s: i.s, end: i.x + i.w });
+  }
+  return out.map((l) => fixAccents(l.s).replace(/\s+/g, " ").trim());
+}
+
+const CHAPTER = /^cap(?:[ií]tulo|\.)?\s*(\d{1,3})\b\s*[:.\-–]?\s*(.*)$/i;
+/** Só números, vírgulas, "e" e intervalos ("1, 3, 7", "21–25", "93 e 105"); aceita um rótulo antes ("Problemas: 1, 3") */
+const NUM_LIST = /^(?:[A-Za-zÀ-ú ]{1,24}:\s*)?(\d{1,3}(?:\s*(?:[,;]|\be\b|[-–])\s*\d{1,3})*\s*[,;.]?)$/;
+
+/** Números de "1, 3, 7, 21–25, 93 e 105" (intervalo de até 60) */
+function numbersOf(s: string): number[] {
+  const out: number[] = [];
+  for (const tok of s.split(/[,;]|\be\b/)) {
+    const r = tok.trim().match(/^(\d{1,3})(?:\s*[-–]\s*(\d{1,3}))?$/);
+    if (!r) continue;
+    const a = Number(r[1]), b = r[2] ? Number(r[2]) : a;
+    if (b >= a && b - a <= 60) for (let n = a; n <= b; n++) out.push(n);
+  }
+  return out;
+}
+
+/** Exercícios sugeridos do livro: "CAPÍTULO 18" seguido de "1, 3, 7, 13…" (ou na mesma linha). Vira "18.1", "18.3"… */
+export function parseBookList(items: PdfItem[]): Question[] {
+  const out: Question[] = [];
+  const seen = new Set<string>();
+  let ch: string | null = null;
+  const add = (s: string) => {
+    for (const n of numbersOf(s)) {
+      const id = `${ch}.${n}`;
+      if (!seen.has(id)) { seen.add(id); out.push({ n: id, parts: 1 }); }
+    }
+  };
+  for (const line of textLines(items)) {
+    const c = line.match(CHAPTER);
+    if (c) { ch = String(Number(c[1])); if (NUM_LIST.test(c[2])) add(c[2].replace(/^[^:]*:/, "")); continue; }
+    if (!ch) continue;
+    const m = /^\d{1,3}\s*[.)]$/.test(line) ? null : line.match(NUM_LIST); // "2." sozinho é questão numerada, não lista
+    if (m) add(m[1]); else ch = null; // texto que não é lista de números: acabou o capítulo
+  }
+  return out.slice(0, MAX_ITEMS);
+}
+
 /** Lê os itens de texto do PDF (pdf.js) e devolve o nome da lista e as questões com as letras */
 export function parseListPdf(items: PdfItem[], fileName = ""): ParsedList {
   const all = items.filter((i) => i.s.trim());
   if (!all.length) return { name: nameFromFile(fileName), questions: [] };
+  const book = parseBookList(all);
+  const list = parseNumbered(all, fileName);
+  return book.length >= 3 && book.length > itemsOf(list.questions).length ? { name: list.name, questions: book, book: true } : list;
+}
+
+/** Lista com as questões numeradas ("Questão 1", "1.", "1)") e as letras de cada uma */
+function parseNumbered(all: PdfItem[], fileName: string): ParsedList {
   const starts = columnStarts(all);
   const colOf = (x: number) => { let c = 0; starts.forEach((s, k) => { if (x >= s - 10) c = k; }); return c; };
   const ordered = all.map((i) => ({ ...i, c: colOf(i.x) }))
@@ -107,11 +164,31 @@ export const itemsOf = (qs: Question[]) => qs.flatMap(labelsOf).slice(0, MAX_ITE
 export function questionsOf(items: string[]): Question[] {
   const out: Question[] = [];
   for (const it of items) {
-    const m = it.match(/^(\d+)([a-z])$/);
+    const m = it.match(/^(\d+(?:\.\d+)?)([a-z])$/);
     const n = m ? m[1] : it;
     const last = out[out.length - 1];
     if (m && last?.n === n) last.parts++;
     else out.push({ n, parts: 1 });
+  }
+  return out;
+}
+
+/** Número da próxima questão: depois de "12" vem "13"; depois de "18.105" (capítulo.exercício), "18.106" */
+export function nextQuestionN(qs: Question[]): string {
+  const last = qs[qs.length - 1]?.n ?? "";
+  const m = last.match(/^(\d+)\.(\d+)$/);
+  if (m) return `${m[1]}.${Number(m[2]) + 1}`;
+  return String(Math.max(0, ...qs.map((q) => (/^\d+$/.test(q.n) ? Number(q.n) : 0))) + 1);
+}
+
+/** Exercícios do livro por capítulo ("18.1", "18.3", "19.3"): agrupa por capítulo para mostrar só o número */
+export function byChapter(items: string[]): { ch: string; items: string[] }[] | null {
+  if (!items.length || !items.every((it) => /^\d+\.\d+[a-z]?$/.test(it))) return null;
+  const out: { ch: string; items: string[] }[] = [];
+  for (const it of items) {
+    const ch = it.split(".")[0];
+    const g = out[out.length - 1];
+    if (g?.ch === ch) g.items.push(it); else out.push({ ch, items: [it] });
   }
   return out;
 }
