@@ -9,6 +9,7 @@ import { fmtClock } from "@/lib/calc";
 import { Brand } from "./Brand";
 import { Icon, useNow } from "./ui";
 import { ExamCheckHost } from "./examCheck";
+import { SubPrepHost } from "./subPrep";
 import { useWeeklyReport } from "./notifications";
 import { DEMO_FLAG } from "@/lib/demo";
 
@@ -89,6 +90,7 @@ export function Shell({ children }: { children: ReactNode }) {
         ))}
       </nav>
       <ExamCheckHost />
+      <SubPrepHost />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { convertLegacy, isLegacyExport } from "@/lib/legacy";
 import type { Profile, Skin } from "@/lib/types";
 import { ConfirmButton, I, Icon } from "@/components/ui";
 import { DEMO_FLAG } from "@/lib/demo";
+import { SubAskSetting } from "@/components/subPrep";
 import { PushSettings } from "@/components/pushSettings";
 import { isUdesc, uniFor } from "@/lib/udesc";
 
@@ -147,6 +148,7 @@ export default function Configuracoes() {
         <label className="check"><input type="checkbox" checked={isUdesc(p)} onChange={(e) => setUdesc(e.target.checked)} />Sou da UDESC</label>
         <p className="small muted" style={{ margin: "8px 0 0" }}>Ligado: importar aulas do comprovante do SIGA, horários de aula da UDESC prontos na rotina e o Fluxograma de disciplinas (matriz do curso). Desligado: o mesmo painel de estudo, para qualquer universidade, sem essas partes. Nada é apagado ao desligar: a grade do curso volta igual se você ligar de novo.</p>
       </section>
+      <SubAskSetting />
       <PushSettings />
       <section className="panel">
         <div className="panel-h"><h2>Seus dados</h2><span className="lbl">{st.subjects.length} disciplinas, {st.sessions.length} sessões, {st.assessments.length + st.events.length} itens de calendário</span></div>

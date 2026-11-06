@@ -62,12 +62,12 @@ export function useUdesc() {
 export const timerMs = (t: Timer | null | undefined, now = Date.now()) => (t ? (t.accum || 0) + (t.running ? now - t.since : 0) : 0);
 const normTime = <T extends { time: string | null }>(r: T): T => ({ ...r, time: r.time ? r.time.slice(0, 5) : null });
 const normBlock = (r: RoutineBlock): RoutineBlock => ({ ...r, start_time: r.start_time.slice(0, 5), end_time: r.end_time.slice(0, 5) });
-const PROFILE_COLS = "id,name,course,university,current_semester,default_min_avg,weekly_goal_h,skin,timer,study_pref,skipped";
+const PROFILE_COLS = "id,name,course,university,current_semester,default_min_avg,weekly_goal_h,skin,timer,study_pref,skipped,sub_ask";
 const COLS: Record<Table, string> = {
   subjects: "id,name,code,professor,semester,credits,hours,color,min_avg,schedule,notes,traits,exam_enabled,exam_w_avg,exam_w_exam,exam_min_final,exam_min_take,archived,study_pref,recovery,sub_replace_lower",
   topics: "id,subject_id,parent_id,name,position,taught_on,assessment_id",
   study_sessions: "id,subject_id,topic_id,activity,started_at,duration_min,notes",
-  assessments: "id,subject_id,name,kind,date,time,weight,grade,predicted,sim_c,sim_e,sim_o,priority,status,description,sub_id,felt",
+  assessments: "id,subject_id,name,kind,date,time,weight,grade,predicted,sim_c,sim_e,sim_o,priority,status,description,sub_id,felt,sub_prep",
   events: "id,subject_id,title,type,date,end_date,time,end_time,priority,status,description",
   routine_blocks: "id,weekday,start_time,end_time,kind,subject_id,label",
   tasks: "id,title,subject_id,due,done,done_at",
@@ -89,16 +89,19 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
   const fetchTable = useCallback(async (t: Table | "profiles") => {
     const db = sb();
     if (t === "profiles") {
-      let { data: p, error } = await db.from("profiles").select(PROFILE_COLS).eq("id", uid).maybeSingle();
-      // banco ainda sem a coluna "skipped" (migration da lixeira não rodada): carrega sem ela; a lixeira fica só no aparelho
-      const noSkip = !!error && /skipped/.test(error.message || "");
-      if (noSkip) ({ data: p, error } = await db.from("profiles").select(PROFILE_COLS.replace(",skipped", "")).eq("id", uid).maybeSingle());
+      // banco ainda sem as colunas "skipped" (lixeira) ou "sub_ask" (acompanhamento para a SUB): carrega sem elas
+      let cols = PROFILE_COLS;
+      let { data: p, error } = await db.from("profiles").select(cols).eq("id", uid).maybeSingle();
+      for (const c of ["sub_ask", "skipped"]) {
+        if (error && new RegExp(c).test(error.message || "")) { cols = cols.replace("," + c, ""); ({ data: p, error } = await db.from("profiles").select(cols).eq("id", uid).maybeSingle()); }
+      }
+      if (error && /sub_ask|skipped/.test(error.message || "")) { cols = cols.replace(",skipped", "").replace(",sub_ask", ""); ({ data: p, error } = await db.from("profiles").select(cols).eq("id", uid).maybeSingle()); }
       if (error) throw error;
       let prof = p as Profile | null;
       if (!prof) {
-        const ins = await db.from("profiles").upsert({ id: uid }).select(PROFILE_COLS.replace(",skipped", "")).single();
+        const ins = await db.from("profiles").upsert({ id: uid }).select(cols).single();
         if (ins.error) throw ins.error;
-        prof = { ...(ins.data as unknown as Profile), ...(noSkip ? {} : { skipped: {} }) };
+        prof = ins.data as unknown as Profile;
       }
       setData((d) => ({ ...d, profile: prof }));
       return;
@@ -109,7 +112,9 @@ export function DataProvider({ uid, email, children, onToast, demo }: { uid: str
     if (t === "habit_checks") q = q.order("day", { ascending: false }).limit(5000);
     let { data: rows, error } = await q;
     // banco ainda sem a coluna "felt" (migration de "Como foi a prova?" não rodada): carrega sem ela
-    if (error && t === "assessments" && /felt/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",felt", "")));
+    // e sem "sub_prep" (acompanhamento para a SUB): carrega sem ela
+    if (error && t === "assessments" && /sub_prep/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",sub_prep", "")));
+    if (error && t === "assessments" && /felt/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",felt", "").replace(",sub_prep", "")));
     // banco ainda sem as colunas "end_time" (estudo extra) ou "end_date" (viagens): carrega sem elas
     if (error && t === "events" && /end_time/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",end_time", "")));
     if (error && t === "events" && /end_date/.test(error.message || "")) ({ data: rows, error } = await db.from(t).select(COLS[t].replace(",end_date", "").replace(",end_time", "")));

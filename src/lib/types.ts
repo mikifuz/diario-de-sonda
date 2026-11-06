@@ -42,6 +42,8 @@ export interface Profile {
   study_pref: StudyPref;
   /** tarefas de estudo descartadas na lixeira do Plano do dia (`skipId` → dia); ausente se o banco não tem a coluna */
   skipped?: Record<string, string>;
+  /** perguntar "Quer se preparar para a SUB?" ao lançar nota baixa; ausente se o banco não tem a coluna */
+  sub_ask?: boolean;
 }
 
 export interface Traits {
@@ -126,6 +128,8 @@ export interface Assessment {
   sub_id: string | null;
   /** "Como foi a prova?" (1 muito mal … 5 muito bem; 0 = não perguntar). Impressão, não é nota. */
   felt?: number | null;
+  /** prova com nota baixa: 1 = quer se preparar para a SUB (acompanhamento), 0 = não quer; ausente se o banco não tem a coluna */
+  sub_prep?: number | null;
 }
 
 export interface CalEvent {
