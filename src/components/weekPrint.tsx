@@ -77,7 +77,12 @@ export function WeekPrint({ start, onDone }: { start: string; onDone: () => void
               {d < today ? <div className="ps-m">(já passou)</div> : <>
                 {tasks.map((x) => <div key={x.task.key} className="ps-t1"><span className="box" />{fromMin(x.start)} {label(x.task)} <span className="ps-m">({x.task.minutes})</span></div>)}
                 {!tasks.length && <div className="ps-m">{p && p.slots.length ? "Blocos de estudo livres" : "Sem bloco de estudo na rotina"}</div>}
-                {p && p.overflow.length > 0 && <div className="ps-m">+{qt(p.overflow.length, "tarefa não coube", "tarefas não couberam")} ({fmtMin(p.overflow.reduce((a, t) => a + t.minutes, 0))})</div>}
+                {p && p.overflow.length > 0 && (
+                  <div className="ps-over">
+                    <div className="ps-oh">{qt(p.overflow.length, "tarefa não coube", "tarefas não couberam")} ({fmtMin(p.overflow.reduce((a, t) => a + t.minutes, 0))})</div>
+                    {p.overflow.map((t) => <div key={t.key} className="ps-t1"><span className="box" />{label(t)} <span>({t.minutes})</span></div>)}
+                  </div>
+                )}
               </>}
             </div>
           );

@@ -393,6 +393,9 @@ ul.plain{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:co
 .ps-exam{font-weight:700;border:1.3px solid #111;padding:1px 3px;border-radius:2px}
 .ps-cl{color:#444}
 .ps-t1{line-height:1.25}
+.ps-over{margin-top:auto;padding-top:3px;border-top:1px dashed #aaa;color:#888;display:flex;flex-direction:column;gap:2px}
+.ps-oh{font-size:7.5pt;text-transform:uppercase;letter-spacing:.04em}
+.ps-week .ps-over .box{border-color:#aaa}
 .ps-week .box{width:9px;height:9px;margin-right:4px}
 .ps-foot2{display:flex;gap:14px;margin-top:8px;align-items:flex-start}
 .ps-hab{border-collapse:collapse;width:60%;flex:none}
